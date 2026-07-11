@@ -1,0 +1,244 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createRoot } from "react-dom/client";
+import {
+  Cartesian2, Cartesian3, Color, CustomDataSource, EllipsoidTerrainProvider,
+  ImageryLayer, OpenStreetMapImageryProvider, Viewer
+} from "cesium";
+import ms from "milsymbol";
+import { degreesLat, degreesLong, eciToGeodetic, gstime, json2satrec, propagate } from "satellite.js";
+import "cesium/Build/Cesium/Widgets/widgets.css";
+import "./styles.css";
+
+const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+type Side = "Blue" | "Red";
+type Scenario = { id: string; title: string; description: string; version: number; authored_entity_count: number; role_count: number; requires_space_catalog: boolean };
+type Game = { id: string; title: string; status: "lobby" | "running" | "paused"; host_player_id: string; player_roles_available: number };
+type Role = { id: string; name: string; side: Side; command_scope: string[]; authority_echelon: number; held: boolean; ai_controlled: boolean; lease_generation: number };
+type Position = { latitude_deg: number; longitude_deg: number; altitude_m: number };
+type Unit = { id: string; name: string; domain: string; position: Position; sidc: string };
+type Track = { track_id: string; target_side: Side; position: Position; identity_confidence: number; observed_tick: number; received_tick: number; observed_sidc: string };
+type Projection = { tick: number; own_units: Unit[]; tracks: Track[] };
+type SpaceStatus = { setup_auth_required: boolean; remembered_credentials: boolean; configured: boolean; syncing: boolean; usable: boolean; stale: boolean; synced_unix?: number; age_seconds?: number; object_count: number; checksum?: string; error?: string };
+type SpaceSnapshot = { synced_unix: number; checksum: string; objects: Record<string, unknown>[] };
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, { ...init, credentials: "include", headers: { "content-type": "application/json", ...init?.headers } });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({ error: response.statusText }));
+    throw new Error(body.error ?? response.statusText);
+  }
+  return response.json() as Promise<T>;
+}
+
+const symbolCache = new Map<string, HTMLCanvasElement>();
+function symbolCanvas(sidc: string, size = 32) {
+  const key = `${sidc}:${size}`;
+  let canvas = symbolCache.get(key);
+  if (!canvas) {
+    canvas = new ms.Symbol(sidc, { size, frame: true, fill: true }).asCanvas();
+    symbolCache.set(key, canvas);
+  }
+  return canvas;
+}
+
+function Globe({ projection, catalog, showDebris }: { projection: Projection; catalog: SpaceSnapshot | null; showDebris: boolean }) {
+  const host = useRef<HTMLDivElement>(null);
+  const viewerRef = useRef<Viewer | null>(null);
+  const spaceSource = useRef<CustomDataSource | null>(null);
+
+  useEffect(() => {
+    if (!host.current || viewerRef.current) return;
+    const viewer = new Viewer(host.current, {
+      animation: false,
+      baseLayer: new ImageryLayer(new OpenStreetMapImageryProvider({ url: "https://tile.openstreetmap.org/", credit: "OpenStreetMap contributors" })),
+      baseLayerPicker: false, fullscreenButton: false, geocoder: false, homeButton: false,
+      infoBox: false, navigationHelpButton: false, sceneModePicker: false, selectionIndicator: false,
+      terrainProvider: new EllipsoidTerrainProvider(), timeline: false
+    });
+    viewer.scene.globe.baseColor = Color.fromCssColorString("#1f3340");
+    viewer.camera.setView({ destination: Cartesian3.fromDegrees(-40, 30, 20_000_000) });
+    const source = new CustomDataSource("public-space-catalog");
+    source.clustering.enabled = true; source.clustering.pixelRange = 45; source.clustering.minimumClusterSize = 4;
+    void viewer.dataSources.add(source);
+    viewerRef.current = viewer; spaceSource.current = source;
+    return () => { viewer.destroy(); viewerRef.current = null; spaceSource.current = null; };
+  }, []);
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    viewer.entities.removeAll();
+    for (const unit of projection.own_units) viewer.entities.add({
+      id: unit.id, name: unit.name,
+      position: Cartesian3.fromDegrees(unit.position.longitude_deg, unit.position.latitude_deg, unit.position.altitude_m),
+      billboard: { image: symbolCanvas(unit.sidc, 36), width: 44, height: 44 },
+      label: { text: unit.name, font: "12px system-ui", fillColor: Color.WHITE, pixelOffset: new Cartesian2(0, 30) }
+    });
+    for (const track of projection.tracks) viewer.entities.add({
+      id: track.track_id, name: `Uncertain ${track.target_side} track`,
+      position: Cartesian3.fromDegrees(track.position.longitude_deg, track.position.latitude_deg, track.position.altitude_m),
+      billboard: { image: symbolCanvas(track.observed_sidc, 34), width: 42, height: 42 },
+      ellipse: { semiMajorAxis: 12_000, semiMinorAxis: 8_000, material: Color.RED.withAlpha(0.16), outline: true, outlineColor: Color.RED }
+    });
+  }, [projection]);
+
+  useEffect(() => {
+    const source = spaceSource.current;
+    if (!source || !catalog) return;
+    source.entities.removeAll();
+    const propagated: { entityId: string; satrec: ReturnType<typeof json2satrec> }[] = [];
+    for (const object of catalog.objects) {
+      const objectType = String(object.OBJECT_TYPE ?? "UNKNOWN");
+      if (!showDebris && objectType === "DEBRIS") continue;
+      try {
+        const satrec = json2satrec(object as Parameters<typeof json2satrec>[0]);
+        const entityId = `space-${String(object.NORAD_CAT_ID)}`;
+        source.entities.add({
+          id: entityId, name: String(object.OBJECT_NAME ?? `NORAD ${String(object.NORAD_CAT_ID)}`),
+          billboard: { image: symbolCanvas(String(object.SIDC), 22), width: 28, height: 28 }
+        });
+        propagated.push({ entityId, satrec });
+      } catch { /* malformed public records are skipped without affecting authored entities */ }
+    }
+    const updatePositions = () => {
+      const date = new Date(); const gmst = gstime(date);
+      for (const item of propagated) {
+        const result = propagate(item.satrec, date);
+        if (!result?.position || typeof result.position === "boolean") continue;
+        const geo = eciToGeodetic(result.position, gmst);
+        const entity = source.entities.getById(item.entityId);
+        if (entity) entity.position = Cartesian3.fromDegrees(degreesLong(geo.longitude), degreesLat(geo.latitude), geo.height * 1000) as never;
+      }
+    };
+    updatePositions(); const timer = window.setInterval(updatePositions, 10_000);
+    return () => window.clearInterval(timer);
+  }, [catalog, showDebris]);
+
+  return <div className="globe" ref={host} />;
+}
+
+function App() {
+  const [scenarios, setScenarios] = useState<Scenario[]>([]);
+  const [games, setGames] = useState<Game[]>([]);
+  const [spaceStatus, setSpaceStatus] = useState<SpaceStatus | null>(null);
+  const [game, setGame] = useState<Game | null>(null);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [role, setRole] = useState<Role | null>(null);
+  const [projection, setProjection] = useState<Projection | null>(null);
+  const [catalog, setCatalog] = useState<SpaceSnapshot | null>(null);
+  const [mode, setMode] = useState<"new" | "join">("new");
+  const [message, setMessage] = useState("Loading scenarios");
+  const [gameTitle, setGameTitle] = useState("Global Crisis");
+  const [displayName, setDisplayName] = useState("Commander");
+  const [adminToken, setAdminToken] = useState("");
+  const [spaceUsername, setSpaceUsername] = useState("");
+  const [spacePassword, setSpacePassword] = useState("");
+  const [rememberCredentials, setRememberCredentials] = useState(true);
+  const [showDebris, setShowDebris] = useState(false);
+  const restoreAttempted = useRef(false);
+  const playerId = useMemo(() => localStorage.getItem("world-at-war-player") ?? crypto.randomUUID(), []);
+  const playable = game?.status === "running" && role !== null;
+
+  async function refreshLobby() {
+    const [loadedScenarios, loadedGames, status] = await Promise.all([
+      request<Scenario[]>("/v1/scenarios"), request<Game[]>("/v1/games"), request<SpaceStatus>("/v1/settings/space-catalog/status")
+    ]);
+    let effectiveStatus = status;
+    if (status.remembered_credentials && !status.configured && !restoreAttempted.current) {
+      restoreAttempted.current = true;
+      effectiveStatus = await request<SpaceStatus>("/v1/settings/space-track/credentials", { method: "POST" });
+    }
+    setScenarios(loadedScenarios); setGames(loadedGames); setSpaceStatus(effectiveStatus);
+    if (game) setGame(loadedGames.find((candidate) => candidate.id === game.id) ?? game);
+  }
+
+  useEffect(() => {
+    localStorage.setItem("world-at-war-player", playerId);
+    void refreshLobby().then(() => setMessage("Create a scenario or join a running game")).catch((error: Error) => setMessage(error.message));
+  }, [playerId]);
+
+  useEffect(() => {
+    if (!game || game.status === "running") return;
+    const timer = window.setInterval(() => void refreshLobby(), 2000);
+    return () => window.clearInterval(timer);
+  }, [game]);
+
+  useEffect(() => {
+    if (!playable || !game || !role) return;
+    const query = `player_id=${playerId}&role_id=${role.id}`;
+    const update = () => request<Projection>(`/v1/games/${game.id}/state?${query}`).then(setProjection).catch((error: Error) => setMessage(error.message));
+    update();
+    void request<SpaceSnapshot>(`/v1/games/${game.id}/space-catalog?${query}`).then(setCatalog).catch((error: Error) => setMessage(error.message));
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [playable, game?.id, role?.id, playerId]);
+
+  async function connectSpaceTrack() {
+    setMessage("Authenticating and downloading the public GP catalog. This can take a minute.");
+    try {
+      const status = await request<SpaceStatus>("/v1/admin/space-track/connect", {
+        method: "POST", headers: { authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ username: spaceUsername, password: spacePassword, remember: rememberCredentials })
+      });
+      setSpaceStatus(status); setSpacePassword(""); setMessage(`Catalog ready: ${status.object_count.toLocaleString()} public objects.`);
+    } catch (error) { setMessage((error as Error).message); }
+  }
+
+  async function forgetSpaceTrack() {
+    try {
+      const status = await request<SpaceStatus>("/v1/settings/space-track/credentials", { method: "DELETE" });
+      setSpaceStatus(status); setSpaceUsername(""); setSpacePassword("");
+      setMessage("Saved Space-Track credentials removed. The downloaded catalog remains available until it expires.");
+    } catch (error) { setMessage((error as Error).message); }
+  }
+
+  async function createGame() {
+    const scenario = scenarios[0]; if (!scenario) return;
+    try {
+      const created = await request<{ game: Game }>("/v1/games", { method: "POST", body: JSON.stringify({ scenario_id: scenario.id, title: gameTitle, host_player_id: playerId }) });
+      setGame(created.game); setRoles(await request<Role[]>(`/v1/games/${created.game.id}/roles`)); setMessage("Claim a role, then start the scenario.");
+    } catch (error) { setMessage((error as Error).message); }
+  }
+
+  async function selectGame(selected: Game) {
+    try {
+      await request(`/v1/games/${selected.id}/join`, { method: "POST", body: JSON.stringify({ display_name: displayName }) });
+      setGame(selected); setRole(null); setRoles(await request<Role[]>(`/v1/games/${selected.id}/roles`)); setMessage("Choose an available role.");
+    } catch (error) { setMessage((error as Error).message); }
+  }
+
+  async function claim(selected: Role) {
+    if (!game) return;
+    try {
+      const claimed = await request<Role>(`/v1/games/${game.id}/roles/${selected.id}/claim`, { method: "POST", body: JSON.stringify({ player_id: playerId }) });
+      setRole(claimed); setRoles((items) => items.map((item) => item.id === claimed.id ? claimed : item)); setMessage(`${claimed.name} claimed.`);
+    } catch (error) { setMessage((error as Error).message); }
+  }
+
+  async function start() {
+    if (!game) return;
+    try { setGame(await request<Game>(`/v1/games/${game.id}/start`, { method: "POST", body: JSON.stringify({ player_id: playerId }) })); }
+    catch (error) { setMessage((error as Error).message); }
+  }
+
+  async function turnNorth() {
+    if (!game || !role || !projection) return;
+    await request(`/v1/games/${game.id}/roles/${role.id}/intent`, { method: "POST", body: JSON.stringify({ player_id: playerId, lease_generation: role.lease_generation, intent: { intent_id: crypto.randomUUID(), issuer_role: role.id, target: role.command_scope[0], kind: { Move: { north_mps: 130, east_mps: 0 } }, requested_tick: projection.tick + 1 } }) }).catch((error: Error) => setMessage(error.message));
+  }
+
+  function leave() { setGame(null); setRole(null); setProjection(null); setCatalog(null); setMessage("Create a scenario or join a running game"); void refreshLobby(); }
+
+  return <main className="app-shell">
+    <header><span className="brand">WORLD AT WAR</span><span className="status-dot" /><span>{game?.status ?? "scenario lobby"}</span><span className="tick">{projection ? `TICK ${projection.tick}` : ""}</span></header>
+    {!playable && <div className="lobby-stage"><section className="scenario-modal" aria-modal="true" role="dialog">
+      <div className="modal-header"><div><h1>Scenario Command</h1><p>{message}</p></div><span className={spaceStatus?.usable ? "catalog-ready" : "catalog-missing"}>{spaceStatus?.usable ? `${spaceStatus.object_count.toLocaleString()} ORBITAL OBJECTS` : "SPACE DATA REQUIRED"}</span></div>
+      {!game && <><div className="tabs"><button className={mode === "new" ? "active" : ""} onClick={() => setMode("new")}>New scenario</button><button className={mode === "join" ? "active" : ""} onClick={() => setMode("join")}>Join game</button></div>
+        {mode === "new" ? <div className="modal-body two-column"><div><h2>Scenario</h2>{scenarios.map((scenario) => <div className="scenario-choice" key={scenario.id}><strong>{scenario.title}</strong><p>{scenario.description}</p><small>{scenario.authored_entity_count} authored entities · {scenario.role_count} roles · full public space catalog</small></div>)}<label>Game title<input value={gameTitle} onChange={(event) => setGameTitle(event.target.value)} /></label><button className="command" disabled={!spaceStatus?.usable} onClick={() => void createGame()}>Create game</button></div><div><h2>Space-Track setup</h2><p className="muted">Credentials are held in server memory. Remembering them stores encrypted data in an HttpOnly cookie.</p>{spaceStatus?.setup_auth_required && <label>Admin setup token<input type="password" value={adminToken} onChange={(event) => setAdminToken(event.target.value)} /></label>}<label>Space-Track username<input autoComplete="username" value={spaceUsername} onChange={(event) => setSpaceUsername(event.target.value)} /></label><label>Space-Track password<input type="password" autoComplete="current-password" value={spacePassword} onChange={(event) => setSpacePassword(event.target.value)} /></label><label className="toggle"><input type="checkbox" checked={rememberCredentials} onChange={(event) => setRememberCredentials(event.target.checked)} />Remember credentials for 30 days</label><button className="secondary" disabled={(spaceStatus?.setup_auth_required && !adminToken) || !spaceUsername || !spacePassword} onClick={() => void connectSpaceTrack()}>Connect and synchronize</button>{spaceStatus?.remembered_credentials && <button className="text-command" onClick={() => void forgetSpaceTrack()}>Forget saved credentials</button>}</div></div>
+        : <div className="modal-body"><label>Display name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label><h2>Available games</h2><div className="game-list">{games.length ? games.map((item) => <button className="game-row" key={item.id} onClick={() => void selectGame(item)}><span>{item.title}</span><small>{item.status} · {item.player_roles_available} open roles</small></button>) : <p className="muted">No games have been created.</p>}</div></div>}</>}
+      {game && <div className="modal-body"><h2>{game.title}</h2><p className="muted">Claim a command role. The operational map remains offline until the scenario starts.</p><div className="role-grid">{roles.map((item) => <button key={item.id} className={`role ${role?.id === item.id ? "selected" : ""}`} disabled={item.ai_controlled || (item.held && role?.id !== item.id)} onClick={() => void claim(item)}><span>{item.name}</span><small>{item.ai_controlled ? "AI" : item.held ? "held" : `echelon ${item.authority_echelon}`}</small></button>)}</div><div className="modal-actions"><button className="secondary" onClick={leave}>Back</button>{game.host_player_id === playerId && <button className="command" disabled={!role} onClick={() => void start()}>Start scenario</button>}{game.host_player_id !== playerId && <span className="muted">Waiting for host to start</span>}</div></div>}
+    </section></div>}
+    {playable && projection && <section className="workspace"><aside className="sidebar"><h1>{role.name}</h1><p className="message">{game.title}</p><h2>Layers</h2><label className="toggle"><input type="checkbox" checked={showDebris} onChange={(event) => setShowDebris(event.target.checked)} />Orbital debris</label><h2>Catalog</h2><p className="muted">{catalog ? `${catalog.objects.length.toLocaleString()} public objects loaded` : "Loading orbital snapshot"}</p><button className="secondary" onClick={leave}>Leave scenario</button></aside><section className="map-region"><Globe projection={projection} catalog={catalog} showDebris={showDebris} /><div className="map-caption">{role.name} · {role.side}</div></section><aside className="inspector"><h2>Operational picture</h2><div className="metric"><span>Own units</span><strong>{projection.own_units.length}</strong></div><div className="metric"><span>Tracks</span><strong>{projection.tracks.length}</strong></div><h2>Actions</h2><button className="command" onClick={() => void turnNorth()}>Turn north</button><h2>Tracks</h2>{projection.tracks.length ? projection.tracks.map((track) => <div className="track" key={track.track_id}><span>Uncertain {track.target_side} contact</span><small>{Math.round(track.identity_confidence * 100)}% identity</small></div>) : <p className="muted">No reports received.</p>}</aside></section>}
+  </main>;
+}
+
+createRoot(document.getElementById("root")!).render(<App />);

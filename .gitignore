@@ -1,0 +1,69 @@
+# Rust build output
+/target/
+**/*.rs.bk
+
+# Node and frontend build output
+**/node_modules/
+/web/dist/
+/web/.vite/
+/web/coverage/
+*.tsbuildinfo
+
+# Test, coverage, and benchmark output
+/coverage/
+/test-results/
+/playwright-report/
+/criterion/
+*.profraw
+*.profdata
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+
+# Runtime state and local service data
+/data/cache/
+/data/raw/
+/data/downloads/
+/data/generated/
+/var/
+/tmp/
+/postgres-data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Logs, process files, and crash dumps
+*.log
+*.pid
+*.pid.lock
+*.stackdump
+core
+core.*
+
+# Editor and IDE settings
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Operating system metadata
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+
+# Local tooling caches
+.cache/
+.eslintcache
+.parcel-cache/
+.turbo/
+.nyc_output/
+

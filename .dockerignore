@@ -1,0 +1,10 @@
+.git/
+target/
+web/node_modules/
+web/dist/
+data/cache/
+data/raw/
+data/downloads/
+data/generated/
+.env
+*.log

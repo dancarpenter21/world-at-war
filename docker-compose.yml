@@ -1,0 +1,27 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: crates/server/Dockerfile
+    environment:
+      BIND_ADDR: 0.0.0.0:8000
+      ADMIN_SETUP_TOKEN: ${ADMIN_SETUP_TOKEN:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      SPACETRACK_USERNAME: ${SPACETRACK_USERNAME:-}
+      SPACETRACK_PASSWORD: ${SPACETRACK_PASSWORD:-}
+    volumes:
+      - space-catalog:/app/data/cache/space-track
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    depends_on:
+      - server
+    ports:
+      - "8080:80"
+
+volumes:
+  space-catalog:

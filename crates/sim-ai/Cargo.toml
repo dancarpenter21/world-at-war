@@ -1,0 +1,9 @@
+[package]
+name = "sim-ai"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sim-core = { path = "../sim-core" }
+uuid.workspace = true
