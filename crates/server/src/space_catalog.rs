@@ -27,7 +27,7 @@ struct Inner {
     snapshots: BTreeMap<String, SpaceCatalogSnapshot>,
     latest_checksum: Option<String>,
     syncing: bool,
-    last_attempt_unix: Option<u64>,
+    last_successful_sync_unix: Option<u64>,
     error: Option<String>,
 }
 
@@ -80,6 +80,7 @@ impl SpaceCatalogService {
         let latest_checksum = snapshot
             .as_ref()
             .map(|snapshot: &SpaceCatalogSnapshot| snapshot.checksum.clone());
+        let last_successful_sync_unix = snapshot.as_ref().map(|snapshot| snapshot.synced_unix);
         let snapshots = snapshot
             .into_iter()
             .map(|snapshot| (snapshot.checksum.clone(), snapshot))
@@ -90,7 +91,7 @@ impl SpaceCatalogService {
                 snapshots,
                 latest_checksum,
                 syncing: false,
-                last_attempt_unix: None,
+                last_successful_sync_unix,
                 error: None,
             })),
             client: reqwest::Client::builder()
@@ -144,11 +145,7 @@ impl SpaceCatalogService {
             if inner.syncing {
                 anyhow::bail!("space catalog synchronization is already running");
             }
-            if !force
-                && inner
-                    .last_attempt_unix
-                    .is_some_and(|last| now.saturating_sub(last) < MIN_SYNC_INTERVAL_SECONDS)
-            {
+            if !force && has_recent_success(inner.last_successful_sync_unix, now) {
                 anyhow::bail!("Space-Track synchronization is limited to once per hour");
             }
             let credentials = inner
@@ -160,7 +157,6 @@ impl SpaceCatalogService {
                 credentials.password.expose_secret().to_owned(),
             );
             inner.syncing = true;
-            inner.last_attempt_unix = Some(now);
             inner.error = None;
             values
         };
@@ -173,8 +169,10 @@ impl SpaceCatalogService {
                     tokio::fs::create_dir_all(parent).await?;
                 }
                 tokio::fs::write(CACHE_PATH, serde_json::to_vec(&snapshot)?).await?;
+                let synced_unix = snapshot.synced_unix;
                 inner.latest_checksum = Some(snapshot.checksum.clone());
                 inner.snapshots.insert(snapshot.checksum.clone(), snapshot);
+                inner.last_successful_sync_unix = Some(synced_unix);
                 Ok(())
             }
             Err(error) => {
@@ -190,13 +188,30 @@ impl SpaceCatalogService {
             .post("https://www.space-track.org/ajaxauth/login")
             .form(&[("identity", username), ("password", password)])
             .send()
-            .await?
-            .error_for_status()?;
-        if login.url().path().contains("login") {
-            anyhow::bail!("Space-Track authentication failed");
+            .await
+            .map_err(|error| {
+                anyhow::anyhow!("Could not reach Space-Track to authenticate: {error}")
+            })?;
+        if !login.status().is_success() {
+            anyhow::bail!(space_track_http_error("authentication", login.status()));
         }
-        let response = self.client.get(GP_URL).send().await?.error_for_status()?;
-        let mut objects: Vec<Value> = response.json().await?;
+        if login.url().path().contains("login") {
+            anyhow::bail!("Space-Track rejected the supplied credentials or the account is not authorized. Verify the username, password, and account access, then try again.");
+        }
+        let response = self.client.get(GP_URL).send().await.map_err(|error| {
+            anyhow::anyhow!("Could not reach Space-Track to download the GP catalog: {error}")
+        })?;
+        if !response.status().is_success() {
+            anyhow::bail!(space_track_http_error(
+                "catalog download",
+                response.status()
+            ));
+        }
+        let mut objects: Vec<Value> = response.json().await.map_err(|error| {
+            anyhow::anyhow!(
+                "Space-Track returned a catalog response that could not be read: {error}"
+            )
+        })?;
         if objects.is_empty() {
             anyhow::bail!("Space-Track returned an empty GP catalog");
         }
@@ -246,6 +261,32 @@ impl SpaceCatalogService {
     }
 }
 
+fn space_track_http_error(stage: &str, status: reqwest::StatusCode) -> String {
+    match status.as_u16() {
+        401 | 403 => format!(
+            "Space-Track denied {stage} (HTTP {}). Verify the username, password, and that the account is authorized for GP catalog access.",
+            status.as_u16()
+        ),
+        429 => format!(
+            "Space-Track rate-limited the {stage} request (HTTP 429). Wait before trying again; this failed request does not start this application's one-hour sync cooldown."
+        ),
+        500..=599 => format!(
+            "Space-Track is currently unavailable during {stage} (HTTP {}). Try again later; this failed request does not start this application's one-hour sync cooldown.",
+            status.as_u16()
+        ),
+        _ => format!(
+            "Space-Track {stage} failed with HTTP {} ({}). Check the service and account access, then try again.",
+            status.as_u16(),
+            status.canonical_reason().unwrap_or("unknown status")
+        ),
+    }
+}
+
+fn has_recent_success(last_successful_sync_unix: Option<u64>, now: u64) -> bool {
+    last_successful_sync_unix
+        .is_some_and(|last| now.saturating_sub(last) < MIN_SYNC_INTERVAL_SECONDS)
+}
+
 fn now_unix() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -259,5 +300,31 @@ fn space_sidc(object_type: &str) -> &'static str {
         "ROCKET BODY" => "100305000011020000000000000000",
         "DEBRIS" => "100305000011030000000000000000",
         _ => "100305000000000000000000000000",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cooldown_messages_explain_auth_and_rate_limit_failures() {
+        let denied = space_track_http_error("authentication", reqwest::StatusCode::UNAUTHORIZED);
+        assert!(denied.contains("username, password"));
+        assert!(denied.contains("HTTP 401"));
+
+        let limited =
+            space_track_http_error("catalog download", reqwest::StatusCode::TOO_MANY_REQUESTS);
+        assert!(limited.contains("does not start"));
+    }
+
+    #[test]
+    fn only_a_successful_sync_starts_the_cooldown() {
+        assert!(!has_recent_success(None, 10_000));
+        assert!(has_recent_success(Some(9_999), 10_000));
+        assert!(!has_recent_success(
+            Some(10_000 - MIN_SYNC_INTERVAL_SECONDS),
+            10_000
+        ));
     }
 }

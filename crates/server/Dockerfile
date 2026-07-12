@@ -4,6 +4,13 @@ COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 RUN cargo build --release --package world-at-war-server
 
+FROM rust:1.89-bookworm AS development
+WORKDIR /workspace
+RUN cargo install cargo-watch --locked
+EXPOSE 8000
+ENV BIND_ADDR=0.0.0.0:8000
+CMD ["cargo", "watch", "--poll", "--watch", "Cargo.toml", "--watch", "Cargo.lock", "--watch", "crates", "--exec", "run --package world-at-war-server"]
+
 FROM debian:bookworm-slim
 RUN useradd --create-home --uid 10001 app
 RUN mkdir -p /app/data/cache/space-track && chown -R app:app /app

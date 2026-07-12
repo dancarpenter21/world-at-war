@@ -1,0 +1,32 @@
+services:
+  proxy:
+    volumes:
+      - ./deploy/nginx/edge.dev.conf:/etc/nginx/conf.d/default.conf:ro
+
+  server:
+    build:
+      target: development
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace
+      - cargo-target:/workspace/target
+      - cargo-registry:/usr/local/cargo/registry
+      - cargo-git:/usr/local/cargo/git
+      - space-catalog:/workspace/data/cache/space-track
+
+  web:
+    build:
+      target: development
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./web:/web
+      - web-node-modules:/web/node_modules
+    expose:
+      - "5173"
+
+volumes:
+  cargo-target:
+  cargo-registry:
+  cargo-git:
+  web-node-modules:

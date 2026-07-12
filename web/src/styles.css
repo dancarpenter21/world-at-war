@@ -17,6 +17,7 @@ header { display: flex; align-items: center; gap: 9px; padding: 0 16px; border-b
 .modal-body { padding: 24px; }.two-column { display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; }
 h1, h2 { color: #f4f8fa; letter-spacing: .04em; }h2 { margin: 0 0 12px; color: #aebfc8; text-transform: uppercase; font-size: 11px; }
 .scenario-choice { padding: 14px; margin-bottom: 16px; border: 1px solid #426170; background: #19272f; }.scenario-choice p { color: #b4c5cc; font-size: 13px; }.scenario-choice small, .muted, small { color: #8299a4; font-size: 11px; }
+.space-track-error { padding: 10px; border: 1px solid #8a5948; color: #efb09a; background: #2a1d1c; font-size: 12px; line-height: 1.45; }.space-track-error strong { color: #ffd2c1; }
 label { display: grid; gap: 6px; margin: 12px 0; color: #aebfc8; font-size: 11px; }input { width: 100%; padding: 10px; color: #eef7fa; background: #0e171c; border: 1px solid #3b515c; border-radius: 2px; }
 select, textarea { width: 100%; padding: 9px; color: #eef7fa; background: #0e171c; border: 1px solid #3b515c; border-radius: 2px; }textarea { min-height: 80px; resize: vertical; }
 .command, .secondary, .game-row, .role { border: 1px solid #426170; border-radius: 3px; padding: 10px; color: #e8f3f7; background: #1c2c34; }
