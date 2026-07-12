@@ -1,4 +1,16 @@
 services:
+  proxy:
+    image: nginx:1.27-alpine
+    depends_on:
+      - web
+      - server
+    ports:
+      - "${APP_PORT:-8080}:80"
+    volumes:
+      - ./deploy/nginx/edge.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - world-at-war
+
   server:
     build:
       context: .
@@ -11,17 +23,23 @@ services:
       SPACETRACK_PASSWORD: ${SPACETRACK_PASSWORD:-}
     volumes:
       - space-catalog:/app/data/cache/space-track
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
+    networks:
+      - world-at-war
 
   web:
     build:
       context: .
       dockerfile: web/Dockerfile
-    depends_on:
-      - server
-    ports:
-      - "8080:80"
+    expose:
+      - "80"
+    networks:
+      - world-at-war
 
 volumes:
   space-catalog:
+
+networks:
+  world-at-war:
+    driver: bridge

@@ -18,7 +18,7 @@ npm install
 npm run dev
 ```
 
-The API runs on `http://localhost:8000` and the Vite client on `http://localhost:5173`. To run the production-shaped local stack, use `docker compose up --build` and open `http://localhost:8080`.
+The API runs on `http://localhost:8000` and the Vite client on `http://localhost:5173`. To run the production-shaped local stack, use `docker compose up --build` and open `http://localhost:8080` (or the `.env` value of `APP_PORT`). Compose publishes only its Nginx edge proxy: it forwards frontend and Cesium assets to the internal `web` container, and `/health`, `/v1/`, and WebSocket upgrades such as `/v1/games/{game_id}/stream` to the internal Rust server. Set `COOKIE_SECURE=true` when an HTTPS proxy terminates TLS in front of this stack.
 
 The first screen is a scenario/join modal; Cesium is not constructed until a player holds a role in a running game. Enter Space-Track credentials in the modal to fetch the current public GP catalog. Selecting **Remember credentials** stores authenticated encrypted data in a 30-day `HttpOnly`, `SameSite=Strict` cookie; the encryption key remains in the ignored server cache volume. Set `COOKIE_SECURE=true` when serving over HTTPS. Catalog snapshots are cached under ignored `data/cache/space-track/`. `SPACETRACK_USERNAME` and `SPACETRACK_PASSWORD` may instead be supplied through the server environment. For a hosted deployment, setting the optional `ADMIN_SETUP_TOKEN` restores bearer-token protection for catalog setup and makes the token field appear in the modal.
 
