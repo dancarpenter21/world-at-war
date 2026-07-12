@@ -1,7 +1,12 @@
 mod credential_cookie;
 mod space_catalog;
 
-use std::{collections::BTreeMap, net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    net::SocketAddr,
+    sync::Arc,
+    time::Duration,
+};
 
 use axum::{
     extract::{
@@ -16,7 +21,10 @@ use axum::{
 use credential_cookie::{CredentialCookie, RememberedCredentials};
 use serde::{Deserialize, Serialize};
 use sim_ai::choose_patrol_intent;
-use sim_core::{OrderResult, PlayerIntent, RoleProjection, Side, Simulation};
+use sim_core::{
+    AuthorityDefinition, AuthorityPolicy, AuthorityRoleKind, AuthorizationRecord, AuthorizedIntent,
+    PlayerIntent, RoleProjection, Side, Simulation,
+};
 use sim_scenario::{global_crisis_scenario, Scenario};
 use space_catalog::{SpaceCatalogService, SpaceCatalogSnapshot, SpaceCatalogStatus};
 use tokio::sync::RwLock;
@@ -43,6 +51,10 @@ struct Game {
     status: GameStatus,
     simulation: Simulation,
     roles: BTreeMap<Uuid, Role>,
+    authority: AuthorityDefinition,
+    authority_requests: BTreeMap<Uuid, AuthorityRequest>,
+    authority_events: Vec<AuthorityEvent>,
+    unit_ids: BTreeSet<Uuid>,
     space_catalog_checksum: String,
 }
 
@@ -59,8 +71,10 @@ struct Role {
     id: Uuid,
     name: String,
     side: Side,
-    command_scope: Vec<Uuid>,
-    authority_echelon: u8,
+    kind: AuthorityRoleKind,
+    location_unit_id: Uuid,
+    command_units: Vec<Uuid>,
+    claimable: bool,
     owner: Option<Uuid>,
     ai_controlled: bool,
     lease_generation: u64,
@@ -93,8 +107,9 @@ struct RoleSummary {
     id: Uuid,
     name: String,
     side: Side,
-    command_scope: Vec<Uuid>,
-    authority_echelon: u8,
+    kind: AuthorityRoleKind,
+    location_unit_id: Uuid,
+    command_units: Vec<Uuid>,
     held: bool,
     ai_controlled: bool,
     lease_generation: u64,
@@ -133,6 +148,93 @@ struct SubmitIntentRequest {
     lease_generation: u64,
     intent: PlayerIntent,
 }
+#[derive(Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+enum SubmissionOutcome {
+    Queued { intent_id: Uuid },
+    PendingAuthority { request_id: Uuid },
+}
+#[derive(Debug, Clone, Serialize)]
+struct AuthorityDecisionRecord {
+    role_id: Uuid,
+    approved: bool,
+    automatic: bool,
+    tick: u64,
+}
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+enum AuthorityRequestStatus {
+    PendingHuman {
+        role_id: Uuid,
+    },
+    WaitingVacant {
+        role_id: Uuid,
+        resolves_at_tick: u64,
+    },
+    Approved,
+    ApprovedNoExecutor,
+    Denied {
+        role_id: Uuid,
+    },
+    BlockedComms,
+}
+#[derive(Debug, Clone, Serialize)]
+struct AuthorityRequest {
+    id: Uuid,
+    action: String,
+    target_unit_id: Uuid,
+    requester_role_id: Uuid,
+    policy: AuthorityPolicy,
+    policy_version: u64,
+    current_step: usize,
+    created_tick: u64,
+    summary: String,
+    status: AuthorityRequestStatus,
+    decisions: Vec<AuthorityDecisionRecord>,
+    #[serde(skip)]
+    intent: Option<PlayerIntent>,
+}
+#[derive(Debug, Clone, Serialize)]
+struct AuthorityEvent {
+    tick: u64,
+    kind: String,
+    detail: String,
+}
+#[derive(Deserialize)]
+struct AuthorityQuery {
+    player_id: Uuid,
+}
+#[derive(Deserialize)]
+struct AuthorityRequestsQuery {
+    player_id: Uuid,
+    role_id: Option<Uuid>,
+}
+#[derive(Deserialize)]
+struct UpdateAuthorityRequest {
+    player_id: Uuid,
+    expected_version: u64,
+    definition: AuthorityDefinition,
+}
+#[derive(Deserialize)]
+struct CreateAuthorityRequest {
+    player_id: Uuid,
+    lease_generation: u64,
+    action: String,
+    target_unit_id: Uuid,
+    summary: String,
+}
+#[derive(Deserialize)]
+struct DecideAuthorityRequest {
+    player_id: Uuid,
+    lease_generation: u64,
+    decision: AuthorityDecision,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum AuthorityDecision {
+    Approve,
+    Deny,
+}
 #[derive(Deserialize)]
 struct ProjectionQuery {
     player_id: Uuid,
@@ -145,7 +247,7 @@ struct SpaceTrackConnectRequest {
     #[serde(default)]
     remember: bool,
 }
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 struct ErrorResponse {
     code: &'static str,
     error: String,
@@ -174,6 +276,22 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/games", get(list_games).post(create_game))
         .route("/v1/games/{game_id}/join", post(join_game))
         .route("/v1/games/{game_id}/roles", get(list_roles))
+        .route(
+            "/v1/games/{game_id}/authority",
+            get(get_authority).put(update_authority),
+        )
+        .route(
+            "/v1/games/{game_id}/authority/requests",
+            get(list_authority_requests),
+        )
+        .route(
+            "/v1/games/{game_id}/roles/{role_id}/authority-requests",
+            post(create_authority_request),
+        )
+        .route(
+            "/v1/games/{game_id}/roles/{role_id}/authority-requests/{request_id}/decision",
+            post(decide_authority_request),
+        )
         .route(
             "/v1/games/{game_id}/roles/{role_id}/claim",
             post(claim_role),
@@ -231,7 +349,7 @@ async fn list_scenarios(State(state): State<AppState>) -> Json<Vec<ScenarioSumma
                 description: scenario.description.clone(),
                 version: scenario.version,
                 authored_entity_count: scenario.units.len(),
-                role_count: scenario.roles.len(),
+                role_count: scenario.authority.roles.len(),
                 requires_space_catalog: scenario.requires_space_catalog,
             })
             .collect(),
@@ -283,7 +401,8 @@ async fn create_game(
             error.to_string(),
         )
     })?;
-    let roles = scenario
+    let authority = scenario.authority.clone();
+    let roles = authority
         .roles
         .iter()
         .map(|template| {
@@ -293,8 +412,10 @@ async fn create_game(
                     id: template.id,
                     name: template.name.clone(),
                     side: template.side,
-                    command_scope: template.command_scope.clone(),
-                    authority_echelon: template.authority_echelon,
+                    kind: template.kind,
+                    location_unit_id: template.location_unit_id,
+                    command_units: authority.controlled_units(template.id),
+                    claimable: template.claimable,
                     owner: None,
                     ai_controlled: template.ai_controlled,
                     lease_generation: 0,
@@ -313,6 +434,10 @@ async fn create_game(
         status: GameStatus::Lobby,
         simulation,
         roles,
+        authority,
+        authority_requests: BTreeMap::new(),
+        authority_events: Vec::new(),
+        unit_ids: scenario.units.iter().map(|unit| unit.id).collect(),
         space_catalog_checksum: checksum,
     };
     let summary = game_summary(&game);
@@ -372,7 +497,7 @@ async fn claim_role(
         .roles
         .get_mut(&role_id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "role_not_found", "role not found"))?;
-    if role.ai_controlled {
+    if role.ai_controlled || !role.claimable {
         return Err(api_error(
             StatusCode::FORBIDDEN,
             "ai_role",
@@ -430,7 +555,7 @@ async fn submit_intent(
     Path((game_id, role_id)): Path<(Uuid, Uuid)>,
     State(state): State<AppState>,
     Json(request): Json<SubmitIntentRequest>,
-) -> ApiResult<Vec<OrderResult>> {
+) -> ApiResult<SubmissionOutcome> {
     let mut games = state.games.write().await;
     let game = games
         .get_mut(&game_id)
@@ -453,16 +578,531 @@ async fn submit_intent(
             "invalid role lease",
         ));
     }
-    if request.intent.issuer_role != role_id || !role.command_scope.contains(&request.intent.target)
-    {
+    if request.intent.issuer_role != role_id {
         return Err(api_error(
             StatusCode::FORBIDDEN,
-            "command_scope",
-            "intent exceeds role command scope",
+            "issuer_role",
+            "intent issuer does not match the held role",
         ));
     }
-    game.simulation.queue_intent(request.intent);
-    Ok(Json(Vec::new()))
+    let action = request.intent.kind.action_key().to_string();
+    let target = request.intent.target;
+    let outcome = submit_authority_action(
+        game,
+        role_id,
+        action,
+        target,
+        String::new(),
+        Some(request.intent),
+    )?;
+    Ok(Json(outcome))
+}
+
+async fn get_authority(
+    Path(game_id): Path<Uuid>,
+    State(state): State<AppState>,
+    Query(query): Query<AuthorityQuery>,
+) -> ApiResult<AuthorityDefinition> {
+    let games = state.games.read().await;
+    let game = games
+        .get(&game_id)
+        .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
+    require_game_participant(game, query.player_id)?;
+    Ok(Json(game.authority.clone()))
+}
+
+async fn update_authority(
+    Path(game_id): Path<Uuid>,
+    State(state): State<AppState>,
+    Json(mut request): Json<UpdateAuthorityRequest>,
+) -> ApiResult<AuthorityDefinition> {
+    let mut games = state.games.write().await;
+    let game = games
+        .get_mut(&game_id)
+        .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
+    if game.host != request.player_id {
+        return Err(api_error(
+            StatusCode::FORBIDDEN,
+            "host_required",
+            "only the host can edit authorities",
+        ));
+    }
+    if request.expected_version != game.authority.version {
+        return Err(api_error(
+            StatusCode::CONFLICT,
+            "authority_version_conflict",
+            format!(
+                "authority definition is now version {}",
+                game.authority.version
+            ),
+        ));
+    }
+    request
+        .definition
+        .validate(&game.unit_ids)
+        .map_err(|error| api_error(StatusCode::UNPROCESSABLE_ENTITY, "invalid_authority", error))?;
+    let new_ids: BTreeSet<_> = request
+        .definition
+        .roles
+        .iter()
+        .map(|role| role.id)
+        .collect();
+    for old in game
+        .roles
+        .values()
+        .filter(|role| role.owner.is_some() || role.ai_controlled)
+    {
+        let Some(new_role) = request
+            .definition
+            .roles
+            .iter()
+            .find(|role| role.id == old.id)
+        else {
+            return Err(api_error(
+                StatusCode::CONFLICT,
+                "occupied_role_removed",
+                format!("occupied or AI role {} cannot be removed", old.name),
+            ));
+        };
+        if new_role.side != old.side {
+            return Err(api_error(
+                StatusCode::CONFLICT,
+                "occupied_role_side_changed",
+                format!("occupied role {} cannot change side", old.name),
+            ));
+        }
+    }
+    request.definition.version = game.authority.version + 1;
+    let mut roles = BTreeMap::new();
+    for definition in &request.definition.roles {
+        let previous = game.roles.get(&definition.id);
+        roles.insert(
+            definition.id,
+            Role {
+                id: definition.id,
+                name: definition.name.clone(),
+                side: definition.side,
+                kind: definition.kind,
+                location_unit_id: definition.location_unit_id,
+                command_units: request.definition.controlled_units(definition.id),
+                claimable: definition.claimable,
+                owner: previous.and_then(|role| role.owner),
+                ai_controlled: definition.ai_controlled,
+                lease_generation: previous.map_or(0, |role| role.lease_generation),
+            },
+        );
+    }
+    debug_assert_eq!(roles.len(), new_ids.len());
+    game.roles = roles;
+    game.authority = request.definition;
+    game.authority_events.push(AuthorityEvent {
+        tick: game.simulation.tick(),
+        kind: "authority_updated".into(),
+        detail: format!("version {} saved by host", game.authority.version),
+    });
+    Ok(Json(game.authority.clone()))
+}
+
+async fn list_authority_requests(
+    Path(game_id): Path<Uuid>,
+    State(state): State<AppState>,
+    Query(query): Query<AuthorityRequestsQuery>,
+) -> ApiResult<Vec<AuthorityRequest>> {
+    let games = state.games.read().await;
+    let game = games
+        .get(&game_id)
+        .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
+    require_game_participant(game, query.player_id)?;
+    if game.host == query.player_id && query.role_id.is_none() {
+        return Ok(Json(game.authority_requests.values().cloned().collect()));
+    }
+    let role_id = query.role_id.ok_or_else(|| {
+        api_error(
+            StatusCode::BAD_REQUEST,
+            "role_required",
+            "role_id is required for non-host players",
+        )
+    })?;
+    let role = game
+        .roles
+        .get(&role_id)
+        .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "role_not_found", "role not found"))?;
+    if role.owner != Some(query.player_id) {
+        return Err(api_error(
+            StatusCode::FORBIDDEN,
+            "role_not_held",
+            "role is not held by this player",
+        ));
+    }
+    Ok(Json(
+        game.authority_requests
+            .values()
+            .filter(|request| {
+                request.requester_role_id == role_id
+                    || current_decision_role(request) == Some(role_id)
+                    || request.policy.notify_role_ids.contains(&role_id)
+            })
+            .cloned()
+            .collect(),
+    ))
+}
+
+async fn create_authority_request(
+    Path((game_id, role_id)): Path<(Uuid, Uuid)>,
+    State(state): State<AppState>,
+    Json(request): Json<CreateAuthorityRequest>,
+) -> ApiResult<SubmissionOutcome> {
+    let mut games = state.games.write().await;
+    let game = games
+        .get_mut(&game_id)
+        .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
+    validate_role_lease(game, role_id, request.player_id, request.lease_generation)?;
+    if request.summary.chars().count() > 500 {
+        return Err(api_error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "summary_too_long",
+            "request summary is limited to 500 characters",
+        ));
+    }
+    let outcome = submit_authority_action(
+        game,
+        role_id,
+        request.action,
+        request.target_unit_id,
+        request.summary,
+        None,
+    )?;
+    Ok(Json(outcome))
+}
+
+async fn decide_authority_request(
+    Path((game_id, role_id, request_id)): Path<(Uuid, Uuid, Uuid)>,
+    State(state): State<AppState>,
+    Json(request): Json<DecideAuthorityRequest>,
+) -> ApiResult<AuthorityRequest> {
+    let mut games = state.games.write().await;
+    let game = games
+        .get_mut(&game_id)
+        .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
+    validate_role_lease(game, role_id, request.player_id, request.lease_generation)?;
+    let mut authority_request = game.authority_requests.remove(&request_id).ok_or_else(|| {
+        api_error(
+            StatusCode::NOT_FOUND,
+            "authority_request_not_found",
+            "authority request not found",
+        )
+    })?;
+    if current_decision_role(&authority_request) != Some(role_id)
+        || !matches!(
+            authority_request.status,
+            AuthorityRequestStatus::PendingHuman { .. }
+        )
+    {
+        game.authority_requests
+            .insert(request_id, authority_request);
+        return Err(api_error(
+            StatusCode::CONFLICT,
+            "decision_not_available",
+            "this role cannot decide the request now",
+        ));
+    }
+    advance_authority_request(
+        game,
+        &mut authority_request,
+        matches!(request.decision, AuthorityDecision::Approve),
+        false,
+    );
+    let response = authority_request.clone();
+    game.authority_requests
+        .insert(request_id, authority_request);
+    Ok(Json(response))
+}
+
+trait CommunicationsGate {
+    fn reachable(&self, _from_role: Uuid, _to: Uuid) -> bool;
+}
+struct AlwaysReachable;
+impl CommunicationsGate for AlwaysReachable {
+    fn reachable(&self, _: Uuid, _: Uuid) -> bool {
+        true
+    }
+}
+
+fn submit_authority_action(
+    game: &mut Game,
+    role_id: Uuid,
+    action: String,
+    target: Uuid,
+    summary: String,
+    intent: Option<PlayerIntent>,
+) -> Result<SubmissionOutcome, (StatusCode, Json<ErrorResponse>)> {
+    let policy = game
+        .authority
+        .policy_for(&action, target)
+        .cloned()
+        .ok_or_else(|| {
+            api_error(
+                StatusCode::FORBIDDEN,
+                "authority_not_defined",
+                "no authority policy covers this action and target",
+            )
+        })?;
+    if policy.direct_role_ids.contains(&role_id)
+        && game.authority.role_is_in_unit_chain(role_id, target)
+    {
+        if !AlwaysReachable.reachable(role_id, target) {
+            return Err(api_error(
+                StatusCode::CONFLICT,
+                "blocked_comms",
+                "no communications route to the target",
+            ));
+        }
+        if let Some(intent) = intent {
+            let intent_id = intent.intent_id;
+            game.simulation.queue_authorized_intent(AuthorizedIntent {
+                intent,
+                authorization: AuthorizationRecord {
+                    policy_id: policy.id,
+                    policy_version: game.authority.version,
+                    requester_role_id: role_id,
+                    granting_role_id: role_id,
+                    request_id: None,
+                },
+            });
+            return Ok(SubmissionOutcome::Queued { intent_id });
+        }
+        return Err(api_error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "direct_action_requires_intent",
+            "this action is directly executable and requires an order payload",
+        ));
+    }
+    if !policy.request_role_ids.contains(&role_id) {
+        return Err(api_error(
+            StatusCode::FORBIDDEN,
+            "request_not_permitted",
+            "role may neither issue nor request this action",
+        ));
+    }
+    let Some(first_step) = policy.decision_steps.first() else {
+        return Err(api_error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "missing_decision_step",
+            "authority policy has no decision step",
+        ));
+    };
+    if !AlwaysReachable.reachable(role_id, first_step.role_id) {
+        return Err(api_error(
+            StatusCode::CONFLICT,
+            "blocked_comms",
+            "no communications route to the deciding role",
+        ));
+    }
+    let request_id = Uuid::new_v4();
+    let tick = game.simulation.tick();
+    let status = status_for_decision_role(game, first_step, tick);
+    game.authority_requests.insert(
+        request_id,
+        AuthorityRequest {
+            id: request_id,
+            action,
+            target_unit_id: target,
+            requester_role_id: role_id,
+            policy,
+            policy_version: game.authority.version,
+            current_step: 0,
+            created_tick: tick,
+            summary,
+            status,
+            decisions: Vec::new(),
+            intent,
+        },
+    );
+    game.authority_events.push(AuthorityEvent {
+        tick,
+        kind: "authority_requested".into(),
+        detail: format!("request {request_id} created"),
+    });
+    Ok(SubmissionOutcome::PendingAuthority { request_id })
+}
+
+fn validate_role_lease(
+    game: &Game,
+    role_id: Uuid,
+    player_id: Uuid,
+    lease_generation: u64,
+) -> Result<(), (StatusCode, Json<ErrorResponse>)> {
+    let role = game
+        .roles
+        .get(&role_id)
+        .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "role_not_found", "role not found"))?;
+    if role.owner != Some(player_id) || role.lease_generation != lease_generation {
+        return Err(api_error(
+            StatusCode::FORBIDDEN,
+            "invalid_role_lease",
+            "invalid role lease",
+        ));
+    }
+    Ok(())
+}
+
+fn require_game_participant(
+    game: &Game,
+    player_id: Uuid,
+) -> Result<(), (StatusCode, Json<ErrorResponse>)> {
+    if game.host == player_id
+        || game
+            .roles
+            .values()
+            .any(|role| role.owner == Some(player_id))
+    {
+        Ok(())
+    } else {
+        Err(api_error(
+            StatusCode::FORBIDDEN,
+            "game_participant_required",
+            "player is not participating in this game",
+        ))
+    }
+}
+
+fn current_decision_role(request: &AuthorityRequest) -> Option<Uuid> {
+    request
+        .policy
+        .decision_steps
+        .get(request.current_step)
+        .map(|step| step.role_id)
+}
+
+fn status_for_decision_role(
+    game: &Game,
+    step: &sim_core::AuthorityDecisionStep,
+    tick: u64,
+) -> AuthorityRequestStatus {
+    if game
+        .roles
+        .get(&step.role_id)
+        .and_then(|role| role.owner)
+        .is_some()
+    {
+        AuthorityRequestStatus::PendingHuman {
+            role_id: step.role_id,
+        }
+    } else {
+        AuthorityRequestStatus::WaitingVacant {
+            role_id: step.role_id,
+            resolves_at_tick: tick.saturating_add(step.vacant_delay_ticks),
+        }
+    }
+}
+
+fn advance_authority_request(
+    game: &mut Game,
+    request: &mut AuthorityRequest,
+    approved: bool,
+    automatic: bool,
+) {
+    let Some(role_id) = current_decision_role(request) else {
+        return;
+    };
+    let tick = game.simulation.tick();
+    request.decisions.push(AuthorityDecisionRecord {
+        role_id,
+        approved,
+        automatic,
+        tick,
+    });
+    if !approved {
+        request.status = AuthorityRequestStatus::Denied { role_id };
+        return;
+    }
+    request.current_step += 1;
+    if let Some(step) = request.policy.decision_steps.get(request.current_step) {
+        if !AlwaysReachable.reachable(role_id, step.role_id) {
+            request.status = AuthorityRequestStatus::BlockedComms;
+        } else {
+            request.status = status_for_decision_role(game, step, tick);
+        }
+        return;
+    }
+    if !request.policy.executable || request.intent.is_none() {
+        request.status = AuthorityRequestStatus::ApprovedNoExecutor;
+        return;
+    }
+    if !AlwaysReachable.reachable(role_id, request.target_unit_id) {
+        request.status = AuthorityRequestStatus::BlockedComms;
+        return;
+    }
+    let intent = request.intent.take().expect("checked above");
+    game.simulation.queue_authorized_intent(AuthorizedIntent {
+        intent,
+        authorization: AuthorizationRecord {
+            policy_id: request.policy.id,
+            policy_version: request.policy_version,
+            requester_role_id: request.requester_role_id,
+            granting_role_id: role_id,
+            request_id: Some(request.id),
+        },
+    });
+    request.status = AuthorityRequestStatus::Approved;
+}
+
+fn process_vacant_authority_requests(game: &mut Game) {
+    let ids: Vec<_> = game.authority_requests.keys().copied().collect();
+    for id in ids {
+        let Some(mut request) = game.authority_requests.remove(&id) else {
+            continue;
+        };
+        let Some(step) = request
+            .policy
+            .decision_steps
+            .get(request.current_step)
+            .cloned()
+        else {
+            game.authority_requests.insert(id, request);
+            continue;
+        };
+        let occupied = game
+            .roles
+            .get(&step.role_id)
+            .and_then(|role| role.owner)
+            .is_some();
+        match request.status {
+            AuthorityRequestStatus::WaitingVacant {
+                resolves_at_tick: _,
+                ..
+            } if occupied => {
+                request.status = AuthorityRequestStatus::PendingHuman {
+                    role_id: step.role_id,
+                };
+            }
+            AuthorityRequestStatus::WaitingVacant {
+                resolves_at_tick, ..
+            } if game.simulation.tick() >= resolves_at_tick => {
+                let sample = ((request.id.as_u128()
+                    ^ request.policy.id.as_u128()
+                    ^ request.policy_version as u128)
+                    % 10_000) as u16;
+                advance_authority_request(
+                    game,
+                    &mut request,
+                    sample < step.approve_probability_bps,
+                    true,
+                );
+            }
+            AuthorityRequestStatus::PendingHuman { .. } if !occupied => {
+                request.status = AuthorityRequestStatus::WaitingVacant {
+                    role_id: step.role_id,
+                    resolves_at_tick: game
+                        .simulation
+                        .tick()
+                        .saturating_add(step.vacant_delay_ticks),
+                };
+            }
+            _ => {}
+        }
+        game.authority_requests.insert(id, request);
+    }
 }
 
 async fn get_projection(
@@ -477,7 +1117,7 @@ async fn get_projection(
     let role = authorized_role(game, &query)?;
     Ok(Json(
         game.simulation
-            .projection_for(role.command_scope[0], role.side),
+            .projection_for(role.location_unit_id, role.side),
     ))
 }
 
@@ -691,7 +1331,7 @@ async fn stream_socket(
                 return;
             };
             game.simulation
-                .projection_for(role.command_scope[0], role.side)
+                .projection_for(role.location_unit_id, role.side)
         };
         let Ok(payload) = serde_json::to_string(&projection) else {
             return;
@@ -718,12 +1358,22 @@ async fn run_simulation_loop(state: AppState) {
                 .cloned()
                 .collect();
             for role in ai_roles {
-                let controlled = role.command_scope[0];
+                let Some(controlled) = role.command_units.first().copied() else {
+                    continue;
+                };
                 let projection = game.simulation.projection_for(controlled, role.side);
                 if let Some(intent) = choose_patrol_intent(role.id, controlled, &projection) {
-                    game.simulation.queue_intent(intent);
+                    let _ = submit_authority_action(
+                        game,
+                        role.id,
+                        intent.kind.action_key().into(),
+                        intent.target,
+                        "AI patrol".into(),
+                        Some(intent),
+                    );
                 }
             }
+            process_vacant_authority_requests(game);
             game.simulation.step();
         }
     }
@@ -738,7 +1388,7 @@ fn game_summary(game: &Game) -> GameSummary {
         player_roles_available: game
             .roles
             .values()
-            .filter(|role| !role.ai_controlled && role.owner.is_none())
+            .filter(|role| role.claimable && !role.ai_controlled && role.owner.is_none())
             .count(),
     }
 }
@@ -747,8 +1397,9 @@ fn role_summary(role: &Role) -> RoleSummary {
         id: role.id,
         name: role.name.clone(),
         side: role.side,
-        command_scope: role.command_scope.clone(),
-        authority_echelon: role.authority_echelon,
+        kind: role.kind,
+        location_unit_id: role.location_unit_id,
+        command_units: role.command_units.clone(),
         held: role.owner.is_some(),
         ai_controlled: role.ai_controlled,
         lease_generation: role.lease_generation,
@@ -766,4 +1417,141 @@ fn api_error(
             error: error.into(),
         }),
     )
+}
+
+#[cfg(test)]
+mod authority_tests {
+    use super::*;
+    use sim_core::{OrderKind, OrderStatus, ACTION_SPACE_SUPPORT};
+
+    fn game() -> Game {
+        let scenario = global_crisis_scenario();
+        let authority = scenario.authority.clone();
+        let roles = authority
+            .roles
+            .iter()
+            .map(|definition| {
+                (
+                    definition.id,
+                    Role {
+                        id: definition.id,
+                        name: definition.name.clone(),
+                        side: definition.side,
+                        kind: definition.kind,
+                        location_unit_id: definition.location_unit_id,
+                        command_units: authority.controlled_units(definition.id),
+                        claimable: definition.claimable,
+                        owner: None,
+                        ai_controlled: definition.ai_controlled,
+                        lease_generation: 0,
+                    },
+                )
+            })
+            .collect();
+        Game {
+            id: Uuid::from_u128(900),
+            title: "Test".into(),
+            host: Uuid::from_u128(901),
+            status: GameStatus::Running,
+            simulation: scenario.spawn().unwrap(),
+            roles,
+            authority,
+            authority_requests: BTreeMap::new(),
+            authority_events: Vec::new(),
+            unit_ids: scenario.units.iter().map(|unit| unit.id).collect(),
+            space_catalog_checksum: String::new(),
+        }
+    }
+
+    #[test]
+    fn direct_order_is_wrapped_and_executed() {
+        let mut game = game();
+        let role = Uuid::from_u128(106);
+        let target = Uuid::from_u128(5);
+        let intent = PlayerIntent {
+            intent_id: Uuid::from_u128(902),
+            issuer_role: role,
+            target,
+            kind: OrderKind::Move {
+                north_mps: 10.0,
+                east_mps: 0.0,
+            },
+            requested_tick: 1,
+        };
+        assert!(matches!(
+            submit_authority_action(
+                &mut game,
+                role,
+                "move".into(),
+                target,
+                String::new(),
+                Some(intent)
+            )
+            .unwrap(),
+            SubmissionOutcome::Queued { .. }
+        ));
+        game.simulation.step();
+        assert!(matches!(
+            game.simulation.drain_order_results()[0].status,
+            OrderStatus::Accepted
+        ));
+    }
+
+    #[test]
+    fn occupied_decider_waits_for_a_human() {
+        let mut game = game();
+        let decider = Uuid::from_u128(112);
+        game.roles.get_mut(&decider).unwrap().owner = Some(Uuid::from_u128(903));
+        let outcome = submit_authority_action(
+            &mut game,
+            Uuid::from_u128(106),
+            ACTION_SPACE_SUPPORT.into(),
+            Uuid::from_u128(47),
+            "Need collection".into(),
+            None,
+        )
+        .unwrap();
+        let SubmissionOutcome::PendingAuthority { request_id } = outcome else {
+            panic!("request expected")
+        };
+        for _ in 0..65 {
+            game.simulation.step();
+            process_vacant_authority_requests(&mut game);
+        }
+        assert!(
+            matches!(game.authority_requests[&request_id].status, AuthorityRequestStatus::PendingHuman { role_id } if role_id == decider)
+        );
+    }
+
+    #[test]
+    fn vacant_decider_resolves_deterministically_after_delay() {
+        let mut game = game();
+        let policy = game
+            .authority
+            .policies
+            .iter_mut()
+            .find(|policy| policy.action == ACTION_SPACE_SUPPORT)
+            .unwrap();
+        policy.decision_steps[0].vacant_delay_ticks = 1;
+        policy.decision_steps[0].approve_probability_bps = 10_000;
+        let outcome = submit_authority_action(
+            &mut game,
+            Uuid::from_u128(106),
+            ACTION_SPACE_SUPPORT.into(),
+            Uuid::from_u128(47),
+            "Need collection".into(),
+            None,
+        )
+        .unwrap();
+        let SubmissionOutcome::PendingAuthority { request_id } = outcome else {
+            panic!("request expected")
+        };
+        game.simulation.step();
+        process_vacant_authority_requests(&mut game);
+        assert!(matches!(
+            game.authority_requests[&request_id].status,
+            AuthorityRequestStatus::ApprovedNoExecutor
+        ));
+        assert!(game.authority_requests[&request_id].decisions[0].automatic);
+    }
 }

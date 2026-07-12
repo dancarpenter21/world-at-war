@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Cartesian2, Cartesian3, Color, CustomDataSource, EllipsoidTerrainProvider,
@@ -8,12 +8,14 @@ import ms from "milsymbol";
 import { degreesLat, degreesLong, eciToGeodetic, gstime, json2satrec, propagate } from "satellite.js";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import "./styles.css";
+import type { AuthorityDefinition, AuthorityRequest, Role } from "./AuthorityWorkspace";
+
+const AuthorityWorkspace = lazy(() => import("./AuthorityWorkspace").then((module) => ({ default: module.AuthorityWorkspace })));
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 type Side = "Blue" | "Red";
 type Scenario = { id: string; title: string; description: string; version: number; authored_entity_count: number; role_count: number; requires_space_catalog: boolean };
 type Game = { id: string; title: string; status: "lobby" | "running" | "paused"; host_player_id: string; player_roles_available: number };
-type Role = { id: string; name: string; side: Side; command_scope: string[]; authority_echelon: number; held: boolean; ai_controlled: boolean; lease_generation: number };
 type Position = { latitude_deg: number; longitude_deg: number; altitude_m: number };
 type Unit = { id: string; name: string; domain: string; position: Position; sidc: string };
 type Track = { track_id: string; target_side: Side; position: Position; identity_confidence: number; observed_tick: number; received_tick: number; observed_sidc: string };
@@ -135,9 +137,18 @@ function App() {
   const [spacePassword, setSpacePassword] = useState("");
   const [rememberCredentials, setRememberCredentials] = useState(true);
   const [showDebris, setShowDebris] = useState(false);
+  const [showAuthority, setShowAuthority] = useState(false);
+  const [authority, setAuthority] = useState<AuthorityDefinition | null>(null);
+  const [authorityRequests, setAuthorityRequests] = useState<AuthorityRequest[]>([]);
   const restoreAttempted = useRef(false);
   const playerId = useMemo(() => localStorage.getItem("world-at-war-player") ?? crypto.randomUUID(), []);
   const playable = game?.status === "running" && role !== null;
+  const authorityUnits = useMemo(() => {
+    if (projection?.own_units.length) return projection.own_units;
+    const ids = new Set<string>();
+    for (const item of roles) { ids.add(item.location_unit_id); item.command_units.forEach((id) => ids.add(id)); }
+    return Array.from(ids, (id) => ({ id, name: `Unit ${id.slice(-6)}`, domain: "Command" }));
+  }, [projection, roles]);
 
   async function refreshLobby() {
     const [loadedScenarios, loadedGames, status] = await Promise.all([
@@ -172,6 +183,17 @@ function App() {
     const timer = window.setInterval(update, 1000);
     return () => window.clearInterval(timer);
   }, [playable, game?.id, role?.id, playerId]);
+
+  useEffect(() => {
+    if (!game || (!role && game.host_player_id !== playerId)) return;
+    const load = () => {
+      void request<AuthorityDefinition>(`/v1/games/${game.id}/authority?player_id=${playerId}`).then((loaded) => setAuthority((current) => current?.version === loaded.version ? current : loaded)).catch((error: Error) => setMessage(error.message));
+      void request<Role[]>(`/v1/games/${game.id}/roles`).then((loaded) => { setRoles(loaded); setRole((current) => current ? loaded.find((candidate) => candidate.id === current.id) ?? current : null); }).catch((error: Error) => setMessage(error.message));
+      const roleQuery = role ? `&role_id=${role.id}` : "";
+      void request<AuthorityRequest[]>(`/v1/games/${game.id}/authority/requests?player_id=${playerId}${roleQuery}`).then(setAuthorityRequests).catch((error: Error) => setMessage(error.message));
+    };
+    load(); const timer = window.setInterval(load, 1000); return () => window.clearInterval(timer);
+  }, [game?.id, role?.id, playerId]);
 
   async function connectSpaceTrack() {
     setMessage("Authenticating and downloading the public GP catalog. This can take a minute.");
@@ -223,7 +245,28 @@ function App() {
 
   async function turnNorth() {
     if (!game || !role || !projection) return;
-    await request(`/v1/games/${game.id}/roles/${role.id}/intent`, { method: "POST", body: JSON.stringify({ player_id: playerId, lease_generation: role.lease_generation, intent: { intent_id: crypto.randomUUID(), issuer_role: role.id, target: role.command_scope[0], kind: { Move: { north_mps: 130, east_mps: 0 } }, requested_tick: projection.tick + 1 } }) }).catch((error: Error) => setMessage(error.message));
+    const target = role.command_units[0]; if (!target) return;
+    await request(`/v1/games/${game.id}/roles/${role.id}/intent`, { method: "POST", body: JSON.stringify({ player_id: playerId, lease_generation: role.lease_generation, intent: { intent_id: crypto.randomUUID(), issuer_role: role.id, target, kind: { Move: { north_mps: 130, east_mps: 0 } }, requested_tick: projection.tick + 1 } }) }).then(() => setMessage("Order submitted through authority validation.")).catch((error: Error) => setMessage(error.message));
+  }
+
+  async function saveAuthority(draft: AuthorityDefinition) {
+    if (!game || !authority) return;
+    try {
+      const saved = await request<AuthorityDefinition>(`/v1/games/${game.id}/authority`, { method: "PUT", body: JSON.stringify({ player_id: playerId, expected_version: authority.version, definition: draft }) });
+      setAuthority(saved); setRoles(await request<Role[]>(`/v1/games/${game.id}/roles`)); setMessage(`Authority definition v${saved.version} is live.`);
+    } catch (error) { setMessage((error as Error).message); throw error; }
+  }
+
+  async function createAuthorityRequest(action: string, target_unit_id: string, summary: string) {
+    if (!game || !role) return;
+    try { await request(`/v1/games/${game.id}/roles/${role.id}/authority-requests`, { method: "POST", body: JSON.stringify({ player_id: playerId, lease_generation: role.lease_generation, action, target_unit_id, summary }) }); setMessage("Authority request transmitted."); }
+    catch (error) { setMessage((error as Error).message); }
+  }
+
+  async function decideAuthorityRequest(requestId: string, decision: "approve" | "deny") {
+    if (!game || !role) return;
+    try { await request(`/v1/games/${game.id}/roles/${role.id}/authority-requests/${requestId}/decision`, { method: "POST", body: JSON.stringify({ player_id: playerId, lease_generation: role.lease_generation, decision }) }); setMessage(`Request ${decision === "approve" ? "approved" : "denied"}.`); }
+    catch (error) { setMessage((error as Error).message); }
   }
 
   function leave() { setGame(null); setRole(null); setProjection(null); setCatalog(null); setMessage("Create a scenario or join a running game"); void refreshLobby(); }
@@ -235,9 +278,10 @@ function App() {
       {!game && <><div className="tabs"><button className={mode === "new" ? "active" : ""} onClick={() => setMode("new")}>New scenario</button><button className={mode === "join" ? "active" : ""} onClick={() => setMode("join")}>Join game</button></div>
         {mode === "new" ? <div className="modal-body two-column"><div><h2>Scenario</h2>{scenarios.map((scenario) => <div className="scenario-choice" key={scenario.id}><strong>{scenario.title}</strong><p>{scenario.description}</p><small>{scenario.authored_entity_count} authored entities · {scenario.role_count} roles · full public space catalog</small></div>)}<label>Game title<input value={gameTitle} onChange={(event) => setGameTitle(event.target.value)} /></label><button className="command" disabled={!spaceStatus?.usable} onClick={() => void createGame()}>Create game</button></div><div><h2>Space-Track setup</h2><p className="muted">Credentials are held in server memory. Remembering them stores encrypted data in an HttpOnly cookie.</p>{spaceStatus?.setup_auth_required && <label>Admin setup token<input type="password" value={adminToken} onChange={(event) => setAdminToken(event.target.value)} /></label>}<label>Space-Track username<input autoComplete="username" value={spaceUsername} onChange={(event) => setSpaceUsername(event.target.value)} /></label><label>Space-Track password<input type="password" autoComplete="current-password" value={spacePassword} onChange={(event) => setSpacePassword(event.target.value)} /></label><label className="toggle"><input type="checkbox" checked={rememberCredentials} onChange={(event) => setRememberCredentials(event.target.checked)} />Remember credentials for 30 days</label><button className="secondary" disabled={(spaceStatus?.setup_auth_required && !adminToken) || !spaceUsername || !spacePassword} onClick={() => void connectSpaceTrack()}>Connect and synchronize</button>{spaceStatus?.remembered_credentials && <button className="text-command" onClick={() => void forgetSpaceTrack()}>Forget saved credentials</button>}</div></div>
         : <div className="modal-body"><label>Display name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label><h2>Available games</h2><div className="game-list">{games.length ? games.map((item) => <button className="game-row" key={item.id} onClick={() => void selectGame(item)}><span>{item.title}</span><small>{item.status} · {item.player_roles_available} open roles</small></button>) : <p className="muted">No games have been created.</p>}</div></div>}</>}
-      {game && <div className="modal-body"><h2>{game.title}</h2><p className="muted">Claim a command role. The operational map remains offline until the scenario starts.</p><div className="role-grid">{roles.map((item) => <button key={item.id} className={`role ${role?.id === item.id ? "selected" : ""}`} disabled={item.ai_controlled || (item.held && role?.id !== item.id)} onClick={() => void claim(item)}><span>{item.name}</span><small>{item.ai_controlled ? "AI" : item.held ? "held" : `echelon ${item.authority_echelon}`}</small></button>)}</div><div className="modal-actions"><button className="secondary" onClick={leave}>Back</button>{game.host_player_id === playerId && <button className="command" disabled={!role} onClick={() => void start()}>Start scenario</button>}{game.host_player_id !== playerId && <span className="muted">Waiting for host to start</span>}</div></div>}
+      {game && <div className="modal-body"><h2>{game.title}</h2><p className="muted">Claim a command role. The operational map remains offline until the scenario starts.</p><div className="role-grid">{roles.map((item) => <button key={item.id} className={`role ${role?.id === item.id ? "selected" : ""}`} disabled={item.ai_controlled || (item.held && role?.id !== item.id)} onClick={() => void claim(item)}><span>{item.name}</span><small>{item.ai_controlled ? "AI" : item.held ? "held" : item.kind.replaceAll("_", " ")}</small></button>)}</div><div className="modal-actions"><button className="secondary" onClick={leave}>Back</button>{game.host_player_id === playerId && <button className="secondary" onClick={() => setShowAuthority(true)}>Configure authorities</button>}{game.host_player_id === playerId && <button className="command" disabled={!role} onClick={() => void start()}>Start scenario</button>}{game.host_player_id !== playerId && <span className="muted">Waiting for host to start</span>}</div></div>}
     </section></div>}
-    {playable && projection && <section className="workspace"><aside className="sidebar"><h1>{role.name}</h1><p className="message">{game.title}</p><h2>Layers</h2><label className="toggle"><input type="checkbox" checked={showDebris} onChange={(event) => setShowDebris(event.target.checked)} />Orbital debris</label><h2>Catalog</h2><p className="muted">{catalog ? `${catalog.objects.length.toLocaleString()} public objects loaded` : "Loading orbital snapshot"}</p><button className="secondary" onClick={leave}>Leave scenario</button></aside><section className="map-region"><Globe projection={projection} catalog={catalog} showDebris={showDebris} /><div className="map-caption">{role.name} · {role.side}</div></section><aside className="inspector"><h2>Operational picture</h2><div className="metric"><span>Own units</span><strong>{projection.own_units.length}</strong></div><div className="metric"><span>Tracks</span><strong>{projection.tracks.length}</strong></div><h2>Actions</h2><button className="command" onClick={() => void turnNorth()}>Turn north</button><h2>Tracks</h2>{projection.tracks.length ? projection.tracks.map((track) => <div className="track" key={track.track_id}><span>Uncertain {track.target_side} contact</span><small>{Math.round(track.identity_confidence * 100)}% identity</small></div>) : <p className="muted">No reports received.</p>}</aside></section>}
+    {playable && projection && <section className="workspace"><aside className="sidebar"><h1>{role.name}</h1><p className="message">{game.title}</p><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human").length})` : ""}</button><h2>Layers</h2><label className="toggle"><input type="checkbox" checked={showDebris} onChange={(event) => setShowDebris(event.target.checked)} />Orbital debris</label><h2>Catalog</h2><p className="muted">{catalog ? `${catalog.objects.length.toLocaleString()} public objects loaded` : "Loading orbital snapshot"}</p><button className="secondary" onClick={leave}>Leave scenario</button></aside><section className="map-region"><Globe projection={projection} catalog={catalog} showDebris={showDebris} /><div className="map-caption">{role.name} · {role.side}</div></section><aside className="inspector"><h2>Operational picture</h2><div className="metric"><span>Own units</span><strong>{projection.own_units.length}</strong></div><div className="metric"><span>Tracks</span><strong>{projection.tracks.length}</strong></div><h2>Actions</h2><button className="command" disabled={!role.command_units.length} onClick={() => void turnNorth()}>Turn north</button><h2>Tracks</h2>{projection.tracks.length ? projection.tracks.map((track) => <div className="track" key={track.track_id}><span>Uncertain {track.target_side} contact</span><small>{Math.round(track.identity_confidence * 100)}% identity</small></div>) : <p className="muted">No reports received.</p>}</aside></section>}
+    {showAuthority && authority && game && <Suspense fallback={<div className="authority-loading">Loading authority graph…</div>}><AuthorityWorkspace definition={authority} runtimeRoles={roles} units={authorityUnits} requests={authorityRequests} currentRole={role} isHost={game.host_player_id === playerId} tick={projection?.tick ?? 0} onClose={() => setShowAuthority(false)} onSave={saveAuthority} onCreateRequest={createAuthorityRequest} onDecision={decideAuthorityRequest} /></Suspense>}
   </main>;
 }
 

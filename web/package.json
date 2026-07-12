@@ -9,7 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@xyflow/react": "^12.11.2",
     "cesium": "^1.139.0",
+    "elkjs": "^0.11.1",
     "milsymbol": "^3.0.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

@@ -6,7 +6,7 @@ See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the phased architecture
 
 ## Development
 
-The implemented global-crisis scenario contains 64 authored entities, seven human Blue roles, a basic Red AI, White House and Pentagon command nodes, and a pinned public orbital catalog. Entities and uncertain tracks use MIL-STD-2525D SIDCs rendered with milsymbol.
+The implemented global-crisis scenario contains 64 authored entities, thirteen claimable Blue command roles, a basic Red AI, a doctrine-oriented authority graph, White House and Pentagon command nodes, and a pinned public orbital catalog. Entities and uncertain tracks use MIL-STD-2525D SIDCs rendered with milsymbol.
 
 ```sh
 cargo test
@@ -21,6 +21,8 @@ npm run dev
 The API runs on `http://localhost:8000` and the Vite client on `http://localhost:5173`. To run the production-shaped local stack, use `docker compose up --build` and open `http://localhost:8080`.
 
 The first screen is a scenario/join modal; Cesium is not constructed until a player holds a role in a running game. Enter Space-Track credentials in the modal to fetch the current public GP catalog. Selecting **Remember credentials** stores authenticated encrypted data in a 30-day `HttpOnly`, `SameSite=Strict` cookie; the encryption key remains in the ignored server cache volume. Set `COOKIE_SECURE=true` when serving over HTTPS. Catalog snapshots are cached under ignored `data/cache/space-track/`. `SPACETRACK_USERNAME` and `SPACETRACK_PASSWORD` may instead be supplied through the server environment. For a hosted deployment, setting the optional `ADMIN_SETUP_TOKEN` restores bearer-token protection for catalog setup and makes the token field appear in the modal.
+
+The host can open **Configure authorities** before or during play. The graph distinguishes operational command from support, advisory, and order-transmission relationships; policies define direct grants, requesters, ordered approval roles, and deterministic vacant-role decisions. Players use the same workspace as a read-only command-chain view and authority-request inbox. Communications currently pass through an always-reachable gate so the later boolean communications graph can replace it without changing authority policy data.
 
 ## Archtecture
 
