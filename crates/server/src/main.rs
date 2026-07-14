@@ -1,4 +1,5 @@
 mod credential_cookie;
+mod space_assets;
 mod space_catalog;
 
 use std::{
@@ -21,11 +22,13 @@ use axum::{
 use credential_cookie::{CredentialCookie, RememberedCredentials};
 use serde::{Deserialize, Serialize};
 use sim_ai::choose_patrol_intent;
+use sim_catalog::space::{SatelliteAuthorityAssignment, SatelliteAuthorityKind, SourceReference};
 use sim_core::{
     AuthorityDefinition, AuthorityPolicy, AuthorityRoleKind, AuthorizationRecord, AuthorizedIntent,
     PlayerIntent, RoleProjection, Side, Simulation,
 };
 use sim_scenario::{global_crisis_scenario, Scenario};
+use space_assets::{SpaceAssetDetail, SpaceAssetService, SpaceAssetsResponse};
 use space_catalog::{SpaceCatalogService, SpaceCatalogSnapshot, SpaceCatalogStatus};
 use tokio::sync::RwLock;
 use tower_http::{
@@ -35,11 +38,15 @@ use tower_http::{
 };
 use uuid::Uuid;
 
+const EXTERNAL_OPERATOR_DELAY_TICKS: u64 = 60;
+const EXTERNAL_OPERATOR_APPROVAL_BPS: u16 = 5_000;
+
 #[derive(Clone)]
 struct AppState {
     games: Arc<RwLock<BTreeMap<Uuid, Game>>>,
     scenarios: Arc<BTreeMap<String, Scenario>>,
     space_catalog: SpaceCatalogService,
+    space_assets: SpaceAssetService,
     admin_token: Arc<Option<String>>,
     credential_cookie: CredentialCookie,
 }
@@ -171,10 +178,17 @@ enum AuthorityRequestStatus {
         role_id: Uuid,
         resolves_at_tick: u64,
     },
+    PendingExternal {
+        authority_id: String,
+        resolves_at_tick: u64,
+    },
     Approved,
     ApprovedNoExecutor,
     Denied {
         role_id: Uuid,
+    },
+    DeniedExternal {
+        authority_id: String,
     },
     BlockedComms,
 }
@@ -183,6 +197,7 @@ struct AuthorityRequest {
     id: Uuid,
     action: String,
     target_unit_id: Uuid,
+    target: AuthorityTarget,
     requester_role_id: Uuid,
     policy: AuthorityPolicy,
     policy_version: u64,
@@ -191,8 +206,23 @@ struct AuthorityRequest {
     summary: String,
     status: AuthorityRequestStatus,
     decisions: Vec<AuthorityDecisionRecord>,
+    satellite_context: Option<FrozenSatelliteContext>,
     #[serde(skip)]
     intent: Option<PlayerIntent>,
+}
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum AuthorityTarget {
+    Unit { unit_id: Uuid },
+    Satellite { norad_catalog_id: u64 },
+}
+#[derive(Debug, Clone, Serialize)]
+struct FrozenSatelliteContext {
+    authority_assignment: SatelliteAuthorityAssignment,
+    catalog_checksum: String,
+    card_manifest_version: Option<String>,
+    requester_role_id: Uuid,
+    public_sources: Vec<SourceReference>,
 }
 #[derive(Debug, Clone, Serialize)]
 struct AuthorityEvent {
@@ -221,6 +251,13 @@ struct CreateAuthorityRequest {
     lease_generation: u64,
     action: String,
     target_unit_id: Uuid,
+    summary: String,
+}
+#[derive(Deserialize)]
+struct CreateSatelliteRequest {
+    player_id: Uuid,
+    lease_generation: u64,
+    action: String,
     summary: String,
 }
 #[derive(Deserialize)]
@@ -266,6 +303,7 @@ async fn main() -> anyhow::Result<()> {
         games: Arc::new(RwLock::new(BTreeMap::new())),
         scenarios: Arc::new(BTreeMap::from([(scenario.id.clone(), scenario)])),
         space_catalog: SpaceCatalogService::load().await?,
+        space_assets: SpaceAssetService::load().await,
         admin_token: Arc::new(admin_token),
         credential_cookie: CredentialCookie::load().await?,
     };
@@ -305,6 +343,15 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/games/{game_id}/state", get(get_projection))
         .route("/v1/games/{game_id}/stream", get(stream_projection))
         .route("/v1/games/{game_id}/space-catalog", get(game_space_catalog))
+        .route("/v1/games/{game_id}/space-assets", get(game_space_assets))
+        .route(
+            "/v1/games/{game_id}/space-assets/{norad_id}",
+            get(game_space_asset),
+        )
+        .route(
+            "/v1/games/{game_id}/roles/{role_id}/space-assets/{norad_id}/requests",
+            post(create_satellite_request),
+        )
         .route(
             "/v1/settings/space-catalog/status",
             get(space_catalog_status),
@@ -818,6 +865,194 @@ async fn decide_authority_request(
     Ok(Json(response))
 }
 
+async fn create_satellite_request(
+    Path((game_id, role_id, norad_id)): Path<(Uuid, Uuid, u64)>,
+    State(state): State<AppState>,
+    Json(request): Json<CreateSatelliteRequest>,
+) -> ApiResult<SubmissionOutcome> {
+    if request.summary.chars().count() > 500 {
+        return Err(api_error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "summary_too_long",
+            "request summary is limited to 500 characters",
+        ));
+    }
+    let checksum = {
+        let games = state.games.read().await;
+        let game = games
+            .get(&game_id)
+            .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
+        validate_role_lease(game, role_id, request.player_id, request.lease_generation)?;
+        game.space_catalog_checksum.clone()
+    };
+    let snapshot = state
+        .space_catalog
+        .snapshot(&checksum)
+        .await
+        .ok_or_else(|| {
+            api_error(
+                StatusCode::GONE,
+                "catalog_snapshot_missing",
+                "the game's pinned space catalog is no longer available",
+            )
+        })?;
+    let detail = state
+        .space_assets
+        .detail(&snapshot, norad_id)
+        .await
+        .ok_or_else(|| {
+            api_error(
+                StatusCode::NOT_FOUND,
+                "space_asset_not_found",
+                "space asset not found",
+            )
+        })?;
+    validate_satellite_request(&detail, &request.action)?;
+
+    let mut games = state.games.write().await;
+    let game = games
+        .get_mut(&game_id)
+        .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
+    validate_role_lease(game, role_id, request.player_id, request.lease_generation)?;
+    if game.space_catalog_checksum != checksum {
+        return Err(api_error(
+            StatusCode::CONFLICT,
+            "catalog_pin_changed",
+            "the game's pinned catalog changed while the request was prepared",
+        ));
+    }
+    let policy_action = match request.action.as_str() {
+        "request_satellite_service" => sim_core::ACTION_SPACE_SUPPORT,
+        "coordinate_satellite_maneuver" => sim_core::ACTION_STRATEGIC_SATELLITE,
+        _ => unreachable!("validated above"),
+    };
+    let policy = game
+        .authority
+        .policies
+        .iter()
+        .find(|policy| policy.action == policy_action)
+        .cloned()
+        .ok_or_else(|| {
+            api_error(
+                StatusCode::FORBIDDEN,
+                "authority_not_defined",
+                "no game authority policy covers this satellite request",
+            )
+        })?;
+    if !policy.request_role_ids.contains(&role_id) && !policy.direct_role_ids.contains(&role_id) {
+        return Err(api_error(
+            StatusCode::FORBIDDEN,
+            "request_not_permitted",
+            "this role may not make the satellite request",
+        ));
+    }
+    let tick = game.simulation.tick();
+    let request_id = Uuid::new_v4();
+    let status = if detail.authority.kind == SatelliteAuthorityKind::MilitaryRole {
+        let first_step = policy.decision_steps.first().ok_or_else(|| {
+            api_error(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "missing_decision_step",
+                "authority policy has no decision step",
+            )
+        })?;
+        status_for_decision_role(game, first_step, tick)
+    } else {
+        AuthorityRequestStatus::PendingExternal {
+            authority_id: detail.authority.authority_id.clone(),
+            resolves_at_tick: tick.saturating_add(EXTERNAL_OPERATOR_DELAY_TICKS),
+        }
+    };
+    let frozen = FrozenSatelliteContext {
+        authority_assignment: detail.authority.clone(),
+        catalog_checksum: checksum,
+        card_manifest_version: detail.manifest_version.clone(),
+        requester_role_id: role_id,
+        public_sources: detail.sources.clone(),
+    };
+    game.authority_requests.insert(
+        request_id,
+        AuthorityRequest {
+            id: request_id,
+            action: request.action,
+            target_unit_id: Uuid::nil(),
+            target: AuthorityTarget::Satellite {
+                norad_catalog_id: norad_id,
+            },
+            requester_role_id: role_id,
+            policy,
+            policy_version: game.authority.version,
+            current_step: 0,
+            created_tick: tick,
+            summary: request.summary,
+            status,
+            decisions: Vec::new(),
+            satellite_context: Some(frozen.clone()),
+            intent: None,
+        },
+    );
+    game.authority_events.push(AuthorityEvent {
+        tick,
+        kind: "satellite_authority_requested".into(),
+        detail: format!(
+            "request {request_id}; frozen={}",
+            serde_json::to_string(&frozen).unwrap_or_else(|_| "unavailable".into())
+        ),
+    });
+    Ok(Json(SubmissionOutcome::PendingAuthority { request_id }))
+}
+
+fn validate_satellite_request(
+    detail: &SpaceAssetDetail,
+    action: &str,
+) -> Result<(), (StatusCode, Json<ErrorResponse>)> {
+    if !matches!(
+        action,
+        "request_satellite_service" | "coordinate_satellite_maneuver"
+    ) {
+        return Err(api_error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "unsupported_satellite_request",
+            "supported actions are request_satellite_service and coordinate_satellite_maneuver",
+        ));
+    }
+    if detail.record.object_type != "PAYLOAD" {
+        return Err(api_error(
+            StatusCode::FORBIDDEN,
+            "payload_required",
+            "requests may target payloads only",
+        ));
+    }
+    if detail.record.nation != "US" {
+        return Err(api_error(
+            StatusCode::FORBIDDEN,
+            "us_payload_required",
+            "v1 requests may target U.S. payloads only",
+        ));
+    }
+    if !detail.authority.commandable || detail.authority.kind == SatelliteAuthorityKind::Unresolved
+    {
+        return Err(api_error(
+            StatusCode::FORBIDDEN,
+            "authority_unresolved",
+            "this payload has no reviewed commandable authority assignment",
+        ));
+    }
+    if !detail
+        .authority
+        .allowed_request_types
+        .iter()
+        .any(|allowed| allowed == action)
+    {
+        return Err(api_error(
+            StatusCode::FORBIDDEN,
+            "request_type_not_allowed",
+            "the authority assignment does not allow this request type",
+        ));
+    }
+    Ok(())
+}
+
 trait CommunicationsGate {
     fn reachable(&self, _from_role: Uuid, _to: Uuid) -> bool;
 }
@@ -907,6 +1142,7 @@ fn submit_authority_action(
             id: request_id,
             action,
             target_unit_id: target,
+            target: AuthorityTarget::Unit { unit_id: target },
             requester_role_id: role_id,
             policy,
             policy_version: game.authority.version,
@@ -915,6 +1151,7 @@ fn submit_authority_action(
             summary,
             status,
             decisions: Vec::new(),
+            satellite_context: None,
             intent,
         },
     );
@@ -1053,6 +1290,36 @@ fn process_vacant_authority_requests(game: &mut Game) {
         let Some(mut request) = game.authority_requests.remove(&id) else {
             continue;
         };
+        if let AuthorityRequestStatus::PendingExternal {
+            authority_id,
+            resolves_at_tick,
+        } = request.status.clone()
+        {
+            if game.simulation.tick() >= resolves_at_tick {
+                let sample =
+                    ((request.id.as_u128() ^ request.policy_version as u128) % 10_000) as u16;
+                request.decisions.push(AuthorityDecisionRecord {
+                    role_id: Uuid::nil(),
+                    approved: sample < EXTERNAL_OPERATOR_APPROVAL_BPS,
+                    automatic: true,
+                    tick: game.simulation.tick(),
+                });
+                request.status = if sample < EXTERNAL_OPERATOR_APPROVAL_BPS {
+                    AuthorityRequestStatus::ApprovedNoExecutor
+                } else {
+                    AuthorityRequestStatus::DeniedExternal { authority_id }
+                };
+                game.authority_events.push(AuthorityEvent {
+                    tick: game.simulation.tick(),
+                    kind: "external_operator_decision".into(),
+                    detail: format!(
+                        "request {id} resolved by deterministic external-operator actor"
+                    ),
+                });
+            }
+            game.authority_requests.insert(id, request);
+            continue;
+        }
         let Some(step) = request
             .policy
             .decision_steps
@@ -1143,6 +1410,91 @@ async fn game_space_catalog(
             )
         })?;
     Ok(Json(snapshot))
+}
+
+async fn game_space_assets(
+    Path(game_id): Path<Uuid>,
+    State(state): State<AppState>,
+    Query(query): Query<ProjectionQuery>,
+) -> Result<(HeaderMap, Json<SpaceAssetsResponse>), (StatusCode, Json<ErrorResponse>)> {
+    let checksum = {
+        let games = state.games.read().await;
+        let game = games
+            .get(&game_id)
+            .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
+        authorized_role(game, &query)?;
+        game.space_catalog_checksum.clone()
+    };
+    let snapshot = state
+        .space_catalog
+        .snapshot(&checksum)
+        .await
+        .ok_or_else(|| {
+            api_error(
+                StatusCode::GONE,
+                "catalog_snapshot_missing",
+                "the game's pinned space catalog is no longer available",
+            )
+        })?;
+    let response = state.space_assets.list(&snapshot);
+    let mut headers = HeaderMap::new();
+    let tag = format!(
+        "\"space-assets-{}-{}\"",
+        checksum,
+        response.manifest_version.as_deref().unwrap_or("baseline")
+    );
+    if let Ok(value) = HeaderValue::from_str(&tag) {
+        headers.insert(axum::http::header::ETAG, value);
+    }
+    Ok((headers, Json(response)))
+}
+
+async fn game_space_asset(
+    Path((game_id, norad_id)): Path<(Uuid, u64)>,
+    State(state): State<AppState>,
+    Query(query): Query<ProjectionQuery>,
+) -> Result<(HeaderMap, Json<SpaceAssetDetail>), (StatusCode, Json<ErrorResponse>)> {
+    let checksum = {
+        let games = state.games.read().await;
+        let game = games
+            .get(&game_id)
+            .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
+        authorized_role(game, &query)?;
+        game.space_catalog_checksum.clone()
+    };
+    let snapshot = state
+        .space_catalog
+        .snapshot(&checksum)
+        .await
+        .ok_or_else(|| {
+            api_error(
+                StatusCode::GONE,
+                "catalog_snapshot_missing",
+                "the game's pinned space catalog is no longer available",
+            )
+        })?;
+    let response = state
+        .space_assets
+        .detail(&snapshot, norad_id)
+        .await
+        .ok_or_else(|| {
+            api_error(
+                StatusCode::NOT_FOUND,
+                "space_asset_not_found",
+                "space asset not found",
+            )
+        })?;
+    let mut headers = HeaderMap::new();
+    let tag = format!(
+        "\"space-card-{}-{}-{}\"",
+        checksum,
+        response.manifest_version.as_deref().unwrap_or("baseline"),
+        norad_id
+    );
+    if let Ok(value) = HeaderValue::from_str(&tag) {
+        headers.insert(axum::http::header::ETAG, value);
+    }
+    Ok((headers, Json(response)))
 }
 
 fn authorized_role<'a>(
@@ -1422,6 +1774,10 @@ fn api_error(
 #[cfg(test)]
 mod authority_tests {
     use super::*;
+    use sim_catalog::space::{
+        AuthorityConfidence, SatelliteAuthorityAssignment, SatelliteAuthorityKind,
+        SpaceAssetIndexEntry,
+    };
     use sim_core::{OrderKind, OrderStatus, ACTION_SPACE_SUPPORT};
 
     fn game() -> Game {
@@ -1553,5 +1909,131 @@ mod authority_tests {
             AuthorityRequestStatus::ApprovedNoExecutor
         ));
         assert!(game.authority_requests[&request_id].decisions[0].automatic);
+    }
+
+    fn satellite_detail(
+        object_type: &str,
+        nation: &str,
+        kind: SatelliteAuthorityKind,
+        commandable: bool,
+    ) -> SpaceAssetDetail {
+        let authority = SatelliteAuthorityAssignment {
+            authority_id: "test.authority".into(),
+            display_name: "Test authority".into(),
+            organization: "Test organization".into(),
+            kind,
+            game_role_name: None,
+            public_source_ids: vec!["official".into()],
+            confidence: AuthorityConfidence::Official,
+            allowed_request_types: vec![
+                "request_satellite_service".into(),
+                "coordinate_satellite_maneuver".into(),
+            ],
+            commandable,
+        };
+        let record = SpaceAssetIndexEntry {
+            norad_catalog_id: 5,
+            cospar_id: Some("1958-002B".into()),
+            canonical_name: "Test payload".into(),
+            aliases: Vec::new(),
+            nation: nation.into(),
+            object_type: object_type.into(),
+            orbital_regime: "leo".into(),
+            operational_status: "Unknown".into(),
+            operator: "Test".into(),
+            mission_category: "Test".into(),
+            launch_year: Some(1958),
+            radar_size_class: "MEDIUM".into(),
+            inclination_deg: Some(34.0),
+            authority: authority.clone(),
+            has_enriched_card: true,
+        };
+        SpaceAssetDetail {
+            catalog_checksum: "a".repeat(64),
+            manifest_version: Some("1.0.0".into()),
+            enrichment_available: true,
+            record,
+            raw_orbital_fields: serde_json::json!({}),
+            markdown: String::new(),
+            sources: Vec::new(),
+            confidence: authority.confidence.clone(),
+            authority,
+        }
+    }
+
+    #[test]
+    fn satellite_request_eligibility_rejects_debris_foreign_and_unresolved_targets() {
+        assert!(validate_satellite_request(
+            &satellite_detail("DEBRIS", "US", SatelliteAuthorityKind::MilitaryRole, true),
+            "request_satellite_service"
+        )
+        .is_err());
+        assert!(validate_satellite_request(
+            &satellite_detail("PAYLOAD", "FR", SatelliteAuthorityKind::CivilOperator, true),
+            "request_satellite_service"
+        )
+        .is_err());
+        assert!(validate_satellite_request(
+            &satellite_detail("PAYLOAD", "US", SatelliteAuthorityKind::Unresolved, false),
+            "request_satellite_service"
+        )
+        .is_err());
+        assert!(validate_satellite_request(
+            &satellite_detail(
+                "PAYLOAD",
+                "US",
+                SatelliteAuthorityKind::CommercialOperator,
+                true
+            ),
+            "request_satellite_service"
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn external_operator_resolves_without_an_executor_or_orbit_change() {
+        let mut game = game();
+        let policy = game
+            .authority
+            .policies
+            .iter()
+            .find(|policy| policy.action == ACTION_SPACE_SUPPORT)
+            .unwrap()
+            .clone();
+        let request_id = Uuid::from_u128(9_999);
+        game.authority_requests.insert(
+            request_id,
+            AuthorityRequest {
+                id: request_id,
+                action: "request_satellite_service".into(),
+                target_unit_id: Uuid::nil(),
+                target: AuthorityTarget::Satellite {
+                    norad_catalog_id: 5,
+                },
+                requester_role_id: Uuid::from_u128(106),
+                policy,
+                policy_version: game.authority.version,
+                current_step: 0,
+                created_tick: 0,
+                summary: "test".into(),
+                status: AuthorityRequestStatus::PendingExternal {
+                    authority_id: "commercial.test".into(),
+                    resolves_at_tick: 1,
+                },
+                decisions: Vec::new(),
+                satellite_context: None,
+                intent: None,
+            },
+        );
+        game.simulation.step();
+        process_vacant_authority_requests(&mut game);
+        let request = &game.authority_requests[&request_id];
+        assert!(matches!(
+            request.status,
+            AuthorityRequestStatus::ApprovedNoExecutor
+                | AuthorityRequestStatus::DeniedExternal { .. }
+        ));
+        assert!(request.decisions[0].automatic);
+        assert!(request.intent.is_none());
     }
 }

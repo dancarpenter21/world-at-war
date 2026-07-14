@@ -1,0 +1,4 @@
+[
+  {"id":"celestrak-satcat","url":"https://celestrak.org/pub/satcat.txt","filename":"celestrak-satcat.txt"},
+  {"id":"gcat-psatcat","url":"https://planet4589.org/space/gcat/data/cats/psatcat","filename":"gcat-psatcat.tsv"}
+]

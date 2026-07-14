@@ -21,9 +21,11 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       SPACETRACK_USERNAME: ${SPACETRACK_USERNAME:-}
       SPACETRACK_PASSWORD: ${SPACETRACK_PASSWORD:-}
+      SPACE_CARDS_DIR: /app/data/generated/space-cards
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     volumes:
       - ./data/cache/space-track:/app/data/cache/space-track
+      - ./data/generated/space-cards:/app/data/generated/space-cards:ro
     expose:
       - "8000"
     networks:

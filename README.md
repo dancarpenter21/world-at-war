@@ -10,7 +10,8 @@ The broader target architecture, planned simulation fidelity, and acceptance cri
 
 - A deterministic Rust ECS simulation with one-second ticks, platform movement, server-side projections, and simple Red patrol AI.
 - A lobby that creates and joins games, role claiming, game start/pause controls, and REST/WebSocket state delivery.
-- A Cesium operational map that renders owned units, uncertain tracks, and propagated public orbital objects. Debris is optional in the map layer.
+- A Cesium operational map that keeps authored owned units and uncertain tracks visually separate from the public orbital catalog.
+- A lazy full-screen space-asset workspace with worker-based bulk propagation, point-primitive rendering, UTC playback, search/facets, sourced payload cards, and authority-routed satellite requests.
 - A versioned authority definition: roles, operational/support/advisory/transmit relationships, policies, direct grants, approval sequences, vacant-role resolution, and human approval or denial of requests.
 - A Space-Track GP catalog integration with encrypted remembered credentials, cached snapshots, clear diagnostics for credential/access/service failures, and per-game catalog pinning.
 - A Docker Compose edge proxy that serves the web client and routes `/health`, `/v1/`, and WebSocket traffic to the Rust server.
@@ -73,10 +74,21 @@ Copy [`.env.example`](.env.example) to an ignored root `.env` file for Compose c
 | `ADMIN_SETUP_TOKEN` | Optional bearer token required to configure catalog credentials through the UI. |
 | `COOKIE_SECURE` | Set to `true` or `1` only when HTTPS terminates in front of the application. |
 | `HOST_UID` / `HOST_GID` | Optional local user/group IDs for the Compose server process; defaults to `1000:1000` so it can read and update the bind-mounted catalog cache. |
+| `SPACE_CARDS_DIR` | Optional path to offline-generated satellite cards; defaults to `data/generated/space-cards`. |
 
 From the setup panel, enter Space-Track credentials and choose whether to remember them. Credentials are held in server memory for the running process. Remembering them stores encrypted data in a 30-day `HttpOnly`, `SameSite=Strict` cookie; its encryption key and catalog cache are retained in `data/cache/space-track/`. Compose bind-mounts that directory, so a catalog downloaded by `space-track-test.sh` is available when the Docker server starts. Plaintext credentials are never returned by the server.
 
 The service loads a valid cached GP snapshot on startup, labels objects for map rendering, and pins its checksum to each game. An explicit Space-Track sign-in attempts to download and atomically save a replacement snapshot. If that refresh fails, the existing cache remains playable and the UI marks it as cached while showing the refresh error. A snapshot becomes marked stale after one hour, but staleness does not prevent a game from using it. The synchronization cooldown is one hour **after a successful persisted download only**. Failed authentication, authorization, network, rate-limit, or catalog parsing attempts can be corrected and retried without triggering that local cooldown.
+
+## Offline space-card enrichment
+
+Enrichment never runs during server startup or Space-Track synchronization. After a snapshot is pinned locally, run:
+
+```sh
+cargo run -p sim-catalog --bin space-card-enrich
+```
+
+The command reads `data/cache/space-track/latest.json`, applies the committed rules and reviewed overrides in `data/space-cards/`, and writes the ignored runtime tree `data/generated/space-cards/`. Pass `--refresh-sources` to refresh the configured public CelesTrak and GCAT downloads under the ignored `data/cache/space-sources/` tree before generation; otherwise the last cached source versions are used. Use `--validate-only` to check full-catalog coverage without writing. Production Compose mounts the generated tree read-only; if it is missing or its checksum does not match the pinned snapshot, the API serves an explicitly uncommandable baseline card from Space-Track fields.
 
 ## Gameplay and authority workflow
 

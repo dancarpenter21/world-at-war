@@ -1,5 +1,7 @@
 //! Versioned, provenance-aware catalog records. Raw source files are imported separately.
 
+pub mod space;
+
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 

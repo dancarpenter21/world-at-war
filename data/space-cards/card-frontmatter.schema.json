@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://world-at-war.invalid/schemas/space-card-frontmatter-v1.json",
+  "type": "object",
+  "required": ["norad_catalog_id", "canonical_name", "nation", "operator", "mission_category", "orbital_regime", "generated_at", "authority_assignment_id", "authority_kind", "authority_confidence", "commandable", "source_urls", "field_confidence"],
+  "properties": {
+    "norad_catalog_id": {"type": "integer", "minimum": 1},
+    "cospar_id": {"type": "string"},
+    "canonical_name": {"type": "string", "minLength": 1},
+    "aliases": {"type": "array", "items": {"type": "string"}},
+    "commandable": {"type": "boolean"},
+    "source_urls": {"type": "array", "items": {"type": "string", "pattern": "^https://"}}
+  },
+  "additionalProperties": true
+}

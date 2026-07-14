@@ -1710,8 +1710,13 @@ dependencies = [
 name = "sim-catalog"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "reqwest",
  "serde",
+ "serde_json",
+ "sha2",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
@@ -2439,6 +2444,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "sim-ai",
+ "sim-catalog",
  "sim-core",
  "sim-scenario",
  "tokio",

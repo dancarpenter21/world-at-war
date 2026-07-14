@@ -1,16 +1,16 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  Cartesian2, Cartesian3, Color, CustomDataSource, EllipsoidTerrainProvider,
+  Cartesian2, Cartesian3, Color, EllipsoidTerrainProvider,
   ImageryLayer, OpenStreetMapImageryProvider, Viewer
 } from "cesium";
 import ms from "milsymbol";
-import { degreesLat, degreesLong, eciToGeodetic, gstime, json2satrec, propagate } from "satellite.js";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import "./styles.css";
 import type { AuthorityDefinition, AuthorityRequest, Role } from "./AuthorityWorkspace";
 
 const AuthorityWorkspace = lazy(() => import("./AuthorityWorkspace").then((module) => ({ default: module.AuthorityWorkspace })));
+const SpaceAssetViewer = lazy(() => import("./SpaceAssetViewer").then((module) => ({ default: module.SpaceAssetViewer })));
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 type Side = "Blue" | "Red";
@@ -21,7 +21,6 @@ type Unit = { id: string; name: string; domain: string; position: Position; sidc
 type Track = { track_id: string; target_side: Side; position: Position; identity_confidence: number; observed_tick: number; received_tick: number; observed_sidc: string };
 type Projection = { tick: number; own_units: Unit[]; tracks: Track[] };
 type SpaceStatus = { setup_auth_required: boolean; remembered_credentials: boolean; configured: boolean; syncing: boolean; usable: boolean; stale: boolean; using_cached_fallback: boolean; synced_unix?: number; age_seconds?: number; object_count: number; checksum?: string; error?: string };
-type SpaceSnapshot = { synced_unix: number; checksum: string; objects: Record<string, unknown>[] };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, { ...init, credentials: "include", headers: { "content-type": "application/json", ...init?.headers } });
@@ -43,10 +42,9 @@ function symbolCanvas(sidc: string, size = 32) {
   return canvas;
 }
 
-function Globe({ projection, catalog, showDebris }: { projection: Projection; catalog: SpaceSnapshot | null; showDebris: boolean }) {
+function Globe({ projection }: { projection: Projection }) {
   const host = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Viewer | null>(null);
-  const spaceSource = useRef<CustomDataSource | null>(null);
 
   useEffect(() => {
     if (!host.current || viewerRef.current) return;
@@ -59,11 +57,8 @@ function Globe({ projection, catalog, showDebris }: { projection: Projection; ca
     });
     viewer.scene.globe.baseColor = Color.fromCssColorString("#1f3340");
     viewer.camera.setView({ destination: Cartesian3.fromDegrees(-40, 30, 20_000_000) });
-    const source = new CustomDataSource("public-space-catalog");
-    source.clustering.enabled = true; source.clustering.pixelRange = 45; source.clustering.minimumClusterSize = 4;
-    void viewer.dataSources.add(source);
-    viewerRef.current = viewer; spaceSource.current = source;
-    return () => { viewer.destroy(); viewerRef.current = null; spaceSource.current = null; };
+    viewerRef.current = viewer;
+    return () => { viewer.destroy(); viewerRef.current = null; };
   }, []);
 
   useEffect(() => {
@@ -84,38 +79,6 @@ function Globe({ projection, catalog, showDebris }: { projection: Projection; ca
     });
   }, [projection]);
 
-  useEffect(() => {
-    const source = spaceSource.current;
-    if (!source || !catalog) return;
-    source.entities.removeAll();
-    const propagated: { entityId: string; satrec: ReturnType<typeof json2satrec> }[] = [];
-    for (const object of catalog.objects) {
-      const objectType = String(object.OBJECT_TYPE ?? "UNKNOWN");
-      if (!showDebris && objectType === "DEBRIS") continue;
-      try {
-        const satrec = json2satrec(object as Parameters<typeof json2satrec>[0]);
-        const entityId = `space-${String(object.NORAD_CAT_ID)}`;
-        source.entities.add({
-          id: entityId, name: String(object.OBJECT_NAME ?? `NORAD ${String(object.NORAD_CAT_ID)}`),
-          billboard: { image: symbolCanvas(String(object.SIDC), 22), width: 28, height: 28 }
-        });
-        propagated.push({ entityId, satrec });
-      } catch { /* malformed public records are skipped without affecting authored entities */ }
-    }
-    const updatePositions = () => {
-      const date = new Date(); const gmst = gstime(date);
-      for (const item of propagated) {
-        const result = propagate(item.satrec, date);
-        if (!result?.position || typeof result.position === "boolean") continue;
-        const geo = eciToGeodetic(result.position, gmst);
-        const entity = source.entities.getById(item.entityId);
-        if (entity) entity.position = Cartesian3.fromDegrees(degreesLong(geo.longitude), degreesLat(geo.latitude), geo.height * 1000) as never;
-      }
-    };
-    updatePositions(); const timer = window.setInterval(updatePositions, 10_000);
-    return () => window.clearInterval(timer);
-  }, [catalog, showDebris]);
-
   return <div className="globe" ref={host} />;
 }
 
@@ -127,7 +90,6 @@ function App() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [role, setRole] = useState<Role | null>(null);
   const [projection, setProjection] = useState<Projection | null>(null);
-  const [catalog, setCatalog] = useState<SpaceSnapshot | null>(null);
   const [mode, setMode] = useState<"new" | "join">("new");
   const [message, setMessage] = useState("Loading scenarios");
   const [gameTitle, setGameTitle] = useState("Global Crisis");
@@ -136,8 +98,8 @@ function App() {
   const [spaceUsername, setSpaceUsername] = useState("");
   const [spacePassword, setSpacePassword] = useState("");
   const [rememberCredentials, setRememberCredentials] = useState(true);
-  const [showDebris, setShowDebris] = useState(false);
   const [showAuthority, setShowAuthority] = useState(false);
+  const [showSpaceAssets, setShowSpaceAssets] = useState(false);
   const [authority, setAuthority] = useState<AuthorityDefinition | null>(null);
   const [authorityRequests, setAuthorityRequests] = useState<AuthorityRequest[]>([]);
   const restoreAttempted = useRef(false);
@@ -179,7 +141,6 @@ function App() {
     const query = `player_id=${playerId}&role_id=${role.id}`;
     const update = () => request<Projection>(`/v1/games/${game.id}/state?${query}`).then(setProjection).catch((error: Error) => setMessage(error.message));
     update();
-    void request<SpaceSnapshot>(`/v1/games/${game.id}/space-catalog?${query}`).then(setCatalog).catch((error: Error) => setMessage(error.message));
     const timer = window.setInterval(update, 1000);
     return () => window.clearInterval(timer);
   }, [playable, game?.id, role?.id, playerId]);
@@ -276,7 +237,7 @@ function App() {
     catch (error) { setMessage((error as Error).message); }
   }
 
-  function leave() { setGame(null); setRole(null); setProjection(null); setCatalog(null); setMessage("Create a scenario or join a running game"); void refreshLobby(); }
+  function leave() { setGame(null); setRole(null); setProjection(null); setMessage("Create a scenario or join a running game"); void refreshLobby(); }
 
   return <main className="app-shell">
     <header><span className="brand">WORLD AT WAR</span><span className="status-dot" /><span>{game?.status ?? "scenario lobby"}</span><span className="tick">{projection ? `TICK ${projection.tick}` : ""}</span></header>
@@ -287,8 +248,9 @@ function App() {
         : <div className="modal-body"><label>Display name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label><h2>Available games</h2><div className="game-list">{games.length ? games.map((item) => <button className="game-row" key={item.id} onClick={() => void selectGame(item)}><span>{item.title}</span><small>{item.status} · {item.player_roles_available} open roles</small></button>) : <p className="muted">No games have been created.</p>}</div></div>}</>}
       {game && <div className="modal-body"><h2>{game.title}</h2><p className="muted">Claim a command role. The operational map remains offline until the scenario starts.</p><div className="role-grid">{roles.map((item) => <button key={item.id} className={`role ${role?.id === item.id ? "selected" : ""}`} disabled={item.ai_controlled || (item.held && role?.id !== item.id)} onClick={() => void claim(item)}><span>{item.name}</span><small>{item.ai_controlled ? "AI" : item.held ? "held" : item.kind.replaceAll("_", " ")}</small></button>)}</div><div className="modal-actions"><button className="secondary" onClick={leave}>Back</button>{game.host_player_id === playerId && <button className="secondary" onClick={() => setShowAuthority(true)}>Configure authorities</button>}{game.host_player_id === playerId && <button className="command" disabled={!role} onClick={() => void start()}>Start scenario</button>}{game.host_player_id !== playerId && <span className="muted">Waiting for host to start</span>}</div></div>}
     </section></div>}
-    {playable && projection && <section className="workspace"><aside className="sidebar"><h1>{role.name}</h1><p className="message">{game.title}</p><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human").length})` : ""}</button><h2>Layers</h2><label className="toggle"><input type="checkbox" checked={showDebris} onChange={(event) => setShowDebris(event.target.checked)} />Orbital debris</label><h2>Catalog</h2><p className="muted">{catalog ? `${catalog.objects.length.toLocaleString()} public objects loaded` : "Loading orbital snapshot"}</p><button className="secondary" onClick={leave}>Leave scenario</button></aside><section className="map-region"><Globe projection={projection} catalog={catalog} showDebris={showDebris} /><div className="map-caption">{role.name} · {role.side}</div></section><aside className="inspector"><h2>Operational picture</h2><div className="metric"><span>Own units</span><strong>{projection.own_units.length}</strong></div><div className="metric"><span>Tracks</span><strong>{projection.tracks.length}</strong></div><h2>Actions</h2><button className="command" disabled={!role.command_units.length} onClick={() => void turnNorth()}>Turn north</button><h2>Tracks</h2>{projection.tracks.length ? projection.tracks.map((track) => <div className="track" key={track.track_id}><span>Uncertain {track.target_side} contact</span><small>{Math.round(track.identity_confidence * 100)}% identity</small></div>) : <p className="muted">No reports received.</p>}</aside></section>}
+    {playable && projection && <section className="workspace"><aside className="sidebar"><h1>{role.name}</h1><p className="message">{game.title}</p><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command space-launch" onClick={() => setShowSpaceAssets(true)}>Space Asset Viewer</button><h2>Catalog</h2><p className="muted">{spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status"}</p><button className="secondary" onClick={leave}>Leave scenario</button></aside><section className="map-region"><Globe projection={projection} /><div className="map-caption">{role.name} · {role.side} · authored game entities</div></section><aside className="inspector"><h2>Operational picture</h2><div className="metric"><span>Own units</span><strong>{projection.own_units.length}</strong></div><div className="metric"><span>Tracks</span><strong>{projection.tracks.length}</strong></div><h2>Actions</h2><button className="command" disabled={!role.command_units.length} onClick={() => void turnNorth()}>Turn north</button><h2>Tracks</h2>{projection.tracks.length ? projection.tracks.map((track) => <div className="track" key={track.track_id}><span>Uncertain {track.target_side} contact</span><small>{Math.round(track.identity_confidence * 100)}% identity</small></div>) : <p className="muted">No reports received.</p>}</aside></section>}
     {showAuthority && authority && game && <Suspense fallback={<div className="authority-loading">Loading authority graph…</div>}><AuthorityWorkspace definition={authority} runtimeRoles={roles} units={authorityUnits} requests={authorityRequests} currentRole={role} isHost={game.host_player_id === playerId} tick={projection?.tick ?? 0} onClose={() => setShowAuthority(false)} onSave={saveAuthority} onCreateRequest={createAuthorityRequest} onDecision={decideAuthorityRequest} /></Suspense>}
+    {showSpaceAssets && game && role && <Suspense fallback={<div className="authority-loading">Loading space catalog workspace…</div>}><SpaceAssetViewer gameId={game.id} playerId={playerId} roleId={role.id} leaseGeneration={role.lease_generation} onClose={() => setShowSpaceAssets(false)} onMessage={setMessage} /></Suspense>}
   </main>;
 }
 

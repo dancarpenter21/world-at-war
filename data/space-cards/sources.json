@@ -1,0 +1,15 @@
+[
+  {"id":"space-track-gp","title":"Space-Track GP data API","url":"https://www.space-track.org/documentation#/api","retrieved_on":"2026-07-13","license":"Space-Track user agreement"},
+  {"id":"celestrak-satcat","title":"CelesTrak SATCAT format","url":"https://celestrak.org/satcat/satcat-format.php","retrieved_on":"2026-07-13","license":"CelesTrak terms"},
+  {"id":"gcat","title":"General Catalog of Artificial Space Objects","url":"https://planet4589.org/space/gcat/web/cat/cols.html","retrieved_on":"2026-07-13","license":"CC-BY-4.0"},
+  {"id":"unoosa","title":"UNOOSA registration resources","url":"https://www.unoosa.org/oosa/en/treatyimplementation/","retrieved_on":"2026-07-13","license":"UNOOSA public information"},
+  {"id":"esa-orbits","title":"ESA types of orbits","url":"https://www.esa.int/Enabling_Support/Space_Transportation/Types_of_orbits","retrieved_on":"2026-07-13","license":"ESA public information"},
+  {"id":"ussf-2sops","title":"2nd Space Operations Squadron","url":"https://www.spaceforce.mil/About-Us/Fact-Sheets/Fact-Sheet-Display/Article/3744787/2nd-space-operations-squadron/","retrieved_on":"2026-07-13","license":"U.S. government public information"},
+  {"id":"ussf-4sops","title":"4th Space Operations Squadron","url":"https://www.spaceforce.mil/About-Us/Fact-Sheets/Fact-Sheet-Display/Article/3743027/4th-space-operations-squadron/","retrieved_on":"2026-07-13","license":"U.S. government public information"},
+  {"id":"ussf-1sops","title":"1st Space Operations Squadron","url":"https://www.spaceforce.mil/About-Us/Fact-Sheets/Fact-Sheet-Display/Article/3743341/1st-space-operations-squadron/","retrieved_on":"2026-07-13","license":"U.S. government public information"},
+  {"id":"noaa-ospo","title":"NOAA Office of Satellite and Product Operations","url":"https://www.ospo.noaa.gov/operations/operational-satellites/","retrieved_on":"2026-07-13","license":"U.S. government public information"},
+  {"id":"nasa-missions","title":"NASA missions","url":"https://science.nasa.gov/missions/","retrieved_on":"2026-07-13","license":"U.S. government public information"},
+  {"id":"spacex-starlink","title":"Starlink","url":"https://www.starlink.com/technology","retrieved_on":"2026-07-13","license":"Operator public information"},
+  {"id":"amazon-kuiper","title":"Project Kuiper","url":"https://www.aboutamazon.com/what-we-do/devices-services/project-kuiper","retrieved_on":"2026-07-13","license":"Operator public information"},
+  {"id":"iridium","title":"Iridium satellite network","url":"https://www.iridium.com/network/","retrieved_on":"2026-07-13","license":"Operator public information"}
+]

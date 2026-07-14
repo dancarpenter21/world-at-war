@@ -15,6 +15,7 @@ FROM debian:bookworm-slim
 RUN useradd --create-home --uid 10001 app
 RUN mkdir -p /app/data/cache/space-track && chown -R app:app /app
 COPY --from=build /workspace/target/release/world-at-war-server /usr/local/bin/world-at-war-server
+COPY data/space-cards /app/data/space-cards
 WORKDIR /app
 USER app
 EXPOSE 8000

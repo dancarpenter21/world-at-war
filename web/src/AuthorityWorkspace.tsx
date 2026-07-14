@@ -15,7 +15,7 @@ export type DecisionStep = { role_id: string; vacant_delay_ticks: number; approv
 export type Policy = { id: string; name: string; action: string; target_unit_ids: string[]; direct_role_ids: string[]; request_role_ids: string[]; decision_steps: DecisionStep[]; notify_role_ids: string[]; executable: boolean };
 export type AuthorityDefinition = { version: number; roles: AuthorityRole[]; relationships: Relationship[]; policies: Policy[] };
 export type AuthorityRequest = {
-  id: string; action: string; target_unit_id: string; requester_role_id: string; policy: Policy;
+  id: string; action: string; target_unit_id: string; target: { kind: "unit"; unit_id: string } | { kind: "satellite"; norad_catalog_id: number }; requester_role_id: string; policy: Policy;
   policy_version: number; current_step: number; created_tick: number; summary: string;
   status: { state: string; role_id?: string; resolves_at_tick?: number }; decisions: { role_id: string; approved: boolean; automatic: boolean; tick: number }[];
 };
