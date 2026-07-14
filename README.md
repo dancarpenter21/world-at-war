@@ -72,14 +72,15 @@ Copy [`.env.example`](.env.example) to an ignored root `.env` file for Compose c
 | `SPACETRACK_USERNAME` / `SPACETRACK_PASSWORD` | Optional server-side Space-Track credentials, instead of entering them in the UI. Never commit real values. |
 | `ADMIN_SETUP_TOKEN` | Optional bearer token required to configure catalog credentials through the UI. |
 | `COOKIE_SECURE` | Set to `true` or `1` only when HTTPS terminates in front of the application. |
+| `HOST_UID` / `HOST_GID` | Optional local user/group IDs for the Compose server process; defaults to `1000:1000` so it can read and update the bind-mounted catalog cache. |
 
-From the setup panel, enter Space-Track credentials and choose whether to remember them. Credentials are held in server memory for the running process. Remembering them stores encrypted data in a 30-day `HttpOnly`, `SameSite=Strict` cookie; its encryption key and catalog cache are retained in `data/cache/space-track/` (or the Compose cache volume). Plaintext credentials are never returned by the server.
+From the setup panel, enter Space-Track credentials and choose whether to remember them. Credentials are held in server memory for the running process. Remembering them stores encrypted data in a 30-day `HttpOnly`, `SameSite=Strict` cookie; its encryption key and catalog cache are retained in `data/cache/space-track/`. Compose bind-mounts that directory, so a catalog downloaded by `space-track-test.sh` is available when the Docker server starts. Plaintext credentials are never returned by the server.
 
-The service fetches the GP catalog, labels objects for map rendering, and stores a checksum snapshot. A scenario requires a usable snapshot, which is valid for 24 hours; a snapshot becomes marked stale after one hour. The synchronization cooldown is one hour **after a successful persisted download only**. Failed authentication, authorization, network, rate-limit, or catalog parsing attempts can be corrected and retried without triggering that local cooldown. The UI distinguishes denied credentials/access, Space-Track rate limits, outages, and malformed responses.
+The service loads a valid cached GP snapshot on startup, labels objects for map rendering, and pins its checksum to each game. An explicit Space-Track sign-in attempts to download and atomically save a replacement snapshot. If that refresh fails, the existing cache remains playable and the UI marks it as cached while showing the refresh error. A snapshot becomes marked stale after one hour, but staleness does not prevent a game from using it. The synchronization cooldown is one hour **after a successful persisted download only**. Failed authentication, authorization, network, rate-limit, or catalog parsing attempts can be corrected and retried without triggering that local cooldown.
 
 ## Gameplay and authority workflow
 
-1. In the scenario lobby, connect Space-Track and synchronize a current catalog.
+1. In the scenario lobby, connect Space-Track to refresh and save the catalog; if a previous catalog is cached, it remains available when refresh fails.
 2. Create **Global Crisis**, claim an available Blue role, and start the game as host.
 3. Use **Configure authorities** to inspect or edit the host-managed authority graph and policies. The saved definition uses optimistic versioning to prevent accidental overwrite.
 4. Submit an order. A policy can execute it directly or create an authority request for the configured approvers. Vacant approver roles resolve deterministically after their configured delay.

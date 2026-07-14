@@ -12,7 +12,7 @@ use sha2::{Digest, Sha256};
 use tokio::sync::RwLock;
 
 const CACHE_PATH: &str = "data/cache/space-track/latest.json";
-const MAX_AGE_SECONDS: u64 = 86_400;
+const CACHE_TEMP_PATH: &str = "data/cache/space-track/latest.json.tmp";
 const MIN_SYNC_INTERVAL_SECONDS: u64 = 3_600;
 const GP_URL: &str = "https://www.space-track.org/basicspacedata/query/class/gp/decay_date/null-val/epoch/%3Enow-10/orderby/norad_cat_id/format/json";
 
@@ -52,6 +52,7 @@ pub struct SpaceCatalogStatus {
     pub syncing: bool,
     pub usable: bool,
     pub stale: bool,
+    pub using_cached_fallback: bool,
     pub synced_unix: Option<u64>,
     pub age_seconds: Option<u64>,
     pub object_count: usize,
@@ -62,7 +63,9 @@ pub struct SpaceCatalogStatus {
 impl SpaceCatalogService {
     pub async fn load() -> anyhow::Result<Self> {
         let snapshot = match tokio::fs::read(CACHE_PATH).await {
-            Ok(bytes) => serde_json::from_slice(&bytes).ok(),
+            Ok(bytes) => serde_json::from_slice(&bytes)
+                .ok()
+                .filter(is_valid_snapshot),
             Err(_) => None,
         };
         let credentials = match (
@@ -107,8 +110,12 @@ impl SpaceCatalogService {
         password: String,
     ) -> anyhow::Result<SpaceCatalogStatus> {
         self.configure(username, password).await?;
-        self.sync(false).await?;
-        Ok(self.status().await)
+        self.authenticate().await?;
+        match self.sync_catalog(false, false).await {
+            Ok(()) => Ok(self.status().await),
+            Err(_error) if self.status().await.usable => Ok(self.status().await),
+            Err(error) => Err(error),
+        }
     }
 
     pub async fn restore_credentials(
@@ -138,7 +145,45 @@ impl SpaceCatalogService {
         self.inner.write().await.credentials = None;
     }
 
+    async fn authenticate(&self) -> anyhow::Result<()> {
+        let (username, password) = {
+            let inner = self.inner.read().await;
+            let credentials = inner
+                .credentials
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("Space-Track credentials are not configured"))?;
+            (
+                credentials.username.clone(),
+                credentials.password.expose_secret().to_owned(),
+            )
+        };
+        self.authenticate_with(&username, &password).await
+    }
+
+    async fn authenticate_with(&self, username: &str, password: &str) -> anyhow::Result<()> {
+        let login = self
+            .client
+            .post("https://www.space-track.org/ajaxauth/login")
+            .form(&[("identity", username), ("password", password)])
+            .send()
+            .await
+            .map_err(|error| {
+                anyhow::anyhow!("Could not reach Space-Track to authenticate: {error}")
+            })?;
+        if !login.status().is_success() {
+            anyhow::bail!(space_track_http_error("authentication", login.status()));
+        }
+        if login.url().path().contains("login") {
+            anyhow::bail!("Space-Track rejected the supplied credentials or the account is not authorized. Verify the username, password, and account access, then try again.");
+        }
+        Ok(())
+    }
+
     pub async fn sync(&self, force: bool) -> anyhow::Result<()> {
+        self.sync_catalog(force, true).await
+    }
+
+    async fn sync_catalog(&self, force: bool, authenticate: bool) -> anyhow::Result<()> {
         let now = now_unix();
         let (username, password) = {
             let mut inner = self.inner.write().await;
@@ -160,15 +205,18 @@ impl SpaceCatalogService {
             inner.error = None;
             values
         };
-        let result = self.fetch(&username, &password).await;
+        let result = match if authenticate {
+            self.fetch(&username, &password).await
+        } else {
+            self.fetch_catalog().await
+        } {
+            Ok(snapshot) => persist_snapshot(&snapshot).await.map(|()| snapshot),
+            Err(error) => Err(error),
+        };
         let mut inner = self.inner.write().await;
         inner.syncing = false;
         match result {
             Ok(snapshot) => {
-                if let Some(parent) = Path::new(CACHE_PATH).parent() {
-                    tokio::fs::create_dir_all(parent).await?;
-                }
-                tokio::fs::write(CACHE_PATH, serde_json::to_vec(&snapshot)?).await?;
                 let synced_unix = snapshot.synced_unix;
                 inner.latest_checksum = Some(snapshot.checksum.clone());
                 inner.snapshots.insert(snapshot.checksum.clone(), snapshot);
@@ -183,21 +231,11 @@ impl SpaceCatalogService {
     }
 
     async fn fetch(&self, username: &str, password: &str) -> anyhow::Result<SpaceCatalogSnapshot> {
-        let login = self
-            .client
-            .post("https://www.space-track.org/ajaxauth/login")
-            .form(&[("identity", username), ("password", password)])
-            .send()
-            .await
-            .map_err(|error| {
-                anyhow::anyhow!("Could not reach Space-Track to authenticate: {error}")
-            })?;
-        if !login.status().is_success() {
-            anyhow::bail!(space_track_http_error("authentication", login.status()));
-        }
-        if login.url().path().contains("login") {
-            anyhow::bail!("Space-Track rejected the supplied credentials or the account is not authorized. Verify the username, password, and account access, then try again.");
-        }
+        self.authenticate_with(username, password).await?;
+        self.fetch_catalog().await
+    }
+
+    async fn fetch_catalog(&self) -> anyhow::Result<SpaceCatalogSnapshot> {
         let response = self.client.get(GP_URL).send().await.map_err(|error| {
             anyhow::anyhow!("Could not reach Space-Track to download the GP catalog: {error}")
         })?;
@@ -246,8 +284,9 @@ impl SpaceCatalogService {
             remembered_credentials: false,
             configured: inner.credentials.is_some(),
             syncing: inner.syncing,
-            usable: age.is_some_and(|seconds| seconds <= MAX_AGE_SECONDS),
+            usable: latest.is_some(),
             stale: age.is_some_and(|seconds| seconds > MIN_SYNC_INTERVAL_SECONDS),
+            using_cached_fallback: latest.is_some() && inner.error.is_some(),
             synced_unix: latest.map(|snapshot| snapshot.synced_unix),
             age_seconds: age,
             object_count: latest.map_or(0, |snapshot| snapshot.objects.len()),
@@ -259,6 +298,19 @@ impl SpaceCatalogService {
     pub async fn snapshot(&self, checksum: &str) -> Option<SpaceCatalogSnapshot> {
         self.inner.read().await.snapshots.get(checksum).cloned()
     }
+}
+
+async fn persist_snapshot(snapshot: &SpaceCatalogSnapshot) -> anyhow::Result<()> {
+    if let Some(parent) = Path::new(CACHE_PATH).parent() {
+        tokio::fs::create_dir_all(parent).await?;
+    }
+    tokio::fs::write(CACHE_TEMP_PATH, serde_json::to_vec(snapshot)?).await?;
+    tokio::fs::rename(CACHE_TEMP_PATH, CACHE_PATH).await?;
+    Ok(())
+}
+
+fn is_valid_snapshot(snapshot: &SpaceCatalogSnapshot) -> bool {
+    !snapshot.checksum.is_empty() && !snapshot.objects.is_empty()
 }
 
 fn space_track_http_error(stage: &str, status: reqwest::StatusCode) -> String {
@@ -307,6 +359,24 @@ fn space_sidc(object_type: &str) -> &'static str {
 mod tests {
     use super::*;
 
+    fn service_with_snapshot(
+        snapshot: SpaceCatalogSnapshot,
+        error: Option<&str>,
+    ) -> SpaceCatalogService {
+        let checksum = snapshot.checksum.clone();
+        SpaceCatalogService {
+            inner: Arc::new(RwLock::new(Inner {
+                credentials: None,
+                snapshots: BTreeMap::from([(checksum.clone(), snapshot)]),
+                latest_checksum: Some(checksum),
+                syncing: false,
+                last_successful_sync_unix: None,
+                error: error.map(str::to_owned),
+            })),
+            client: reqwest::Client::new(),
+        }
+    }
+
     #[test]
     fn cooldown_messages_explain_auth_and_rate_limit_failures() {
         let denied = space_track_http_error("authentication", reqwest::StatusCode::UNAUTHORIZED);
@@ -326,5 +396,34 @@ mod tests {
             Some(10_000 - MIN_SYNC_INTERVAL_SECONDS),
             10_000
         ));
+    }
+
+    #[tokio::test]
+    async fn old_cached_snapshots_remain_usable_and_report_fallback() {
+        let service = service_with_snapshot(
+            SpaceCatalogSnapshot {
+                synced_unix: now_unix().saturating_sub(MIN_SYNC_INTERVAL_SECONDS + 1),
+                source: "test".into(),
+                checksum: "cached-checksum".into(),
+                objects: vec![serde_json::json!({ "NORAD_CAT_ID": "5" })],
+            },
+            Some("catalog download timed out"),
+        );
+
+        let status = service.status().await;
+        assert!(status.usable);
+        assert!(status.stale);
+        assert!(status.using_cached_fallback);
+        assert_eq!(status.checksum.as_deref(), Some("cached-checksum"));
+    }
+
+    #[test]
+    fn empty_cached_snapshots_are_not_usable() {
+        assert!(!is_valid_snapshot(&SpaceCatalogSnapshot {
+            synced_unix: 0,
+            source: "test".into(),
+            checksum: "checksum".into(),
+            objects: vec![],
+        }));
     }
 }

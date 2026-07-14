@@ -21,8 +21,9 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       SPACETRACK_USERNAME: ${SPACETRACK_USERNAME:-}
       SPACETRACK_PASSWORD: ${SPACETRACK_PASSWORD:-}
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     volumes:
-      - space-catalog:/app/data/cache/space-track
+      - ./data/cache/space-track:/app/data/cache/space-track
     expose:
       - "8000"
     networks:
@@ -36,9 +37,6 @@ services:
       - "80"
     networks:
       - world-at-war
-
-volumes:
-  space-catalog:
 
 networks:
   world-at-war:

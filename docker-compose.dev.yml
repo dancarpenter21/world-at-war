@@ -12,7 +12,6 @@ services:
       - cargo-target:/workspace/target
       - cargo-registry:/usr/local/cargo/registry
       - cargo-git:/usr/local/cargo/git
-      - space-catalog:/workspace/data/cache/space-track
 
   web:
     build:
