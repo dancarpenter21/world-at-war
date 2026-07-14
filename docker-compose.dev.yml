@@ -4,8 +4,13 @@ services:
       - ./deploy/nginx/edge.dev.conf:/etc/nginx/conf.d/default.conf:ro
 
   server:
+    image: world-at-war-server:development
     build:
       target: development
+    # Named Cargo volumes are initialized by Docker as root. Keep the
+    # development toolchain root-run so first boot and cache reuse work on
+    # every host; the production image continues to use its non-root user.
+    user: "0:0"
     working_dir: /workspace
     volumes:
       - ./:/workspace
@@ -14,6 +19,7 @@ services:
       - cargo-git:/usr/local/cargo/git
 
   web:
+    image: world-at-war-web:development
     build:
       target: development
     environment:
@@ -23,6 +29,8 @@ services:
       - web-node-modules:/web/node_modules
     expose:
       - "5173"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:5173/', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"]
 
 volumes:
   cargo-target:
