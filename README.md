@@ -10,7 +10,7 @@ The broader target architecture, planned simulation fidelity, and acceptance cri
 
 - A deterministic Rust ECS simulation with one-second ticks, platform movement, server-side projections, and simple Red patrol AI.
 - A lobby that creates and joins games, role claiming, game start/pause controls, and REST/WebSocket state delivery.
-- A Cesium operational map that keeps authored owned units and uncertain tracks visually separate from the public orbital catalog.
+- A Cesium operational map that keeps authored owned units and uncertain tracks visually separate from the public orbital catalog, reconciling entities in place so movement ticks do not recreate or flicker MIL-STD-2525D icons.
 - A lazy full-screen space-asset workspace with worker-based bulk propagation, point-primitive rendering, UTC playback, search/facets, sourced payload cards, and authority-routed satellite requests.
 - A versioned authority definition: roles, operational/support/advisory/transmit relationships, policies, direct grants, approval sequences, vacant-role resolution, and human approval or denial of requests.
 - A Space-Track GP catalog integration with encrypted remembered credentials, cached snapshots, clear diagnostics for credential/access/service failures, and per-game catalog pinning.
@@ -37,7 +37,7 @@ In a second terminal, run the web client:
 
 ```sh
 cd web
-npm install
+npm ci
 npm run dev
 ```
 
@@ -60,6 +60,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
 Open the same edge-proxy URL. Source directories are bind-mounted; `cargo watch` polls for Rust changes and restarts the server, while Vite uses polling and HMR for frontend changes. Named volumes preserve Cargo artifacts/downloads, frontend dependencies, and the Space-Track cache between restarts. Stop either stack with the matching `docker compose ... down` command.
+
+Source edits are picked up without rebuilding images, and Cargo manifest changes are handled by `cargo watch`. After changing `web/package.json` or `web/package-lock.json`, refresh the named dependency volume with `docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web npm ci`, then restart the web service. Rebuild the development images after changing either Dockerfile or its toolchain.
 
 ## Configuration and Space-Track
 
@@ -105,7 +107,7 @@ The command reads `data/cache/space-track/latest.json`, applies the committed ru
 - `crates/sim-ai/` — constrained Red patrol planner that operates on a role projection.
 - `crates/sim-catalog/` — provenance-aware catalog data types and validation.
 - `crates/server/` — Axum API, game lifecycle, credential cookie, catalog service, and simulation loop.
-- `web/` — React, TypeScript, Cesium, MIL-STD-2525D rendering, and authority workspace.
+- `web/` — React, TypeScript, Cesium, persistent MIL-STD-2525D entity rendering, authority and space-asset workspaces, and Vitest frontend regression tests.
 - `deploy/nginx/` — production and development edge-proxy configurations.
 - `docker-compose.yml` — production-shaped local stack; `docker-compose.dev.yml` — hot-reload override.
 
@@ -117,6 +119,7 @@ cargo check
 cargo test
 
 cd web
+npm test
 npm run build
 ```
 
