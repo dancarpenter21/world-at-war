@@ -2,12 +2,13 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Cartesian3, Color, EllipsoidTerrainProvider,
-  ImageryLayer, OpenStreetMapImageryProvider, Viewer
+  ImageryLayer, Math as CesiumMath, OpenStreetMapImageryProvider, Viewer
 } from "cesium";
 import ms from "milsymbol";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import "./styles.css";
 import type { AuthorityDefinition, AuthorityRequest, Role } from "./AuthorityWorkspace";
+import { AirportLayer, type AirportListResponse } from "./airportLayer";
 import { GlobeEntityReconciler, type Projection } from "./globeEntities";
 
 const AuthorityWorkspace = lazy(() => import("./AuthorityWorkspace").then((module) => ({ default: module.AuthorityWorkspace })));
@@ -42,6 +43,7 @@ function Globe({ projection }: { projection: Projection }) {
   const host = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Viewer | null>(null);
   const reconcilerRef = useRef<GlobeEntityReconciler | null>(null);
+  const [airportStatus, setAirportStatus] = useState("Loading airports");
 
   useEffect(() => {
     if (!host.current || viewerRef.current) return;
@@ -56,14 +58,65 @@ function Globe({ projection }: { projection: Projection }) {
     viewer.camera.setView({ destination: Cartesian3.fromDegrees(-40, 30, 20_000_000) });
     viewerRef.current = viewer;
     reconcilerRef.current = new GlobeEntityReconciler(viewer.entities, symbolCanvas);
-    return () => { reconcilerRef.current = null; viewer.destroy(); viewerRef.current = null; };
+    const airportLayer = new AirportLayer(viewer);
+    let airportRequest: AbortController | undefined;
+    let refreshTimer: number | undefined;
+    let stopped = false;
+
+    const refreshAirports = async () => {
+      const rectangle = viewer.camera.computeViewRectangle(viewer.scene.globe.ellipsoid);
+      if (!rectangle) return;
+      airportRequest?.abort();
+      airportRequest = new AbortController();
+      const cameraPosition = viewer.camera.positionCartographic;
+      const ellipsoidRadius = viewer.scene.globe.ellipsoid.maximumRadius;
+      const horizonRadius = Math.acos(Math.min(1, ellipsoidRadius / Math.max(ellipsoidRadius, ellipsoidRadius + cameraPosition.height)));
+      const query = new URLSearchParams({
+        west: CesiumMath.toDegrees(rectangle.west).toFixed(5),
+        south: CesiumMath.toDegrees(rectangle.south).toFixed(5),
+        east: CesiumMath.toDegrees(rectangle.east).toFixed(5),
+        north: CesiumMath.toDegrees(rectangle.north).toFixed(5),
+        horizon_latitude: CesiumMath.toDegrees(cameraPosition.latitude).toFixed(5),
+        horizon_longitude: CesiumMath.toDegrees(cameraPosition.longitude).toFixed(5),
+        horizon_radius_deg: CesiumMath.toDegrees(horizonRadius).toFixed(5),
+        limit: "500"
+      });
+      try {
+        const response = await request<AirportListResponse>(`/v1/airports?${query}`, { signal: airportRequest.signal });
+        if (stopped) return;
+        airportLayer.update(response.airports);
+        setAirportStatus(response.total > response.airports.length
+          ? `${response.airports.length.toLocaleString()} of ${response.total.toLocaleString()} airports in view`
+          : `${response.total.toLocaleString()} airports in view`);
+      } catch (error) {
+        if (!stopped && !(error instanceof DOMException && error.name === "AbortError")) {
+          setAirportStatus("Airport layer unavailable");
+        }
+      }
+    };
+    const scheduleAirportRefresh = () => {
+      if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(() => void refreshAirports(), 150);
+    };
+    viewer.camera.moveEnd.addEventListener(scheduleAirportRefresh);
+    void refreshAirports();
+    return () => {
+      stopped = true;
+      airportRequest?.abort();
+      if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
+      viewer.camera.moveEnd.removeEventListener(scheduleAirportRefresh);
+      airportLayer.destroy();
+      reconcilerRef.current = null;
+      viewer.destroy();
+      viewerRef.current = null;
+    };
   }, []);
 
   useEffect(() => {
     reconcilerRef.current?.reconcile(projection);
   }, [projection]);
 
-  return <div className="globe" ref={host} />;
+  return <><div className="globe" ref={host} /><div className="airport-layer-status">{airportStatus}</div></>;
 }
 
 function App() {

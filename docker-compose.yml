@@ -26,9 +26,13 @@ services:
       SPACETRACK_USERNAME: ${SPACETRACK_USERNAME:-}
       SPACETRACK_PASSWORD: ${SPACETRACK_PASSWORD:-}
       SPACE_CARDS_DIR: /app/data/generated/space-cards
+      AIRPORT_CACHE_DIR: /app/data/cache/airports
+      AIRPORT_REFRESH_MAX_AGE_SECONDS: ${AIRPORT_REFRESH_MAX_AGE_SECONDS:-86400}
+      FAA_NASR_APT_URL: ${FAA_NASR_APT_URL:-}
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     volumes:
       - ./data/cache/space-track:/app/data/cache/space-track
+      - ./data/cache/airports:/app/data/cache/airports
       - ./data/generated/space-cards:/app/data/generated/space-cards:ro
     expose:
       - "8000"

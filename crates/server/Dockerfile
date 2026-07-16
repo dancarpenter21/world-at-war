@@ -19,7 +19,7 @@ RUN apt-get update \
   && apt-get install --no-install-recommends -y curl \
   && rm -rf /var/lib/apt/lists/* \
   && useradd --create-home --uid 10001 app
-RUN mkdir -p /app/data/cache/space-track && chown -R app:app /app
+RUN mkdir -p /app/data/cache/space-track /app/data/cache/airports && chown -R app:app /app
 COPY --from=build /workspace/target/release/world-at-war-server /usr/local/bin/world-at-war-server
 COPY data/space-cards /app/data/space-cards
 WORKDIR /app

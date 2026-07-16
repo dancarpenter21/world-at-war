@@ -6,13 +6,19 @@ license.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+csv.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+zip.workspace = true
 
 [[bin]]
 name = "space-card-enrich"
 path = "src/bin/space-card-enrich.rs"
+
+[[bin]]
+name = "airport-cache-sync"
+path = "src/bin/airport-cache-sync.rs"

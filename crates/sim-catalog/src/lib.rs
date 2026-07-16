@@ -1,5 +1,6 @@
 //! Versioned, provenance-aware catalog records. Raw source files are imported separately.
 
+pub mod airport;
 pub mod space;
 
 use serde::{Deserialize, Serialize};

@@ -1,3 +1,4 @@
+mod airport_catalog;
 mod credential_cookie;
 mod space_assets;
 mod space_catalog;
@@ -9,6 +10,7 @@ use std::{
     time::Duration,
 };
 
+use airport_catalog::{AirportCatalogService, AirportCatalogStatus};
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
@@ -22,7 +24,13 @@ use axum::{
 use credential_cookie::{CredentialCookie, RememberedCredentials};
 use serde::{Deserialize, Serialize};
 use sim_ai::choose_patrol_intent;
-use sim_catalog::space::{SatelliteAuthorityAssignment, SatelliteAuthorityKind, SourceReference};
+use sim_catalog::{
+    airport::{
+        evaluate_airport, Airport, AirportKind, MilitaryUse, RunwayCompatibilityAssessment,
+        RunwayCompatibilityRequest,
+    },
+    space::{SatelliteAuthorityAssignment, SatelliteAuthorityKind, SourceReference},
+};
 use sim_core::{
     AuthorityDefinition, AuthorityPolicy, AuthorityRoleKind, AuthorizationRecord, AuthorizedIntent,
     PlayerIntent, RoleProjection, Side, Simulation,
@@ -45,6 +53,7 @@ const EXTERNAL_OPERATOR_APPROVAL_BPS: u16 = 5_000;
 struct AppState {
     games: Arc<RwLock<BTreeMap<Uuid, Game>>>,
     scenarios: Arc<BTreeMap<String, Scenario>>,
+    airport_catalog: AirportCatalogService,
     space_catalog: SpaceCatalogService,
     space_assets: SpaceAssetService,
     admin_token: Arc<Option<String>>,
@@ -108,6 +117,54 @@ struct GameSummary {
     status: GameStatus,
     host_player_id: Uuid,
     player_roles_available: usize,
+}
+#[derive(Deserialize)]
+struct AirportListQuery {
+    query: Option<String>,
+    country: Option<String>,
+    facility_use: Option<String>,
+    minimum_runway_length_m: Option<f64>,
+    west: Option<f64>,
+    south: Option<f64>,
+    east: Option<f64>,
+    north: Option<f64>,
+    horizon_latitude: Option<f64>,
+    horizon_longitude: Option<f64>,
+    horizon_radius_deg: Option<f64>,
+    limit: Option<usize>,
+    offset: Option<usize>,
+}
+#[derive(Serialize)]
+struct AirportSummary {
+    id: String,
+    name: String,
+    kind: AirportKind,
+    country_code: String,
+    region_code: Option<String>,
+    municipality: Option<String>,
+    military_use: MilitaryUse,
+    latitude_deg: f64,
+    longitude_deg: f64,
+    runway_count: usize,
+    longest_runway_m: Option<f64>,
+}
+#[derive(Serialize)]
+struct AirportListResponse {
+    checksum: String,
+    total: usize,
+    limit: usize,
+    offset: usize,
+    airports: Vec<AirportSummary>,
+}
+#[derive(Serialize)]
+struct AirportCompatibilityResponse {
+    catalog_checksum: String,
+    airport_id: String,
+    assessments: Vec<RunwayCompatibilityAssessment>,
+}
+#[derive(Deserialize)]
+struct ForceSyncQuery {
+    force: Option<bool>,
 }
 #[derive(Serialize)]
 struct RoleSummary {
@@ -302,14 +359,27 @@ async fn main() -> anyhow::Result<()> {
     let state = AppState {
         games: Arc::new(RwLock::new(BTreeMap::new())),
         scenarios: Arc::new(BTreeMap::from([(scenario.id.clone(), scenario)])),
+        airport_catalog: AirportCatalogService::load().await,
         space_catalog: SpaceCatalogService::load().await?,
         space_assets: SpaceAssetService::load().await,
         admin_token: Arc::new(admin_token),
         credential_cookie: CredentialCookie::load().await?,
     };
     tokio::spawn(run_simulation_loop(state.clone()));
+    let airport_catalog = state.airport_catalog.clone();
+    tokio::spawn(async move {
+        airport_catalog.refresh_if_stale().await;
+    });
     let app = Router::new()
         .route("/health", get(health))
+        .route("/v1/airport-catalog/status", get(airport_catalog_status))
+        .route("/v1/airports", get(list_airports))
+        .route("/v1/airports/{airport_id}", get(get_airport))
+        .route(
+            "/v1/airports/{airport_id}/compatibility",
+            post(evaluate_airport_compatibility),
+        )
+        .route("/v1/admin/airport-catalog/sync", post(sync_airport_catalog))
         .route("/v1/scenarios", get(list_scenarios))
         .route("/v1/games", get(list_games).post(create_game))
         .route("/v1/games/{game_id}/join", post(join_game))
@@ -1513,6 +1583,358 @@ fn authorized_role<'a>(
         ));
     }
     Ok(role)
+}
+
+async fn airport_catalog_status(State(state): State<AppState>) -> Json<AirportCatalogStatus> {
+    let mut status = state.airport_catalog.status().await;
+    status.setup_auth_required = state.admin_token.is_some();
+    Json(status)
+}
+
+async fn list_airports(
+    State(state): State<AppState>,
+    Query(query): Query<AirportListQuery>,
+) -> ApiResult<AirportListResponse> {
+    if query
+        .minimum_runway_length_m
+        .is_some_and(|value| !value.is_finite() || value < 0.0)
+    {
+        return Err(api_error(
+            StatusCode::BAD_REQUEST,
+            "invalid_runway_length",
+            "minimum runway length must be non-negative",
+        ));
+    }
+    let bounds = match (query.west, query.south, query.east, query.north) {
+        (None, None, None, None) => None,
+        (Some(west), Some(south), Some(east), Some(north))
+            if [west, south, east, north]
+                .iter()
+                .all(|value| value.is_finite())
+                && (-180.0..=180.0).contains(&west)
+                && (-180.0..=180.0).contains(&east)
+                && (-90.0..=90.0).contains(&south)
+                && (-90.0..=90.0).contains(&north)
+                && south <= north =>
+        {
+            Some((west, south, east, north))
+        }
+        _ => {
+            return Err(api_error(
+                StatusCode::BAD_REQUEST,
+                "invalid_bounds",
+                "west, south, east, and north must all be supplied as valid degree bounds",
+            ));
+        }
+    };
+    let horizon = match (
+        query.horizon_latitude,
+        query.horizon_longitude,
+        query.horizon_radius_deg,
+    ) {
+        (None, None, None) => None,
+        (Some(latitude), Some(longitude), Some(radius))
+            if [latitude, longitude, radius]
+                .iter()
+                .all(|value| value.is_finite())
+                && (-90.0..=90.0).contains(&latitude)
+                && (-180.0..=180.0).contains(&longitude)
+                && (0.0..=180.0).contains(&radius) =>
+        {
+            Some((latitude, longitude, radius))
+        }
+        _ => {
+            return Err(api_error(
+                StatusCode::BAD_REQUEST,
+                "invalid_horizon",
+                "horizon latitude, longitude, and radius must all be supplied as valid degree values",
+            ));
+        }
+    };
+    let snapshot = state.airport_catalog.snapshot().await.ok_or_else(|| {
+        api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "airport_catalog_unavailable",
+            "airport catalog is not ready",
+        )
+    })?;
+    let search = query
+        .query
+        .as_deref()
+        .map(|value| value.trim().to_lowercase())
+        .filter(|value| !value.is_empty());
+    let country = query
+        .country
+        .as_deref()
+        .map(|value| value.trim().to_ascii_uppercase())
+        .filter(|value| !value.is_empty());
+    let facility_use = query
+        .facility_use
+        .as_deref()
+        .map(|value| value.trim().to_lowercase())
+        .filter(|value| !value.is_empty());
+    let mut matching: Vec<&Airport> = snapshot
+        .airports
+        .iter()
+        .filter(|airport| {
+            if bounds.is_some_and(|(west, south, east, north)| {
+                airport.latitude_deg < south
+                    || airport.latitude_deg > north
+                    || !longitude_in_bounds(airport.longitude_deg, west, east)
+            }) {
+                return false;
+            }
+            if horizon.is_some_and(|(latitude, longitude, radius)| {
+                angular_distance_degrees(
+                    latitude,
+                    longitude,
+                    airport.latitude_deg,
+                    airport.longitude_deg,
+                ) > radius
+            }) {
+                return false;
+            }
+            if country
+                .as_ref()
+                .is_some_and(|country| airport.country_code.to_ascii_uppercase() != *country)
+            {
+                return false;
+            }
+            if query.minimum_runway_length_m.is_some_and(|minimum| {
+                !airport
+                    .runways
+                    .iter()
+                    .any(|runway| runway.length_m.is_some_and(|length| length >= minimum))
+            }) {
+                return false;
+            }
+            if facility_use
+                .as_ref()
+                .is_some_and(|filter| !airport_matches_use(airport, filter))
+            {
+                return false;
+            }
+            search.as_ref().is_none_or(|search| {
+                airport.name.to_lowercase().contains(search)
+                    || airport
+                        .municipality
+                        .as_ref()
+                        .is_some_and(|value| value.to_lowercase().contains(search))
+                    || airport
+                        .identifiers
+                        .values()
+                        .any(|value| value.to_lowercase().contains(search))
+            })
+        })
+        .collect();
+    if bounds.is_some() {
+        matching.sort_by(|left, right| {
+            airport_map_priority(right)
+                .cmp(&airport_map_priority(left))
+                .then_with(|| longest_runway(right).total_cmp(&longest_runway(left)))
+                .then_with(|| left.name.cmp(&right.name))
+                .then_with(|| left.id.cmp(&right.id))
+        });
+    } else {
+        matching.sort_by(|left, right| {
+            left.name
+                .cmp(&right.name)
+                .then_with(|| left.id.cmp(&right.id))
+        });
+    }
+    let total = matching.len();
+    let limit = query.limit.unwrap_or(100).clamp(1, 500);
+    let offset = query.offset.unwrap_or(0);
+    let airports = matching
+        .into_iter()
+        .skip(offset)
+        .take(limit)
+        .map(airport_summary)
+        .collect();
+    Ok(Json(AirportListResponse {
+        checksum: snapshot.checksum.clone(),
+        total,
+        limit,
+        offset,
+        airports,
+    }))
+}
+
+async fn get_airport(
+    State(state): State<AppState>,
+    Path(airport_id): Path<String>,
+) -> ApiResult<Airport> {
+    let snapshot = state.airport_catalog.snapshot().await.ok_or_else(|| {
+        api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "airport_catalog_unavailable",
+            "airport catalog is not ready",
+        )
+    })?;
+    snapshot
+        .airports
+        .iter()
+        .find(|airport| airport.id == airport_id)
+        .cloned()
+        .map(Json)
+        .ok_or_else(|| {
+            api_error(
+                StatusCode::NOT_FOUND,
+                "airport_not_found",
+                "airport not found",
+            )
+        })
+}
+
+async fn evaluate_airport_compatibility(
+    State(state): State<AppState>,
+    Path(airport_id): Path<String>,
+    Json(request): Json<RunwayCompatibilityRequest>,
+) -> ApiResult<AirportCompatibilityResponse> {
+    let snapshot = state.airport_catalog.snapshot().await.ok_or_else(|| {
+        api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "airport_catalog_unavailable",
+            "airport catalog is not ready",
+        )
+    })?;
+    let airport = snapshot
+        .airports
+        .iter()
+        .find(|airport| airport.id == airport_id)
+        .ok_or_else(|| {
+            api_error(
+                StatusCode::NOT_FOUND,
+                "airport_not_found",
+                "airport not found",
+            )
+        })?;
+    let assessments = evaluate_airport(airport, &request).map_err(|error| {
+        api_error(
+            StatusCode::BAD_REQUEST,
+            "invalid_aircraft_requirements",
+            error.to_string(),
+        )
+    })?;
+    Ok(Json(AirportCompatibilityResponse {
+        catalog_checksum: snapshot.checksum.clone(),
+        airport_id,
+        assessments,
+    }))
+}
+
+async fn sync_airport_catalog(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<ForceSyncQuery>,
+) -> ApiResult<AirportCatalogStatus> {
+    require_admin(&state, &headers)?;
+    state
+        .airport_catalog
+        .sync(query.force.unwrap_or(false))
+        .await
+        .map_err(|error| {
+            let status = if error.to_string().contains("already running") {
+                StatusCode::CONFLICT
+            } else {
+                StatusCode::BAD_GATEWAY
+            };
+            api_error(status, "airport_catalog_sync_error", error.to_string())
+        })?;
+    let mut status = state.airport_catalog.status().await;
+    status.setup_auth_required = state.admin_token.is_some();
+    Ok(Json(status))
+}
+
+fn airport_summary(airport: &Airport) -> AirportSummary {
+    AirportSummary {
+        id: airport.id.clone(),
+        name: airport.name.clone(),
+        kind: airport.kind,
+        country_code: airport.country_code.clone(),
+        region_code: airport.region_code.clone(),
+        municipality: airport.municipality.clone(),
+        military_use: airport.military_use,
+        latitude_deg: airport.latitude_deg,
+        longitude_deg: airport.longitude_deg,
+        runway_count: airport.runways.len(),
+        longest_runway_m: airport
+            .runways
+            .iter()
+            .filter_map(|runway| runway.length_m)
+            .reduce(f64::max),
+    }
+}
+
+fn longest_runway(airport: &Airport) -> f64 {
+    airport
+        .runways
+        .iter()
+        .filter_map(|runway| runway.length_m)
+        .reduce(f64::max)
+        .unwrap_or(0.0)
+}
+
+fn airport_map_priority(airport: &Airport) -> u8 {
+    match airport.kind {
+        AirportKind::LargeAirport => 4,
+        AirportKind::MediumAirport => 3,
+        AirportKind::SmallAirport => 2,
+        AirportKind::Unknown => 1,
+        AirportKind::Heliport
+        | AirportKind::SeaplaneBase
+        | AirportKind::Balloonport
+        | AirportKind::ClosedAirport => 0,
+    }
+}
+
+fn longitude_in_bounds(longitude: f64, west: f64, east: f64) -> bool {
+    if west <= east {
+        (west..=east).contains(&longitude)
+    } else {
+        longitude >= west || longitude <= east
+    }
+}
+
+fn angular_distance_degrees(
+    left_latitude: f64,
+    left_longitude: f64,
+    right_latitude: f64,
+    right_longitude: f64,
+) -> f64 {
+    let left_latitude = left_latitude.to_radians();
+    let right_latitude = right_latitude.to_radians();
+    let latitude_delta = right_latitude - left_latitude;
+    let longitude_delta = (right_longitude - left_longitude).to_radians();
+    let haversine = (latitude_delta / 2.0).sin().powi(2)
+        + left_latitude.cos() * right_latitude.cos() * (longitude_delta / 2.0).sin().powi(2);
+    2.0 * haversine.clamp(0.0, 1.0).sqrt().asin().to_degrees()
+}
+
+#[cfg(test)]
+mod airport_query_tests {
+    use super::{angular_distance_degrees, longitude_in_bounds};
+
+    #[test]
+    fn horizon_distance_and_antimeridian_bounds_are_spherical() {
+        assert!((angular_distance_degrees(0.0, 179.0, 0.0, -179.0) - 2.0).abs() < 1e-9);
+        assert!((angular_distance_degrees(0.0, 0.0, 0.0, 180.0) - 180.0).abs() < 1e-9);
+        assert!(longitude_in_bounds(-179.0, 170.0, -170.0));
+        assert!(!longitude_in_bounds(0.0, 170.0, -170.0));
+    }
+}
+
+fn airport_matches_use(airport: &Airport, filter: &str) -> bool {
+    match filter {
+        "military" => airport.military_use == MilitaryUse::Military,
+        "joint" | "joint_use" => airport.military_use == MilitaryUse::Joint,
+        "civilian" => airport.military_use == MilitaryUse::Civilian,
+        "unknown" => airport.military_use == MilitaryUse::Unknown,
+        other => airport
+            .facility_use
+            .as_ref()
+            .is_some_and(|value| value.eq_ignore_ascii_case(other)),
+    }
 }
 
 async fn space_catalog_status(

@@ -14,6 +14,7 @@ The broader target architecture, planned simulation fidelity, and acceptance cri
 - A lazy full-screen space-asset workspace with worker-based bulk propagation, point-primitive rendering, UTC playback, search/facets, sourced payload cards, and authority-routed satellite requests.
 - A versioned authority definition: roles, operational/support/advisory/transmit relationships, policies, direct grants, approval sequences, vacant-role resolution, and human approval or denial of requests.
 - A Space-Track GP catalog integration with encrypted remembered credentials, cached snapshots, clear diagnostics for credential/access/service failures, and per-game catalog pinning.
+- A global airport/runway cache using public-domain OurAirports data with an authoritative FAA NASR overlay for U.S. facilities, declared distances, pavement ratings, and reported gross-weight limits.
 - A Docker Compose edge proxy that serves the web client and routes `/health`, `/v1/`, and WebSocket traffic to the Rust server.
 
 Current limitations: communications are an always-reachable gate, sensor and track behavior is intentionally simplified, and the broader platform, terrain, logistics, cyber, and multi-source catalog systems remain planned work.
@@ -77,6 +78,9 @@ Copy [`.env.example`](.env.example) to an ignored root `.env` file for Compose c
 | `COOKIE_SECURE` | Set to `true` or `1` only when HTTPS terminates in front of the application. |
 | `HOST_UID` / `HOST_GID` | Optional local user/group IDs for the Compose server process; defaults to `1000:1000` so it can read and update the bind-mounted catalog cache. |
 | `SPACE_CARDS_DIR` | Optional path to offline-generated satellite cards; defaults to `data/generated/space-cards`. |
+| `AIRPORT_CACHE_DIR` | Airport raw-source and normalized snapshot cache; defaults to `data/cache/airports`. |
+| `AIRPORT_REFRESH_MAX_AGE_SECONDS` | Age after which startup schedules a background airport refresh; defaults to `86400`. |
+| `FAA_NASR_APT_URL` | Optional URL pin for a specific FAA APT CSV archive; otherwise the current cycle is discovered automatically. |
 
 From the setup panel, enter Space-Track credentials and choose whether to remember them. Credentials are held in server memory for the running process. Remembering them stores encrypted data in a 30-day `HttpOnly`, `SameSite=Strict` cookie; its encryption key and catalog cache are retained in `data/cache/space-track/`. Compose bind-mounts that directory, so a catalog downloaded by `space-track-test.sh` is available when the Docker server starts. Plaintext credentials are never returned by the server.
 
@@ -92,6 +96,18 @@ cargo run -p sim-catalog --bin space-card-enrich
 
 The command reads `data/cache/space-track/latest.json`, applies the committed rules and reviewed overrides in `data/space-cards/`, and writes the ignored runtime tree `data/generated/space-cards/`. Pass `--refresh-sources` to refresh the configured public CelesTrak and GCAT downloads under the ignored `data/cache/space-sources/` tree before generation; otherwise the last cached source versions are used. Use `--validate-only` to check full-catalog coverage without writing. Production Compose mounts the generated tree read-only; if it is missing or its checksum does not match the pinned snapshot, the API serves an explicitly uncommandable baseline card from Space-Track fields.
 
+## Airport and runway catalog
+
+The server loads `data/cache/airports/latest.json` immediately and refreshes stale data in the background. The worldwide baseline comes from the nightly public-domain OurAirports airport and runway CSVs. The current FAA 28-day NASR APT archive overlays U.S. runway geometry, declared distances, military/joint-use metadata, pavement classification, and reported gross-weight limits. DAFIF is not fetched because its NGA distribution requires authenticated access.
+
+Refresh explicitly with:
+
+```sh
+cargo run -p sim-catalog --bin airport-cache-sync
+```
+
+The REST API exposes catalog status at `/v1/airport-catalog/status`, paginated search at `/v1/airports`, airport/runway details at `/v1/airports/{airport_id}`, and conservative runway compatibility evaluation at `/v1/airports/{airport_id}/compatibility`. Airport search accepts `west`, `south`, `east`, and `north` degree bounds for viewport loading, including bounds that cross the antimeridian. Optional `horizon_latitude`, `horizon_longitude`, and `horizon_radius_deg` parameters further restrict results to a spherical camera-horizon cap. The Cesium operational map uses both filters to display a compact, globe-occluded crossed-runway airport symbol and prioritizes major airports when a viewport contains more than 500 facilities. Compatibility requests supply aircraft mass, landing-gear category, operation, and already-adjusted required distance. Missing pavement-strength information returns `unknown` rather than assuming compatibility.
+
 ## Gameplay and authority workflow
 
 1. In the scenario lobby, connect Space-Track to refresh and save the catalog; if a previous catalog is cached, it remains available when refresh fails.
@@ -105,7 +121,7 @@ The command reads `data/cache/space-track/latest.json`, applies the committed ru
 - `crates/sim-core/` — deterministic ECS simulation, projections, orders, and authority model.
 - `crates/sim-scenario/` — validated, versioned scenario definitions and the Global Crisis fixture.
 - `crates/sim-ai/` — constrained Red patrol planner that operates on a role projection.
-- `crates/sim-catalog/` — provenance-aware catalog data types and validation.
+- `crates/sim-catalog/` — provenance-aware platform, space, airport/runway, importer, and compatibility data types.
 - `crates/server/` — Axum API, game lifecycle, credential cookie, catalog service, and simulation loop.
 - `web/` — React, TypeScript, Cesium, persistent MIL-STD-2525D entity rendering, authority and space-asset workspaces, and Vitest frontend regression tests.
 - `deploy/nginx/` — production and development edge-proxy configurations.
