@@ -1,25 +1,21 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  Cartesian2, Cartesian3, Color, EllipsoidTerrainProvider,
+  Cartesian3, Color, EllipsoidTerrainProvider,
   ImageryLayer, OpenStreetMapImageryProvider, Viewer
 } from "cesium";
 import ms from "milsymbol";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import "./styles.css";
 import type { AuthorityDefinition, AuthorityRequest, Role } from "./AuthorityWorkspace";
+import { GlobeEntityReconciler, type Projection } from "./globeEntities";
 
 const AuthorityWorkspace = lazy(() => import("./AuthorityWorkspace").then((module) => ({ default: module.AuthorityWorkspace })));
 const SpaceAssetViewer = lazy(() => import("./SpaceAssetViewer").then((module) => ({ default: module.SpaceAssetViewer })));
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
-type Side = "Blue" | "Red";
 type Scenario = { id: string; title: string; description: string; version: number; authored_entity_count: number; role_count: number; requires_space_catalog: boolean };
 type Game = { id: string; title: string; status: "lobby" | "running" | "paused"; host_player_id: string; player_roles_available: number };
-type Position = { latitude_deg: number; longitude_deg: number; altitude_m: number };
-type Unit = { id: string; name: string; domain: string; position: Position; sidc: string };
-type Track = { track_id: string; target_side: Side; position: Position; identity_confidence: number; observed_tick: number; received_tick: number; observed_sidc: string };
-type Projection = { tick: number; own_units: Unit[]; tracks: Track[] };
 type SpaceStatus = { setup_auth_required: boolean; remembered_credentials: boolean; configured: boolean; syncing: boolean; usable: boolean; stale: boolean; using_cached_fallback: boolean; synced_unix?: number; age_seconds?: number; object_count: number; checksum?: string; error?: string };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -45,6 +41,7 @@ function symbolCanvas(sidc: string, size = 32) {
 function Globe({ projection }: { projection: Projection }) {
   const host = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Viewer | null>(null);
+  const reconcilerRef = useRef<GlobeEntityReconciler | null>(null);
 
   useEffect(() => {
     if (!host.current || viewerRef.current) return;
@@ -58,25 +55,12 @@ function Globe({ projection }: { projection: Projection }) {
     viewer.scene.globe.baseColor = Color.fromCssColorString("#1f3340");
     viewer.camera.setView({ destination: Cartesian3.fromDegrees(-40, 30, 20_000_000) });
     viewerRef.current = viewer;
-    return () => { viewer.destroy(); viewerRef.current = null; };
+    reconcilerRef.current = new GlobeEntityReconciler(viewer.entities, symbolCanvas);
+    return () => { reconcilerRef.current = null; viewer.destroy(); viewerRef.current = null; };
   }, []);
 
   useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!viewer) return;
-    viewer.entities.removeAll();
-    for (const unit of projection.own_units) viewer.entities.add({
-      id: unit.id, name: unit.name,
-      position: Cartesian3.fromDegrees(unit.position.longitude_deg, unit.position.latitude_deg, unit.position.altitude_m),
-      billboard: { image: symbolCanvas(unit.sidc, 36), width: 44, height: 44 },
-      label: { text: unit.name, font: "12px system-ui", fillColor: Color.WHITE, pixelOffset: new Cartesian2(0, 30) }
-    });
-    for (const track of projection.tracks) viewer.entities.add({
-      id: track.track_id, name: `Uncertain ${track.target_side} track`,
-      position: Cartesian3.fromDegrees(track.position.longitude_deg, track.position.latitude_deg, track.position.altitude_m),
-      billboard: { image: symbolCanvas(track.observed_sidc, 34), width: 42, height: 42 },
-      ellipse: { semiMajorAxis: 12_000, semiMinorAxis: 8_000, material: Color.RED.withAlpha(0.16), outline: true, outlineColor: Color.RED }
-    });
+    reconcilerRef.current?.reconcile(projection);
   }, [projection]);
 
   return <div className="globe" ref={host} />;
