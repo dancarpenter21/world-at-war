@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
+    "test:e2e": "tsc --project tsconfig.e2e.json && cargo build --manifest-path ../Cargo.toml --package world-at-war-server && playwright test",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -19,6 +20,8 @@
     "satellite.js": "^6.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.1",
+    "@types/node": "^22.20.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",

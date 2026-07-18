@@ -86,6 +86,16 @@ From the setup panel, enter Space-Track credentials and choose whether to rememb
 
 The service loads a valid cached GP snapshot on startup, labels objects for map rendering, and pins its checksum to each game. An explicit Space-Track sign-in attempts to download and atomically save a replacement snapshot. If that refresh fails, the existing cache remains playable and the UI marks it as cached while showing the refresh error. A snapshot becomes marked stale after one hour, but staleness does not prevent a game from using it. The synchronization cooldown is one hour **after a successful persisted download only**. Failed authentication, authorization, network, rate-limit, or catalog parsing attempts can be corrected and retried without triggering that local cooldown.
 
+The browser integration test drives the rendered setup form, follows the Rust session-cookie flow, downloads a two-object GP fixture from an in-process Space-Track-compatible server, and verifies the checksum snapshot written under an isolated temporary directory:
+
+```sh
+cd web
+npx playwright install chromium
+npm run test:e2e
+```
+
+To perform the same test against the live provider, explicitly set `SPACETRACK_E2E_USERNAME` and `SPACETRACK_E2E_PASSWORD`. Live mode makes a real full-catalog GP request, so run it no more than once per hour and never commit or print those values.
+
 ## Offline space-card enrichment
 
 Enrichment never runs during server startup or Space-Track synchronization. After a snapshot is pinned locally, run:

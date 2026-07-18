@@ -19,6 +19,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    allowedHosts: ["host.docker.internal"],
     watch: {
       usePolling: process.env.CHOKIDAR_USEPOLLING === "true"
     },

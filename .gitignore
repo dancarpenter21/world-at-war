@@ -13,6 +13,8 @@
 /coverage/
 /test-results/
 /playwright-report/
+/web/test-results/
+/web/playwright-report/
 /criterion/
 *.profraw
 *.profdata
@@ -66,4 +68,3 @@ Desktop.ini
 .parcel-cache/
 .turbo/
 .nyc_output/
-

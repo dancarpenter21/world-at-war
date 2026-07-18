@@ -5,6 +5,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use reqwest::header::CONTENT_TYPE;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -14,12 +15,15 @@ use tokio::sync::RwLock;
 const CACHE_PATH: &str = "data/cache/space-track/latest.json";
 const CACHE_TEMP_PATH: &str = "data/cache/space-track/latest.json.tmp";
 const MIN_SYNC_INTERVAL_SECONDS: u64 = 3_600;
-const GP_URL: &str = "https://www.space-track.org/basicspacedata/query/class/gp/decay_date/null-val/epoch/%3Enow-10/orderby/norad_cat_id/format/json";
+const DEFAULT_LOGIN_URL: &str = "https://www.space-track.org/ajaxauth/login";
+const DEFAULT_GP_URL: &str = "https://www.space-track.org/basicspacedata/query/class/gp/decay_date/null-val/epoch/%3Enow-10/orderby/norad_cat_id/format/json";
 
 #[derive(Clone)]
 pub struct SpaceCatalogService {
     inner: Arc<RwLock<Inner>>,
     client: reqwest::Client,
+    login_url: String,
+    gp_url: String,
 }
 
 struct Inner {
@@ -101,6 +105,9 @@ impl SpaceCatalogService {
                 .cookie_store(true)
                 .user_agent("world-at-war/0.1")
                 .build()?,
+            login_url: std::env::var("SPACETRACK_LOGIN_URL")
+                .unwrap_or_else(|_| DEFAULT_LOGIN_URL.into()),
+            gp_url: std::env::var("SPACETRACK_GP_URL").unwrap_or_else(|_| DEFAULT_GP_URL.into()),
         })
     }
 
@@ -163,7 +170,7 @@ impl SpaceCatalogService {
     async fn authenticate_with(&self, username: &str, password: &str) -> anyhow::Result<()> {
         let login = self
             .client
-            .post("https://www.space-track.org/ajaxauth/login")
+            .post(&self.login_url)
             .form(&[("identity", username), ("password", password)])
             .send()
             .await
@@ -172,9 +179,6 @@ impl SpaceCatalogService {
             })?;
         if !login.status().is_success() {
             anyhow::bail!(space_track_http_error("authentication", login.status()));
-        }
-        if login.url().path().contains("login") {
-            anyhow::bail!("Space-Track rejected the supplied credentials or the account is not authorized. Verify the username, password, and account access, then try again.");
         }
         Ok(())
     }
@@ -236,14 +240,30 @@ impl SpaceCatalogService {
     }
 
     async fn fetch_catalog(&self) -> anyhow::Result<SpaceCatalogSnapshot> {
-        let response = self.client.get(GP_URL).send().await.map_err(|error| {
-            anyhow::anyhow!("Could not reach Space-Track to download the GP catalog: {error}")
-        })?;
+        let response = self
+            .client
+            .get(&self.gp_url)
+            .send()
+            .await
+            .map_err(|error| {
+                anyhow::anyhow!("Could not reach Space-Track to download the GP catalog: {error}")
+            })?;
         if !response.status().is_success() {
             anyhow::bail!(space_track_http_error(
                 "catalog download",
                 response.status()
             ));
+        }
+        if is_login_path(response.url().path()) {
+            anyhow::bail!("Space-Track rejected the supplied credentials or the account is not authorized. Verify the username, password, and account access, then try again.");
+        }
+        if response
+            .headers()
+            .get(CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .is_some_and(is_html_content_type)
+        {
+            anyhow::bail!("Space-Track returned a login or HTML page instead of the GP catalog. The authentication session may not have been established; verify the account credentials and access, then try again.");
         }
         let mut objects: Vec<Value> = response.json().await.map_err(|error| {
             anyhow::anyhow!(
@@ -266,7 +286,7 @@ impl SpaceCatalogService {
         let checksum = format!("{:x}", Sha256::digest(&bytes));
         Ok(SpaceCatalogSnapshot {
             synced_unix: now_unix(),
-            source: GP_URL.into(),
+            source: self.gp_url.clone(),
             checksum,
             objects,
         })
@@ -311,6 +331,17 @@ async fn persist_snapshot(snapshot: &SpaceCatalogSnapshot) -> anyhow::Result<()>
 
 fn is_valid_snapshot(snapshot: &SpaceCatalogSnapshot) -> bool {
     !snapshot.checksum.is_empty() && !snapshot.objects.is_empty()
+}
+
+fn is_login_path(path: &str) -> bool {
+    path == "/auth/login" || path.starts_with("/auth/login/")
+}
+
+fn is_html_content_type(value: &str) -> bool {
+    value
+        .split(';')
+        .next()
+        .is_some_and(|media_type| media_type.trim().eq_ignore_ascii_case("text/html"))
 }
 
 fn space_track_http_error(stage: &str, status: reqwest::StatusCode) -> String {
@@ -374,6 +405,8 @@ mod tests {
                 error: error.map(str::to_owned),
             })),
             client: reqwest::Client::new(),
+            login_url: DEFAULT_LOGIN_URL.into(),
+            gp_url: DEFAULT_GP_URL.into(),
         }
     }
 
@@ -386,6 +419,21 @@ mod tests {
         let limited =
             space_track_http_error("catalog download", reqwest::StatusCode::TOO_MANY_REQUESTS);
         assert!(limited.contains("does not start"));
+    }
+
+    #[test]
+    fn only_catalog_redirects_to_the_login_page_are_authentication_failures() {
+        assert!(is_login_path("/auth/login"));
+        assert!(is_login_path("/auth/login/expired"));
+        assert!(!is_login_path("/ajaxauth/login"));
+        assert!(!is_login_path("/basicspacedata/query/class/gp/format/json"));
+    }
+
+    #[test]
+    fn html_catalog_responses_are_not_parsed_as_json() {
+        assert!(is_html_content_type("text/html"));
+        assert!(is_html_content_type("Text/HTML; charset=UTF-8"));
+        assert!(!is_html_content_type("application/json"));
     }
 
     #[test]
