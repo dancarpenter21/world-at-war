@@ -49,6 +49,10 @@ struct FamilyRule {
     nation: Option<String>,
     operator: String,
     mission_category: String,
+    #[serde(default)]
+    public_description: Option<String>,
+    #[serde(default)]
+    sensors: Vec<String>,
     authority_id: String,
     authority_display_name: String,
     authority_organization: String,
@@ -65,6 +69,8 @@ struct ObjectOverride {
     aliases: Option<Vec<String>>,
     operator: Option<String>,
     mission_category: Option<String>,
+    public_description: Option<String>,
+    sensors: Option<Vec<String>>,
     authority: Option<SatelliteAuthorityAssignment>,
     source_ids: Option<Vec<String>>,
 }
@@ -190,6 +196,13 @@ fn generate(input: &Path, output: &Path, validate_only: bool) -> anyhow::Result<
             .and_then(|value| value.mission_category.clone())
             .or_else(|| family.map(|value| value.mission_category.clone()))
             .unwrap_or_else(|| "Unknown".into());
+        let public_description = override_value
+            .and_then(|value| value.public_description.clone())
+            .or_else(|| family.and_then(|value| value.public_description.clone()));
+        let sensors = override_value
+            .and_then(|value| value.sensors.clone())
+            .or_else(|| family.map(|value| value.sensors.clone()))
+            .unwrap_or_default();
         let aliases = override_value
             .and_then(|value| value.aliases.clone())
             .unwrap_or_default();
@@ -201,7 +214,7 @@ fn generate(input: &Path, output: &Path, validate_only: bool) -> anyhow::Result<
             number(raw, "INCLINATION"),
         )
         .to_owned();
-        let record = SpaceAssetIndexEntry {
+        let mut record = SpaceAssetIndexEntry {
             norad_catalog_id: norad,
             cospar_id: cospar.clone(),
             canonical_name: canonical_name.clone(),
@@ -214,6 +227,9 @@ fn generate(input: &Path, output: &Path, validate_only: bool) -> anyhow::Result<
                 .unwrap_or_else(|| "Unknown".into()),
             operator,
             mission_category,
+            public_description,
+            sensors,
+            public_source_ids: Vec::new(),
             launch_year: string(raw, "LAUNCH_DATE")
                 .and_then(|date| date.get(..4).and_then(|year| year.parse().ok())),
             radar_size_class: string(raw, "RCS_SIZE").unwrap_or_else(|| "Unknown".into()),
@@ -235,6 +251,7 @@ fn generate(input: &Path, output: &Path, validate_only: bool) -> anyhow::Result<
             }
             source_ids.sort();
             source_ids.dedup();
+            record.public_source_ids = source_ids.clone();
             cards.push((
                 norad,
                 render_card(
@@ -530,14 +547,28 @@ fn render_card(
         serde_json::to_string(&record.authority.public_source_ids)?,
     );
     let quote = |value: &str| serde_json::to_string(value).unwrap_or_else(|_| "\"Unknown\"".into());
+    let redacted = "[REDACTED]";
+    let sensor_markdown = if record.sensors.is_empty() {
+        redacted.into()
+    } else {
+        record
+            .sensors
+            .iter()
+            .map(|sensor| format!("- {}", escape_markdown(sensor)))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
     let mut markdown = format!(
-        "---\nnorad_catalog_id: {}\ncospar_id: {}\ncanonical_name: {}\naliases: {}\nnation: {}\noperator: {}\nowner: {}\nmanufacturer: {}\nmission_category: {}\noperational_status: {}\nlaunch_date: {}\nlaunch_site: {}\nbus: {}\nmass: {}\ndimensions: {}\norbital_regime: {}\ngenerated_at: {}\nauthority_assignment_id: {}\nauthority_kind: {}\nauthority_confidence: {}\ncommandable: {}\nsource_urls: {}\n{}\n---\n\n# {}\n\n## Overview\n\nPublic catalog payload {} (COSPAR {}). Current orbital elements are displayed live from the game-pinned Space-Track snapshot.\n\n## Public Mission\n\nMission category: **{}**. Unknown details are intentionally left as Unknown.\n\n## Operator and Operations\n\nOperator: **{}**. Operational status: **{}**.\n\n## Command Authority\n\n{} — {}. This assignment is {} and is separate from ownership.\n\n## Physical Characteristics\n\nBus, mass, and dimensions: **Unknown** unless a reviewed public override supplies them.\n\n## Registration\n\nNation/state: **{}**. Launch date: **{}**. Launch site: **{}**.\n\n## Sources\n\n",
+        "---\nnorad_catalog_id: {}\ncospar_id: {}\ncanonical_name: {}\naliases: {}\nnation: {}\noperator: {}\nowner: {}\nmanufacturer: {}\nmission_category: {}\npublic_description: {}\nsensors: {}\noperational_status: {}\nlaunch_date: {}\nlaunch_site: {}\nbus: {}\nmass: {}\ndimensions: {}\norbital_regime: {}\ngenerated_at: {}\nauthority_assignment_id: {}\nauthority_kind: {}\nauthority_confidence: {}\ncommandable: {}\nsource_urls: {}\n{}\n---\n\n# {}\n\n## Overview\n\n{}\n\nPublic catalog payload {} (COSPAR {}). Current orbital elements are displayed live from the game-pinned Space-Track snapshot.\n\n## Public Mission\n\nMission category: **{}**.\n\n## Publicly Reported Sensors and Payloads\n\n{}\n\n## Operator and Operations\n\nOperator: **{}**. Operational status: **{}**.\n\n## Command Authority\n\n{} — {}. This assignment is {} and is separate from ownership.\n\n## Physical Characteristics\n\nBus, mass, and dimensions: **[REDACTED]** unless a reviewed public override supplies them.\n\n## Registration\n\nNation/state: **{}**. Launch date: **{}**. Launch site: **{}**.\n\n## Sources\n\n",
         record.norad_catalog_id,
         quote(record.cospar_id.as_deref().unwrap_or("Unknown")),
         quote(&record.canonical_name),
         serde_json::to_string(&record.aliases)?,
         quote(&record.nation), quote(&record.operator), quote(satcat.map(|value| value.owner.as_str()).unwrap_or("Unknown")), quote("Unknown"),
-        quote(&record.mission_category), quote(&record.operational_status),
+        quote(&record.mission_category),
+        quote(record.public_description.as_deref().unwrap_or(redacted)),
+        serde_json::to_string(&record.sensors)?,
+        quote(&record.operational_status),
         quote(string(raw, "LAUNCH_DATE").as_deref().unwrap_or("Unknown")),
         quote(string(raw, "SITE").as_deref().unwrap_or("Unknown")),
         quote("Unknown"), quote("Unknown"), quote("Unknown"), quote(&record.orbital_regime),
@@ -545,9 +576,13 @@ fn render_card(
         quote(&enum_name(&record.authority.kind)),
         quote(&enum_name(&record.authority.confidence)),
         record.authority.commandable, serde_json::to_string(&source_urls)?, field_metadata,
-        escape_markdown(&record.canonical_name), record.norad_catalog_id,
+        escape_markdown(&record.canonical_name),
+        escape_markdown(record.public_description.as_deref().unwrap_or(redacted)),
+        record.norad_catalog_id,
         escape_markdown(record.cospar_id.as_deref().unwrap_or("Unknown")),
-        escape_markdown(&record.mission_category), escape_markdown(&record.operator),
+        escape_markdown(if record.mission_category == "Unknown" { redacted } else { &record.mission_category }),
+        sensor_markdown,
+        escape_markdown(&record.operator),
         escape_markdown(&record.operational_status), escape_markdown(&record.authority.display_name),
         escape_markdown(&record.authority.organization),
         escape_markdown(&enum_name(&record.authority.confidence)),

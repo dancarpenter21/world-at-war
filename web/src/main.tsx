@@ -8,7 +8,7 @@ import ms from "milsymbol";
 import "cesium/Build/Cesium/Widgets/widgets.css";
 import "./styles.css";
 import type { AuthorityDefinition, AuthorityRequest, Role } from "./AuthorityWorkspace";
-import { AirportLayer, type AirportListResponse } from "./airportLayer";
+import { AirportLayer, type AirportDetail, type AirportListResponse } from "./airportLayer";
 import { GlobeEntityReconciler, type Projection } from "./globeEntities";
 
 const AuthorityWorkspace = lazy(() => import("./AuthorityWorkspace").then((module) => ({ default: module.AuthorityWorkspace })));
@@ -51,14 +51,16 @@ function Globe({ projection }: { projection: Projection }) {
       animation: false,
       baseLayer: new ImageryLayer(new OpenStreetMapImageryProvider({ url: "https://tile.openstreetmap.org/", credit: "OpenStreetMap contributors" })),
       baseLayerPicker: false, fullscreenButton: false, geocoder: false, homeButton: false,
-      infoBox: false, navigationHelpButton: false, sceneModePicker: false, selectionIndicator: false,
+      infoBox: true, navigationHelpButton: false, sceneModePicker: false, selectionIndicator: true,
       terrainProvider: new EllipsoidTerrainProvider(), timeline: false
     });
     viewer.scene.globe.baseColor = Color.fromCssColorString("#1f3340");
     viewer.camera.setView({ destination: Cartesian3.fromDegrees(-40, 30, 20_000_000) });
     viewerRef.current = viewer;
     reconcilerRef.current = new GlobeEntityReconciler(viewer.entities, symbolCanvas);
-    const airportLayer = new AirportLayer(viewer);
+    const airportLayer = new AirportLayer(viewer, (airportId) =>
+      request<AirportDetail>(`/v1/airports/${encodeURIComponent(airportId)}`)
+    );
     let airportRequest: AbortController | undefined;
     let refreshTimer: number | undefined;
     let stopped = false;

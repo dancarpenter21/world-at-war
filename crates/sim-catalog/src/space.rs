@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub const SPACE_CARD_GENERATOR_VERSION: &str = "1.0.0";
+pub const SPACE_CARD_GENERATOR_VERSION: &str = "1.1.0";
 pub const REGIME_CLASSIFIER_VERSION: &str = "1.0.0";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -56,6 +56,12 @@ pub struct SpaceAssetIndexEntry {
     pub operational_status: String,
     pub operator: String,
     pub mission_category: String,
+    #[serde(default)]
+    pub public_description: Option<String>,
+    #[serde(default)]
+    pub sensors: Vec<String>,
+    #[serde(default)]
+    pub public_source_ids: Vec<String>,
     pub launch_year: Option<u16>,
     pub radar_size_class: String,
     pub inclination_deg: Option<f64>,

@@ -1,1 +1,72 @@
-{}
+{
+  "20580": {
+    "public_description": "The Hubble Space Telescope is a NASA/ESA orbiting observatory that records ultraviolet, visible, and near-infrared light for astronomy and astrophysics.",
+    "sensors": ["Advanced Camera for Surveys (ACS)", "Cosmic Origins Spectrograph (COS)", "Space Telescope Imaging Spectrograph (STIS)", "Wide Field Camera 3 (WFC3)", "Fine Guidance Sensors (FGS)"],
+    "source_ids": ["nasa-hubble-instruments"]
+  },
+  "25994": {
+    "public_description": "Terra is NASA's flagship Earth Observing System spacecraft, designed to make simultaneous measurements of Earth's atmosphere, land, oceans, and energy budget.",
+    "sensors": ["Advanced Spaceborne Thermal Emission and Reflection Radiometer (ASTER)", "Clouds and the Earth's Radiant Energy System (CERES)", "Multi-angle Imaging SpectroRadiometer (MISR)", "Moderate Resolution Imaging Spectroradiometer (MODIS)", "Measurements of Pollution in the Troposphere (MOPITT)"],
+    "source_ids": ["nasa-terra-instruments"]
+  },
+  "27424": {
+    "public_description": "Aqua is a NASA Earth-observing mission focused on the global water cycle and related atmospheric, land, ocean, and energy-budget measurements.",
+    "sensors": ["Atmospheric Infrared Sounder (AIRS)", "Advanced Microwave Sounding Unit (AMSU-A)", "Humidity Sounder for Brazil (HSB)", "Advanced Microwave Scanning Radiometer for EOS (AMSR-E)", "Moderate Resolution Imaging Spectroradiometer (MODIS)", "Clouds and the Earth's Radiant Energy System (CERES)"],
+    "source_ids": ["nasa-aqua-instruments"]
+  },
+  "28376": {
+    "public_description": "Aura is a NASA Earth-observing mission that measures atmospheric trace gases and studies ozone, air quality, and climate.",
+    "sensors": ["High Resolution Dynamics Limb Sounder (HIRDLS)", "Microwave Limb Sounder (MLS)", "Ozone Monitoring Instrument (OMI)", "Tropospheric Emission Spectrometer (TES)"],
+    "source_ids": ["nasa-aura-instruments"]
+  },
+  "37849": {
+    "public_description": "Suomi NPP is a U.S. polar-orbiting environmental satellite providing observations used for weather forecasting and climate records.",
+    "sensors": ["Visible Infrared Imaging Radiometer Suite (VIIRS)", "Cross-track Infrared Sounder (CrIS)", "Advanced Technology Microwave Sounder (ATMS)", "Ozone Mapping and Profiler Suite (OMPS)", "Clouds and the Earth's Radiant Energy System (CERES)"],
+    "source_ids": ["noaa-jpss-instruments"]
+  },
+  "39084": {
+    "public_description": "Landsat 8 collects calibrated multispectral and thermal imagery of Earth's land surface for the continuous Landsat record.",
+    "sensors": ["Operational Land Imager (OLI)", "Thermal Infrared Sensor (TIRS)"],
+    "source_ids": ["nasa-landsat-9-instruments"]
+  },
+  "41866": {
+    "public_description": "GOES-16 is a NOAA geostationary environmental satellite in the GOES-R series, providing terrestrial and space-weather observations.",
+    "sensors": ["Advanced Baseline Imager (ABI)", "Geostationary Lightning Mapper (GLM)", "Extreme Ultraviolet and X-ray Irradiance Sensors (EXIS)", "Solar Ultraviolet Imager (SUVI)", "Space Environment In-Situ Suite (SEISS)", "Magnetometer (MAG)"],
+    "source_ids": ["noaa-goes-r-instruments"]
+  },
+  "43013": {
+    "public_description": "NOAA-20 is a JPSS polar-orbiting environmental satellite providing global atmospheric, ocean, and land observations.",
+    "sensors": ["Visible Infrared Imaging Radiometer Suite (VIIRS)", "Cross-track Infrared Sounder (CrIS)", "Advanced Technology Microwave Sounder (ATMS)", "Ozone Mapping and Profiler Suite (OMPS)", "Clouds and the Earth's Radiant Energy System (CERES-FM6)"],
+    "source_ids": ["noaa-jpss-instruments"]
+  },
+  "43226": {
+    "public_description": "GOES-17 is a NOAA geostationary environmental satellite in the GOES-R series, providing terrestrial and space-weather observations.",
+    "sensors": ["Advanced Baseline Imager (ABI)", "Geostationary Lightning Mapper (GLM)", "Extreme Ultraviolet and X-ray Irradiance Sensors (EXIS)", "Solar Ultraviolet Imager (SUVI)", "Space Environment In-Situ Suite (SEISS)", "Magnetometer (MAG)"],
+    "source_ids": ["noaa-goes-r-instruments"]
+  },
+  "49260": {
+    "public_description": "Landsat 9 collects calibrated multispectral and thermal imagery of Earth's land surface and continues the long-running Landsat record.",
+    "sensors": ["Operational Land Imager 2 (OLI-2)", "Thermal Infrared Sensor 2 (TIRS-2)"],
+    "source_ids": ["nasa-landsat-9-instruments"]
+  },
+  "50463": {
+    "public_description": "The James Webb Space Telescope is a NASA/ESA/CSA infrared observatory designed for imaging and spectroscopy of planets, stars, nebulae, and galaxies.",
+    "sensors": ["Mid-Infrared Instrument (MIRI)", "Near-Infrared Camera (NIRCam)", "Near-Infrared Spectrograph (NIRSpec)", "Near-Infrared Imager and Slitless Spectrograph / Fine Guidance Sensor (NIRISS/FGS)"],
+    "source_ids": ["nasa-webb-instruments"]
+  },
+  "51850": {
+    "public_description": "GOES-18 is a NOAA geostationary environmental satellite in the GOES-R series, providing terrestrial and space-weather observations.",
+    "sensors": ["Advanced Baseline Imager (ABI)", "Geostationary Lightning Mapper (GLM)", "Extreme Ultraviolet and X-ray Irradiance Sensors (EXIS)", "Solar Ultraviolet Imager (SUVI)", "Space Environment In-Situ Suite (SEISS)", "Magnetometer (MAG)"],
+    "source_ids": ["noaa-goes-r-instruments"]
+  },
+  "54234": {
+    "public_description": "NOAA-21 is a JPSS polar-orbiting environmental satellite providing global atmospheric, ocean, and land observations.",
+    "sensors": ["Visible Infrared Imaging Radiometer Suite (VIIRS)", "Cross-track Infrared Sounder (CrIS)", "Advanced Technology Microwave Sounder (ATMS)", "Ozone Mapping and Profiler Suite (OMPS)"],
+    "source_ids": ["noaa-jpss-instruments"]
+  },
+  "60133": {
+    "public_description": "GOES-19 is a NOAA geostationary environmental satellite in the GOES-R series, providing terrestrial and space-weather observations.",
+    "sensors": ["Advanced Baseline Imager (ABI)", "Geostationary Lightning Mapper (GLM)", "Extreme Ultraviolet and X-ray Irradiance Sensors (EXIS)", "Solar Ultraviolet Imager (SUVI)", "Space Environment In-Situ Suite (SEISS)", "Magnetometer (MAG)", "Compact Coronagraph 1 (CCOR-1)"],
+    "source_ids": ["noaa-goes-r-instruments"]
+  }
+}

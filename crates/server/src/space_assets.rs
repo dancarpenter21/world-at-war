@@ -134,9 +134,11 @@ impl SpaceAssetService {
         };
         let enrichment_available = markdown.is_some();
         let markdown = markdown.unwrap_or_else(|| baseline_markdown(&record));
-        let sources = record
-            .authority
-            .public_source_ids
+        let mut source_ids = record.public_source_ids.clone();
+        source_ids.extend(record.authority.public_source_ids.iter().cloned());
+        source_ids.sort();
+        source_ids.dedup();
+        let sources = source_ids
             .iter()
             .filter_map(|id| self.inner.sources.get(id).cloned())
             .collect();
@@ -193,6 +195,9 @@ fn baseline_record(raw: &Value) -> Option<SpaceAssetIndexEntry> {
         operational_status: "Unknown".into(),
         operator: "Unknown".into(),
         mission_category: "Unknown".into(),
+        public_description: None,
+        sensors: Vec::new(),
+        public_source_ids: vec!["space-track-gp".into()],
         launch_year: string(raw, "LAUNCH_DATE").and_then(|date| date.get(..4)?.parse().ok()),
         radar_size_class: string(raw, "RCS_SIZE").unwrap_or_else(|| "Unknown".into()),
         inclination_deg: number(raw, "INCLINATION"),

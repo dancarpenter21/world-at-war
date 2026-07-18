@@ -11,5 +11,13 @@
   {"id":"nasa-missions","title":"NASA missions","url":"https://science.nasa.gov/missions/","retrieved_on":"2026-07-13","license":"U.S. government public information"},
   {"id":"spacex-starlink","title":"Starlink","url":"https://www.starlink.com/technology","retrieved_on":"2026-07-13","license":"Operator public information"},
   {"id":"amazon-kuiper","title":"Project Kuiper","url":"https://www.aboutamazon.com/what-we-do/devices-services/project-kuiper","retrieved_on":"2026-07-13","license":"Operator public information"},
-  {"id":"iridium","title":"Iridium satellite network","url":"https://www.iridium.com/network/","retrieved_on":"2026-07-13","license":"Operator public information"}
+  {"id":"iridium","title":"Iridium satellite network","url":"https://www.iridium.com/network/","retrieved_on":"2026-07-13","license":"Operator public information"},
+  {"id":"nasa-landsat-9-instruments","title":"Landsat 9 instruments","url":"https://science.nasa.gov/mission/landsat-9/","retrieved_on":"2026-07-18","license":"U.S. government public information"},
+  {"id":"noaa-goes-r-instruments","title":"GOES-R Series instruments","url":"https://goes-r.noaa.gov/spacesegment/instruments.html","retrieved_on":"2026-07-18","license":"U.S. government public information"},
+  {"id":"noaa-jpss-instruments","title":"JPSS satellite and instruments","url":"https://www.nesdis.noaa.gov/our-satellites/currently-flying/joint-polar-satellite-system/jpss-satellite-and-instruments","retrieved_on":"2026-07-18","license":"U.S. government public information"},
+  {"id":"nasa-terra-instruments","title":"Terra instruments","url":"https://terra.nasa.gov/about/terra-instruments","retrieved_on":"2026-07-18","license":"U.S. government public information"},
+  {"id":"nasa-aqua-instruments","title":"Aqua instruments","url":"https://aqua.nasa.gov/content/instruments","retrieved_on":"2026-07-18","license":"U.S. government public information"},
+  {"id":"nasa-aura-instruments","title":"Aura spacecraft and instruments","url":"https://science.nasa.gov/mission/aura/spacecraft-and-instruments/","retrieved_on":"2026-07-18","license":"U.S. government public information"},
+  {"id":"nasa-hubble-instruments","title":"Hubble instruments","url":"https://science.nasa.gov/mission/hubble/observatory/design/instruments/","retrieved_on":"2026-07-18","license":"U.S. government public information"},
+  {"id":"nasa-webb-instruments","title":"Webb scientific instruments","url":"https://science.nasa.gov/mission/webb/science-overview/science-explainers/webbs-scientific-instruments/","retrieved_on":"2026-07-18","license":"U.S. government public information"}
 ]
