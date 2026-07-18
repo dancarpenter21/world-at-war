@@ -10,9 +10,10 @@ import "./styles.css";
 import type { AuthorityDefinition, AuthorityRequest, Role } from "./AuthorityWorkspace";
 import { AirportLayer, type AirportDetail, type AirportListResponse } from "./airportLayer";
 import { GlobeEntityReconciler, type Projection } from "./globeEntities";
+import { MapFilterDialog, type MapFilters } from "./MapFilterDialog";
+import { SpaceAssetLayer } from "./spaceAssetLayer";
 
 const AuthorityWorkspace = lazy(() => import("./AuthorityWorkspace").then((module) => ({ default: module.AuthorityWorkspace })));
-const SpaceAssetViewer = lazy(() => import("./SpaceAssetViewer").then((module) => ({ default: module.SpaceAssetViewer })));
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 type Scenario = { id: string; title: string; description: string; version: number; authored_entity_count: number; role_count: number; requires_space_catalog: boolean };
@@ -39,11 +40,25 @@ function symbolCanvas(sidc: string, size = 32) {
   return canvas;
 }
 
-function Globe({ projection }: { projection: Projection }) {
+function Globe({ projection, filters, gameId, playerId, roleId }: {
+  projection: Projection;
+  filters: MapFilters;
+  gameId: string;
+  playerId: string;
+  roleId: string;
+}) {
   const host = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Viewer | null>(null);
   const reconcilerRef = useRef<GlobeEntityReconciler | null>(null);
+  const airportLayerRef = useRef<AirportLayer | null>(null);
+  const spaceAssetLayerRef = useRef<SpaceAssetLayer | null>(null);
+  const showSpaceAssetsRef = useRef<() => void>(() => undefined);
+  const airportRequestRef = useRef<AbortController | undefined>(undefined);
+  const refreshAirportsRef = useRef<() => void>(() => undefined);
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
   const [airportStatus, setAirportStatus] = useState("Loading airports");
+  const [spaceAssetStatus, setSpaceAssetStatus] = useState("Space assets hidden");
 
   useEffect(() => {
     if (!host.current || viewerRef.current) return;
@@ -61,15 +76,25 @@ function Globe({ projection }: { projection: Projection }) {
     const airportLayer = new AirportLayer(viewer, (airportId) =>
       request<AirportDetail>(`/v1/airports/${encodeURIComponent(airportId)}`)
     );
-    let airportRequest: AbortController | undefined;
+    airportLayerRef.current = airportLayer;
+    const showSpaceAssets = () => {
+      if (!spaceAssetLayerRef.current) {
+        spaceAssetLayerRef.current = new SpaceAssetLayer(viewer, gameId, playerId, roleId, setSpaceAssetStatus);
+      }
+      spaceAssetLayerRef.current.setFilters(filtersRef.current.spaceAssets);
+    };
+    showSpaceAssetsRef.current = showSpaceAssets;
+    if (filtersRef.current.spaceAssets.showAll || filtersRef.current.spaceAssets.showStarlink) showSpaceAssets();
     let refreshTimer: number | undefined;
     let stopped = false;
 
     const refreshAirports = async () => {
+      const runwayFilters = filtersRef.current.runways;
+      if (!runwayFilters.visible) return;
       const rectangle = viewer.camera.computeViewRectangle(viewer.scene.globe.ellipsoid);
       if (!rectangle) return;
-      airportRequest?.abort();
-      airportRequest = new AbortController();
+      airportRequestRef.current?.abort();
+      airportRequestRef.current = new AbortController();
       const cameraPosition = viewer.camera.positionCartographic;
       const ellipsoidRadius = viewer.scene.globe.ellipsoid.maximumRadius;
       const horizonRadius = Math.acos(Math.min(1, ellipsoidRadius / Math.max(ellipsoidRadius, ellipsoidRadius + cameraPosition.height)));
@@ -81,21 +106,24 @@ function Globe({ projection }: { projection: Projection }) {
         horizon_latitude: CesiumMath.toDegrees(cameraPosition.latitude).toFixed(5),
         horizon_longitude: CesiumMath.toDegrees(cameraPosition.longitude).toFixed(5),
         horizon_radius_deg: CesiumMath.toDegrees(horizonRadius).toFixed(5),
+        minimum_runway_length_m: String(runwayFilters.minimumLengthM),
         limit: "500"
       });
       try {
-        const response = await request<AirportListResponse>(`/v1/airports?${query}`, { signal: airportRequest.signal });
-        if (stopped) return;
+        const response = await request<AirportListResponse>(`/v1/airports?${query}`, { signal: airportRequestRef.current.signal });
+        if (stopped || !filtersRef.current.runways.visible) return;
         airportLayer.update(response.airports);
+        const threshold = runwayFilters.minimumLengthM > 0 ? ` · runways ≥ ${runwayFilters.minimumLengthM.toLocaleString()} m` : "";
         setAirportStatus(response.total > response.airports.length
-          ? `${response.airports.length.toLocaleString()} of ${response.total.toLocaleString()} airports in view`
-          : `${response.total.toLocaleString()} airports in view`);
+          ? `${response.airports.length.toLocaleString()} of ${response.total.toLocaleString()} airports${threshold}`
+          : `${response.total.toLocaleString()} airports${threshold}`);
       } catch (error) {
         if (!stopped && !(error instanceof DOMException && error.name === "AbortError")) {
           setAirportStatus("Airport layer unavailable");
         }
       }
     };
+    refreshAirportsRef.current = () => void refreshAirports();
     const scheduleAirportRefresh = () => {
       if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
       refreshTimer = window.setTimeout(() => void refreshAirports(), 150);
@@ -104,10 +132,15 @@ function Globe({ projection }: { projection: Projection }) {
     void refreshAirports();
     return () => {
       stopped = true;
-      airportRequest?.abort();
+      airportRequestRef.current?.abort();
       if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
       viewer.camera.moveEnd.removeEventListener(scheduleAirportRefresh);
+      spaceAssetLayerRef.current?.destroy();
       airportLayer.destroy();
+      airportLayerRef.current = null;
+      spaceAssetLayerRef.current = null;
+      showSpaceAssetsRef.current = () => undefined;
+      refreshAirportsRef.current = () => undefined;
       reconcilerRef.current = null;
       viewer.destroy();
       viewerRef.current = null;
@@ -118,7 +151,27 @@ function Globe({ projection }: { projection: Projection }) {
     reconcilerRef.current?.reconcile(projection);
   }, [projection]);
 
-  return <><div className="globe" ref={host} /><div className="airport-layer-status">{airportStatus}</div></>;
+  useEffect(() => {
+    if (filters.spaceAssets.showAll || filters.spaceAssets.showStarlink) {
+      showSpaceAssetsRef.current();
+    } else {
+      spaceAssetLayerRef.current?.setFilters(filters.spaceAssets);
+      setSpaceAssetStatus("Space assets hidden");
+    }
+  }, [filters.spaceAssets.showAll, filters.spaceAssets.showStarlink]);
+
+  useEffect(() => {
+    airportRequestRef.current?.abort();
+    if (!filters.runways.visible) {
+      airportLayerRef.current?.hide();
+      setAirportStatus("Airport runways hidden");
+      return;
+    }
+    setAirportStatus("Loading airports");
+    refreshAirportsRef.current();
+  }, [filters.runways.visible, filters.runways.minimumLengthM]);
+
+  return <><div className="globe" ref={host} /><div className="map-layer-status"><span>{airportStatus}</span><span>{spaceAssetStatus}</span></div></>;
 }
 
 function App() {
@@ -138,7 +191,11 @@ function App() {
   const [spacePassword, setSpacePassword] = useState("");
   const [rememberCredentials, setRememberCredentials] = useState(true);
   const [showAuthority, setShowAuthority] = useState(false);
-  const [showSpaceAssets, setShowSpaceAssets] = useState(false);
+  const [showMapFilters, setShowMapFilters] = useState(false);
+  const [mapFilters, setMapFilters] = useState<MapFilters>({
+    spaceAssets: { showAll: false, showStarlink: false },
+    runways: { visible: true, minimumLengthM: 0 }
+  });
   const [authority, setAuthority] = useState<AuthorityDefinition | null>(null);
   const [authorityRequests, setAuthorityRequests] = useState<AuthorityRequest[]>([]);
   const restoreAttempted = useRef(false);
@@ -287,9 +344,16 @@ function App() {
         : <div className="modal-body"><label>Display name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label><h2>Available games</h2><div className="game-list">{games.length ? games.map((item) => <button className="game-row" key={item.id} onClick={() => void selectGame(item)}><span>{item.title}</span><small>{item.status} · {item.player_roles_available} open roles</small></button>) : <p className="muted">No games have been created.</p>}</div></div>}</>}
       {game && <div className="modal-body"><h2>{game.title}</h2><p className="muted">Claim a command role. The operational map remains offline until the scenario starts.</p><div className="role-grid">{roles.map((item) => <button key={item.id} className={`role ${role?.id === item.id ? "selected" : ""}`} disabled={item.ai_controlled || (item.held && role?.id !== item.id)} onClick={() => void claim(item)}><span>{item.name}</span><small>{item.ai_controlled ? "AI" : item.held ? "held" : item.kind.replaceAll("_", " ")}</small></button>)}</div><div className="modal-actions"><button className="secondary" onClick={leave}>Back</button>{game.host_player_id === playerId && <button className="secondary" onClick={() => setShowAuthority(true)}>Configure authorities</button>}{game.host_player_id === playerId && <button className="command" disabled={!role} onClick={() => void start()}>Start scenario</button>}{game.host_player_id !== playerId && <span className="muted">Waiting for host to start</span>}</div></div>}
     </section></div>}
-    {playable && projection && <section className="workspace"><aside className="sidebar"><h1>{role.name}</h1><p className="message">{game.title}</p><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command space-launch" onClick={() => setShowSpaceAssets(true)}>Space Asset Viewer</button><h2>Catalog</h2><p className="muted">{spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status"}</p><button className="secondary" onClick={leave}>Leave scenario</button></aside><section className="map-region"><Globe projection={projection} /><div className="map-caption">{role.name} · {role.side} · authored game entities</div></section><aside className="inspector"><h2>Operational picture</h2><div className="metric"><span>Own units</span><strong>{projection.own_units.length}</strong></div><div className="metric"><span>Tracks</span><strong>{projection.tracks.length}</strong></div><h2>Actions</h2><button className="command" disabled={!role.command_units.length} onClick={() => void turnNorth()}>Turn north</button><h2>Tracks</h2>{projection.tracks.length ? projection.tracks.map((track) => <div className="track" key={track.track_id}><span>Uncertain {track.target_side} contact</span><small>{Math.round(track.identity_confidence * 100)}% identity</small></div>) : <p className="muted">No reports received.</p>}</aside></section>}
+    {playable && projection && <section className="workspace">
+      <aside className="sidebar"><h1>{role.name}</h1><p className="message">{game.title}</p><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command map-filter-launch" onClick={() => setShowMapFilters((value) => !value)}>Map filters</button><h2>Catalog</h2><p className="muted">{spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status"}</p><button className="secondary" onClick={leave}>Leave scenario</button></aside>
+      <section className="map-region">
+        <Globe projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} />
+        {showMapFilters && <MapFilterDialog filters={mapFilters} onChange={setMapFilters} onClose={() => setShowMapFilters(false)} />}
+        <div className="map-caption">{role.name} · {role.side} · operational picture</div>
+      </section>
+      <aside className="inspector"><h2>Operational picture</h2><div className="metric"><span>Own units</span><strong>{projection.own_units.length}</strong></div><div className="metric"><span>Tracks</span><strong>{projection.tracks.length}</strong></div><h2>Actions</h2><button className="command" disabled={!role.command_units.length} onClick={() => void turnNorth()}>Turn north</button><h2>Tracks</h2>{projection.tracks.length ? projection.tracks.map((track) => <div className="track" key={track.track_id}><span>Uncertain {track.target_side} contact</span><small>{Math.round(track.identity_confidence * 100)}% identity</small></div>) : <p className="muted">No reports received.</p>}</aside>
+    </section>}
     {showAuthority && authority && game && <Suspense fallback={<div className="authority-loading">Loading authority graph…</div>}><AuthorityWorkspace definition={authority} runtimeRoles={roles} units={authorityUnits} requests={authorityRequests} currentRole={role} isHost={game.host_player_id === playerId} tick={projection?.tick ?? 0} onClose={() => setShowAuthority(false)} onSave={saveAuthority} onCreateRequest={createAuthorityRequest} onDecision={decideAuthorityRequest} /></Suspense>}
-    {showSpaceAssets && game && role && <Suspense fallback={<div className="authority-loading">Loading space catalog workspace…</div>}><SpaceAssetViewer gameId={game.id} playerId={playerId} roleId={role.id} leaseGeneration={role.lease_generation} onClose={() => setShowSpaceAssets(false)} onMessage={setMessage} /></Suspense>}
   </main>;
 }
 

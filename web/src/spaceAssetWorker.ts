@@ -9,7 +9,7 @@ type RecordEntry = {
   operator: string; mission_category: string; launch_year?: number; radar_size_class: string;
   inclination_deg?: number; authority: Authority;
 };
-type Filters = { query: string; mode: "payloads" | "all"; debris: boolean; rocketBodies: boolean; facets: Record<string, string[]> };
+type Filters = { query: string; excludeQuery?: string; mode: "payloads" | "all"; debris: boolean; rocketBodies: boolean; facets: Record<string, string[]> };
 type Orbital = { id: number; satrec: SatRec };
 
 const scope = self as unknown as DedicatedWorkerGlobalScope;
@@ -30,7 +30,7 @@ scope.onmessage = (event: MessageEvent) => {
   if (message.type === "select") { selected = message.noradId; postOrbitPath(); }
 };
 
-async function initialize(message: { apiBase: string; gameId: string; playerId: string; roleId: string }) {
+async function initialize(message: { apiBase: string; gameId: string; playerId: string; roleId: string; initialFilters?: Filters }) {
   const query = new URLSearchParams({ player_id: message.playerId, role_id: message.roleId });
   const [indexResponse, rawResponse] = await Promise.all([
     fetch(`${message.apiBase}/v1/games/${message.gameId}/space-assets?${query}`, { credentials: "include" }),
@@ -52,19 +52,22 @@ async function initialize(message: { apiBase: string; gameId: string; playerId: 
   });
   orbitalById = new Map(orbital.map((value) => [value.id, value.satrec]));
   scope.postMessage({ type: "ready", records, facets: index.facets, checksum: index.catalog_checksum, manifestVersion: index.manifest_version, enrichmentAvailable: index.enrichment_available });
-  applyFilters({ query: "", mode: "payloads", debris: false, rocketBodies: false, facets: {} });
+  applyFilters(message.initialFilters ?? { query: "", mode: "payloads", debris: false, rocketBodies: false, facets: {} });
   propagationTimer = scope.setInterval(propagateVisible, 10_000);
 }
 
 function applyFilters(filters: Filters) {
   const query = filters.query.trim().toLocaleLowerCase();
+  const excludeQuery = filters.excludeQuery?.trim().toLocaleLowerCase() ?? "";
   const result = records.filter((record) => {
     if (filters.mode === "payloads" && record.object_type !== "PAYLOAD") return false;
     if (filters.mode === "all") {
       if (!filters.debris && record.object_type === "DEBRIS") return false;
       if (!filters.rocketBodies && record.object_type === "ROCKET BODY") return false;
     }
-    if (query && !searchText(record).includes(query)) return false;
+    const searchable = searchText(record);
+    if (query && !searchable.includes(query)) return false;
+    if (excludeQuery && searchable.includes(excludeQuery)) return false;
     return Object.entries(filters.facets).every(([facet, selectedValues]) => !selectedValues.length || selectedValues.includes(facetValue(record, facet)));
   });
   visible = new Set(result.map((record) => record.norad_catalog_id));

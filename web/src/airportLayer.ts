@@ -200,6 +200,14 @@ export class AirportLayer {
     }
   }
 
+  hide() {
+    this.selectionGeneration++;
+    this.billboards.removeAll();
+    const selectedAirport = this.viewer.entities.getById(AIRPORT_DETAIL_ID);
+    this.viewer.entities.removeById(AIRPORT_DETAIL_ID);
+    if (this.viewer.selectedEntity === selectedAirport) this.viewer.selectedEntity = undefined;
+  }
+
   private async select(airportId: string) {
     const generation = ++this.selectionGeneration;
     this.viewer.entities.removeById(AIRPORT_DETAIL_ID);
