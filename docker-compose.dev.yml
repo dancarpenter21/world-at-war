@@ -1,7 +1,17 @@
 services:
   proxy:
+    image: world-at-war-proxy:development
+    build:
+      context: .
+      dockerfile: deploy/nginx/Dockerfile.dev
     volumes:
       - ./deploy/nginx/edge.dev.conf:/etc/nginx/conf.d/default.conf:ro
+    develop:
+      watch:
+        - action: restart
+          path: ./deploy/nginx/edge.dev.conf
+        - action: rebuild
+          path: ./deploy/nginx/Dockerfile.dev
 
   server:
     image: world-at-war-server:development
@@ -13,10 +23,30 @@ services:
     user: "0:0"
     working_dir: /workspace
     volumes:
-      - ./:/workspace
       - cargo-target:/workspace/target
       - cargo-registry:/usr/local/cargo/registry
       - cargo-git:/usr/local/cargo/git
+      - ./data/cache/space-track:/workspace/data/cache/space-track
+    develop:
+      watch:
+        - action: sync
+          path: ./crates
+          target: /workspace/crates
+          initial_sync: true
+        - action: sync
+          path: ./Cargo.toml
+          target: /workspace/Cargo.toml
+          initial_sync: true
+        - action: sync
+          path: ./Cargo.lock
+          target: /workspace/Cargo.lock
+          initial_sync: true
+        - action: sync+restart
+          path: ./data/space-cards
+          target: /workspace/data/space-cards
+          initial_sync: true
+        - action: rebuild
+          path: ./crates/server/Dockerfile
 
   web:
     image: world-at-war-web:development
@@ -24,16 +54,30 @@ services:
       target: development
     environment:
       CHOKIDAR_USEPOLLING: "true"
-    volumes:
-      - ./web:/web
-      - web-node-modules:/web/node_modules
     expose:
       - "5173"
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:5173/', r => process.exit(r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"]
+    develop:
+      watch:
+        - action: sync
+          path: ./web
+          target: /web
+          initial_sync: true
+          ignore:
+            - node_modules/
+            - dist/
+            - package.json
+            - package-lock.json
+            - Dockerfile
+        - action: rebuild
+          path: ./web/package.json
+        - action: rebuild
+          path: ./web/package-lock.json
+        - action: rebuild
+          path: ./web/Dockerfile
 
 volumes:
   cargo-target:
   cargo-registry:
   cargo-git:
-  web-node-modules:

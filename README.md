@@ -57,12 +57,12 @@ Open `http://localhost:8080`, or the port set by `APP_PORT`. The internal server
 For containerized development with hot reloading, use the development override:
 
 ```sh
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build --watch
 ```
 
-Open the same edge-proxy URL. Source directories are bind-mounted; `cargo watch` polls for Rust changes and restarts the server, while Vite uses polling and HMR for frontend changes. Named volumes preserve Cargo artifacts/downloads, frontend dependencies, and the Space-Track cache between restarts. Stop either stack with the matching `docker compose ... down` command.
+This workflow requires Docker Compose 2.32 or newer. Open the same edge-proxy URL. Compose Watch syncs browser assets into the Vite container, where polling and HMR update the open page. It also syncs Rust changes for `cargo watch`, restarts Nginx when its development configuration changes, and rebuilds the affected image when a dependency manifest or Dockerfile changes. Named volumes preserve Cargo artifacts/downloads and the Space-Track cache between restarts. Stop either stack with the matching `docker compose ... down` command.
 
-Source edits are picked up without rebuilding images, and Cargo manifest changes are handled by `cargo watch`. After changing `web/package.json` or `web/package-lock.json`, refresh the named dependency volume with `docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm web npm ci`, then restart the web service. Rebuild the development images after changing either Dockerfile or its toolchain.
+Application, dependency, proxy, and image-definition changes are handled for the running stack. Changes to either Compose YAML file alter the watcher itself, so restart the command after editing those files.
 
 ## Configuration and Space-Track
 
@@ -125,7 +125,7 @@ The REST API exposes catalog status at `/v1/airport-catalog/status`, paginated s
 - `crates/server/` — Axum API, game lifecycle, credential cookie, catalog service, and simulation loop.
 - `web/` — React, TypeScript, Cesium, persistent MIL-STD-2525D entity rendering, authority and space-asset workspaces, and Vitest frontend regression tests.
 - `deploy/nginx/` — production and development edge-proxy configurations.
-- `docker-compose.yml` — production-shaped local stack; `docker-compose.dev.yml` — hot-reload override.
+- `docker-compose.yml` — production-shaped local stack; `docker-compose.dev.yml` — Compose Watch hot-reload override.
 
 ## Verify changes
 

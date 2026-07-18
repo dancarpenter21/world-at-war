@@ -10,6 +10,9 @@ RUN apt-get update \
   && apt-get install --no-install-recommends -y curl \
   && rm -rf /var/lib/apt/lists/* \
   && cargo install cargo-watch --locked
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+COPY data/space-cards ./data/space-cards
 EXPOSE 8000
 ENV BIND_ADDR=0.0.0.0:8000
 CMD ["cargo", "watch", "--poll", "--watch", "Cargo.toml", "--watch", "Cargo.lock", "--watch", "crates", "--exec", "run --package world-at-war-server"]
