@@ -153,6 +153,15 @@ test("downloads and persists a Space-Track catalog through the login form", asyn
   await page.getByRole("button", { name: "Connect and synchronize" }).click();
   expect((await connectResponse).status()).toBe(200);
   await expect(page.getByText(/Catalog ready: [\d,]+ public objects\./)).toBeVisible();
+  const successFeedback = page.getByRole("status").filter({ hasText: "Catalog download complete" });
+  await expect(successFeedback).toBeVisible();
+  await expect(successFeedback).toContainText(/\d[\d,]* public objects are ready to use\./);
+  await expect(page.getByRole("button", { name: "Connect and synchronize" })).toBeEnabled();
+
+  await page.getByRole("button", { name: "Create game" }).click();
+  await expect(page.getByText("Claim a command role.")).toBeVisible();
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(page.getByRole("heading", { name: "Space-Track setup" })).toBeVisible();
 
   const snapshotPath = path.join(runDirectory, "data/cache/space-track/latest.json");
   const snapshot = JSON.parse(await readFile(snapshotPath, "utf8")) as {

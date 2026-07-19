@@ -18,6 +18,14 @@ header { display: flex; align-items: center; gap: 9px; padding: 0 16px; border-b
 h1, h2 { color: #f4f8fa; letter-spacing: .04em; }h2 { margin: 0 0 12px; color: #aebfc8; text-transform: uppercase; font-size: 11px; }
 .scenario-choice { padding: 14px; margin-bottom: 16px; border: 1px solid #426170; background: #19272f; }.scenario-choice p { color: #b4c5cc; font-size: 13px; }.scenario-choice small, .muted, small { color: #8299a4; font-size: 11px; }
 .space-track-error { padding: 10px; border: 1px solid #8a5948; color: #efb09a; background: #2a1d1c; font-size: 12px; line-height: 1.45; }.space-track-error strong { color: #ffd2c1; }
+.space-track-connect { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.button-spinner { width: 13px; height: 13px; border: 2px solid #58707b; border-top-color: #dce8ee; border-radius: 50%; animation: button-spin .8s linear infinite; }
+.space-track-feedback { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: center; margin-top: 12px; padding: 12px; border: 1px solid #367b63; color: #b9e8d4; background: #152a23; font-size: 12px; line-height: 1.4; }
+.space-track-feedback .feedback-icon { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; color: #0d2119; background: #70d1a9; font-weight: 800; font-size: 17px; }
+.space-track-feedback strong, .space-track-feedback small { display: block; }.space-track-feedback strong { color: #ddf7eb; }.space-track-feedback small { margin-top: 2px; color: #92b9a8; }
+.space-track-feedback.warning { border-color: #8b7139; color: #ead59e; background: #292416; }.space-track-feedback.warning .feedback-icon { color: #2a210d; background: #e1bd62; }.space-track-feedback.warning strong { color: #f7e8ba; }.space-track-feedback.warning small { color: #c1ad79; }
+.space-track-feedback.error { border-color: #8a5948; color: #efb09a; background: #2a1d1c; }.space-track-feedback.error .feedback-icon { color: #2a1512; background: #ef9d7d; }.space-track-feedback.error strong { color: #ffd2c1; }.space-track-feedback.error small { color: #d9a18f; }
+@keyframes button-spin { to { transform: rotate(360deg); } }
 label { display: grid; gap: 6px; margin: 12px 0; color: #aebfc8; font-size: 11px; }input { width: 100%; padding: 10px; color: #eef7fa; background: #0e171c; border: 1px solid #3b515c; border-radius: 2px; }
 select, textarea { width: 100%; padding: 9px; color: #eef7fa; background: #0e171c; border: 1px solid #3b515c; border-radius: 2px; }textarea { min-height: 80px; resize: vertical; }
 .command, .secondary, .game-row, .role { border: 1px solid #426170; border-radius: 3px; padding: 10px; color: #e8f3f7; background: #1c2c34; }

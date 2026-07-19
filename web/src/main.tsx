@@ -19,6 +19,7 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 type Scenario = { id: string; title: string; description: string; version: number; authored_entity_count: number; role_count: number; requires_space_catalog: boolean };
 type Game = { id: string; title: string; status: "lobby" | "running" | "paused"; host_player_id: string; player_roles_available: number };
 type SpaceStatus = { setup_auth_required: boolean; remembered_credentials: boolean; configured: boolean; syncing: boolean; usable: boolean; stale: boolean; using_cached_fallback: boolean; synced_unix?: number; age_seconds?: number; object_count: number; checksum?: string; error?: string };
+type SpaceTrackFeedback = { kind: "success" | "warning" | "error"; title: string; detail: string };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, { ...init, credentials: "include", headers: { "content-type": "application/json", ...init?.headers } });
@@ -190,6 +191,8 @@ function App() {
   const [spaceUsername, setSpaceUsername] = useState("");
   const [spacePassword, setSpacePassword] = useState("");
   const [rememberCredentials, setRememberCredentials] = useState(true);
+  const [spaceTrackSyncing, setSpaceTrackSyncing] = useState(false);
+  const [spaceTrackFeedback, setSpaceTrackFeedback] = useState<SpaceTrackFeedback | null>(null);
   const [showAuthority, setShowAuthority] = useState(false);
   const [showMapFilters, setShowMapFilters] = useState(false);
   const [mapFilters, setMapFilters] = useState<MapFilters>({
@@ -218,7 +221,9 @@ function App() {
       effectiveStatus = await request<SpaceStatus>("/v1/settings/space-track/credentials", { method: "POST" });
     }
     setScenarios(loadedScenarios); setGames(loadedGames); setSpaceStatus(effectiveStatus);
-    if (game) setGame(loadedGames.find((candidate) => candidate.id === game.id) ?? game);
+    setGame((current) => current
+      ? loadedGames.find((candidate) => candidate.id === current.id) ?? current
+      : null);
   }
 
   useEffect(() => {
@@ -253,6 +258,8 @@ function App() {
   }, [game?.id, role?.id, playerId]);
 
   async function connectSpaceTrack() {
+    setSpaceTrackSyncing(true);
+    setSpaceTrackFeedback(null);
     setMessage("Authenticating and downloading the public GP catalog. This can take a minute.");
     try {
       const status = await request<SpaceStatus>("/v1/admin/space-track/connect", {
@@ -260,13 +267,27 @@ function App() {
         body: JSON.stringify({ username: spaceUsername, password: spacePassword, remember: rememberCredentials })
       });
       setSpaceStatus(status); setSpacePassword("");
+      setSpaceTrackFeedback(status.using_cached_fallback
+        ? {
+            kind: "warning",
+            title: "Refresh failed; cached catalog is still available",
+            detail: `${status.object_count.toLocaleString()} cached public objects are ready to use.`
+          }
+        : {
+            kind: "success",
+            title: "Catalog download complete",
+            detail: `${status.object_count.toLocaleString()} public objects are ready to use.`
+          });
       setMessage(status.using_cached_fallback
         ? `Catalog refresh failed; using ${status.object_count.toLocaleString()} cached public objects.`
         : `Catalog ready: ${status.object_count.toLocaleString()} public objects.`);
     } catch (error) {
       const detail = (error as Error).message;
+      setSpaceTrackFeedback({ kind: "error", title: "Catalog download failed", detail });
       setMessage(`Space-Track synchronization failed: ${detail}`);
       void request<SpaceStatus>("/v1/settings/space-catalog/status").then(setSpaceStatus).catch(() => undefined);
+    } finally {
+      setSpaceTrackSyncing(false);
     }
   }
 
@@ -340,7 +361,7 @@ function App() {
     {!playable && <div className="lobby-stage"><section className="scenario-modal" aria-modal="true" role="dialog">
       <div className="modal-header"><div><h1>Scenario Command</h1><p>{message}</p></div><span className={spaceStatus?.usable ? "catalog-ready" : "catalog-missing"}>{spaceStatus?.usable ? `${spaceStatus.object_count.toLocaleString()} ORBITAL OBJECTS${spaceStatus.stale ? " · CACHED" : ""}` : "SPACE DATA REQUIRED"}</span></div>
       {!game && <><div className="tabs"><button className={mode === "new" ? "active" : ""} onClick={() => setMode("new")}>New scenario</button><button className={mode === "join" ? "active" : ""} onClick={() => setMode("join")}>Join game</button></div>
-        {mode === "new" ? <div className="modal-body two-column"><div><h2>Scenario</h2>{scenarios.map((scenario) => <div className="scenario-choice" key={scenario.id}><strong>{scenario.title}</strong><p>{scenario.description}</p><small>{scenario.authored_entity_count} authored entities · {scenario.role_count} roles · full public space catalog</small></div>)}<label>Game title<input value={gameTitle} onChange={(event) => setGameTitle(event.target.value)} /></label><button className="command" disabled={!spaceStatus?.usable} onClick={() => void createGame()}>Create game</button></div><div><h2>Space-Track setup</h2><p className="muted">Credentials are held in server memory. Remembering them stores encrypted data in an HttpOnly cookie.</p>{spaceStatus?.error && <p className="space-track-error" role="alert"><strong>{spaceStatus.using_cached_fallback ? "Refresh failed; cached catalog remains active." : "Synchronization failed."}</strong> {spaceStatus.error}</p>}{spaceStatus?.setup_auth_required && <label>Admin setup token<input type="password" value={adminToken} onChange={(event) => setAdminToken(event.target.value)} /></label>}<label>Space-Track username<input autoComplete="username" value={spaceUsername} onChange={(event) => setSpaceUsername(event.target.value)} /></label><label>Space-Track password<input type="password" autoComplete="current-password" value={spacePassword} onChange={(event) => setSpacePassword(event.target.value)} /></label><label className="toggle"><input type="checkbox" checked={rememberCredentials} onChange={(event) => setRememberCredentials(event.target.checked)} />Remember credentials for 30 days</label><button className="secondary" disabled={(spaceStatus?.setup_auth_required && !adminToken) || !spaceUsername || !spacePassword} onClick={() => void connectSpaceTrack()}>Connect and synchronize</button><p className="muted">Sign-in attempts to refresh and save the catalog; a failed refresh keeps the cached catalog available.</p>{spaceStatus?.remembered_credentials && <button className="text-command" onClick={() => void forgetSpaceTrack()}>Forget saved credentials</button>}</div></div>
+        {mode === "new" ? <div className="modal-body two-column"><div><h2>Scenario</h2>{scenarios.map((scenario) => <div className="scenario-choice" key={scenario.id}><strong>{scenario.title}</strong><p>{scenario.description}</p><small>{scenario.authored_entity_count} authored entities · {scenario.role_count} roles · full public space catalog</small></div>)}<label>Game title<input value={gameTitle} onChange={(event) => setGameTitle(event.target.value)} /></label><button className="command" disabled={!spaceStatus?.usable} onClick={() => void createGame()}>Create game</button></div><div><h2>Space-Track setup</h2><p className="muted">Credentials are held in server memory. Remembering them stores encrypted data in an HttpOnly cookie.</p>{spaceStatus?.error && <p className="space-track-error" role="alert"><strong>{spaceStatus.using_cached_fallback ? "Refresh failed; cached catalog remains active." : "Synchronization failed."}</strong> {spaceStatus.error}</p>}{spaceStatus?.setup_auth_required && <label>Admin setup token<input type="password" value={adminToken} onChange={(event) => setAdminToken(event.target.value)} /></label>}<label>Space-Track username<input autoComplete="username" value={spaceUsername} onChange={(event) => { setSpaceUsername(event.target.value); setSpaceTrackFeedback(null); }} /></label><label>Space-Track password<input type="password" autoComplete="current-password" value={spacePassword} onChange={(event) => { setSpacePassword(event.target.value); setSpaceTrackFeedback(null); }} /></label><label className="toggle"><input type="checkbox" checked={rememberCredentials} onChange={(event) => setRememberCredentials(event.target.checked)} />Remember credentials for 30 days</label><button className="secondary space-track-connect" aria-busy={spaceTrackSyncing} disabled={spaceTrackSyncing || (spaceStatus?.setup_auth_required && !adminToken) || !spaceUsername || !spacePassword} onClick={() => void connectSpaceTrack()}>{spaceTrackSyncing ? <><span className="button-spinner" aria-hidden="true" />Authenticating and downloading…</> : "Connect and synchronize"}</button>{spaceTrackFeedback && <div className={`space-track-feedback ${spaceTrackFeedback.kind}`} role={spaceTrackFeedback.kind === "error" ? "alert" : "status"} aria-live="polite"><span className="feedback-icon" aria-hidden="true">{spaceTrackFeedback.kind === "success" ? "✓" : "!"}</span><span><strong>{spaceTrackFeedback.title}</strong><small>{spaceTrackFeedback.detail}</small></span></div>}<p className="muted">Sign-in attempts to refresh and save the catalog; a failed refresh keeps the cached catalog available.</p>{spaceStatus?.remembered_credentials && <button className="text-command" onClick={() => void forgetSpaceTrack()}>Forget saved credentials</button>}</div></div>
         : <div className="modal-body"><label>Display name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label><h2>Available games</h2><div className="game-list">{games.length ? games.map((item) => <button className="game-row" key={item.id} onClick={() => void selectGame(item)}><span>{item.title}</span><small>{item.status} · {item.player_roles_available} open roles</small></button>) : <p className="muted">No games have been created.</p>}</div></div>}</>}
       {game && <div className="modal-body"><h2>{game.title}</h2><p className="muted">Claim a command role. The operational map remains offline until the scenario starts.</p><div className="role-grid">{roles.map((item) => <button key={item.id} className={`role ${role?.id === item.id ? "selected" : ""}`} disabled={item.ai_controlled || (item.held && role?.id !== item.id)} onClick={() => void claim(item)}><span>{item.name}</span><small>{item.ai_controlled ? "AI" : item.held ? "held" : item.kind.replaceAll("_", " ")}</small></button>)}</div><div className="modal-actions"><button className="secondary" onClick={leave}>Back</button>{game.host_player_id === playerId && <button className="secondary" onClick={() => setShowAuthority(true)}>Configure authorities</button>}{game.host_player_id === playerId && <button className="command" disabled={!role} onClick={() => void start()}>Start scenario</button>}{game.host_player_id !== playerId && <span className="muted">Waiting for host to start</span>}</div></div>}
     </section></div>}
