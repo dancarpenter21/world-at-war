@@ -1943,7 +1943,9 @@ async fn space_catalog_status(
 ) -> Json<SpaceCatalogStatus> {
     let mut status = state.space_catalog.status().await;
     status.setup_auth_required = state.admin_token.is_some();
-    status.remembered_credentials = remembered_credentials(&state, &headers).is_some();
+    let remembered = remembered_credentials(&state, &headers);
+    status.remembered_credentials = remembered.is_some();
+    status.remembered_username = remembered.map(|credentials| credentials.username);
     Json(status)
 }
 async fn connect_space_track(
@@ -1969,6 +1971,7 @@ async fn connect_space_track(
         })?;
     status.setup_auth_required = state.admin_token.is_some();
     status.remembered_credentials = request.remember;
+    status.remembered_username = request.remember.then(|| remembered.username.clone());
     let cookie = if request.remember {
         let value = state.credential_cookie.seal(&remembered).map_err(|error| {
             api_error(
@@ -1995,9 +1998,10 @@ async fn restore_space_track(
             "no valid saved Space-Track credentials were found",
         )
     })?;
+    let username = credentials.username;
     let mut status = state
         .space_catalog
-        .restore_credentials(credentials.username, credentials.password)
+        .restore_credentials(username.clone(), credentials.password)
         .await
         .map_err(|error| {
             api_error(
@@ -2008,6 +2012,7 @@ async fn restore_space_track(
         })?;
     status.setup_auth_required = state.admin_token.is_some();
     status.remembered_credentials = true;
+    status.remembered_username = Some(username);
     Ok(Json(status))
 }
 
@@ -2016,6 +2021,7 @@ async fn forget_space_track(State(state): State<AppState>) -> CookieApiResult<Sp
     let mut status = state.space_catalog.status().await;
     status.setup_auth_required = state.admin_token.is_some();
     status.remembered_credentials = false;
+    status.remembered_username = None;
     Ok((
         set_cookie_headers(state.credential_cookie.clear_header())?,
         Json(status),
@@ -2035,7 +2041,9 @@ async fn sync_space_catalog(
     })?;
     let mut status = state.space_catalog.status().await;
     status.setup_auth_required = state.admin_token.is_some();
-    status.remembered_credentials = remembered_credentials(&state, &headers).is_some();
+    let remembered = remembered_credentials(&state, &headers);
+    status.remembered_credentials = remembered.is_some();
+    status.remembered_username = remembered.map(|credentials| credentials.username);
     Ok(Json(status))
 }
 

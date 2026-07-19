@@ -14,6 +14,7 @@ const serverBinary = path.join(repoRoot, "target/debug/world-at-war-server");
 const liveUsername = process.env.SPACETRACK_E2E_USERNAME;
 const livePassword = process.env.SPACETRACK_E2E_PASSWORD;
 const useLiveProvider = Boolean(liveUsername && livePassword);
+const savedPasswordMask = "••••••••••••";
 
 let backend: ChildProcess;
 let mockProvider: Server | undefined;
@@ -143,6 +144,10 @@ test("downloads and persists a Space-Track catalog through the login form", asyn
   });
   const navigation = await page.goto("/");
   expect(navigation?.status()).toBe(200);
+  const spaceConfigurationTab = page.getByRole("button", { name: "Space Configuration" });
+  await expect(spaceConfigurationTab).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".catalog-tab-status.missing")).toBeVisible();
+  await spaceConfigurationTab.click();
   await expect(page.getByLabel("Space-Track username")).toBeVisible({ timeout: 15_000 });
   await page.getByLabel("Space-Track username").fill(liveUsername ?? "integration-user");
   await page.getByLabel("Space-Track password").fill(livePassword ?? "integration-password");
@@ -156,12 +161,29 @@ test("downloads and persists a Space-Track catalog through the login form", asyn
   const successFeedback = page.getByRole("status").filter({ hasText: "Catalog download complete" });
   await expect(successFeedback).toBeVisible();
   await expect(successFeedback).toContainText(/\d[\d,]* public objects are ready to use\./);
-  await expect(page.getByRole("button", { name: "Connect and synchronize" })).toBeEnabled();
+  await expect(page.getByText("Last downloaded", { exact: true })).toBeVisible();
+  await expect(page.locator(".space-catalog-timestamp time")).toHaveAttribute("datetime", /^\d{4}-\d{2}-\d{2}T/);
+  await expect(page.locator(".space-catalog-timestamp")).toContainText("just now");
+  await expect(page.locator(".catalog-tab-status.ready")).toBeVisible();
+  const cooldownButton = page.getByRole("button", { name: /Refresh available in \d+m \d{2}s/ });
+  await expect(cooldownButton).toBeDisabled();
+  await expect(page.getByText("Catalog downloads are limited to once per hour after a successful refresh.")).toBeVisible();
 
+  await page.reload();
+  await page.getByRole("button", { name: "Space Configuration" }).click();
+  await expect(page.getByLabel("Space-Track username")).toHaveValue(liveUsername ?? "integration-user");
+  await expect(page.getByLabel("Space-Track password")).toHaveValue(savedPasswordMask);
+  await expect(page.getByText("Credentials saved for 30 days")).toBeVisible();
+  await page.getByLabel("Space-Track password").focus();
+  await expect(page.getByLabel("Space-Track password")).toHaveValue("");
+  await page.getByRole("heading", { name: "Space-Track setup" }).click();
+  await expect(page.getByLabel("Space-Track password")).toHaveValue(savedPasswordMask);
+
+  await page.getByRole("button", { name: "New scenario" }).click();
   await page.getByRole("button", { name: "Create game" }).click();
   await expect(page.getByText("Claim a command role.")).toBeVisible();
   await page.getByRole("button", { name: "Back" }).click();
-  await expect(page.getByRole("heading", { name: "Space-Track setup" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Scenario", exact: true })).toBeVisible();
 
   const snapshotPath = path.join(runDirectory, "data/cache/space-track/latest.json");
   const snapshot = JSON.parse(await readFile(snapshotPath, "utf8")) as {

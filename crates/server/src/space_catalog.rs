@@ -15,6 +15,7 @@ use tokio::sync::RwLock;
 const CACHE_PATH: &str = "data/cache/space-track/latest.json";
 const CACHE_TEMP_PATH: &str = "data/cache/space-track/latest.json.tmp";
 const MIN_SYNC_INTERVAL_SECONDS: u64 = 3_600;
+const STALE_AFTER_SECONDS: u64 = 7 * 24 * 3_600;
 const DEFAULT_LOGIN_URL: &str = "https://www.space-track.org/ajaxauth/login";
 const DEFAULT_GP_URL: &str = "https://www.space-track.org/basicspacedata/query/class/gp/decay_date/null-val/epoch/%3Enow-10/orderby/norad_cat_id/format/json";
 
@@ -52,6 +53,7 @@ pub struct SpaceCatalogSnapshot {
 pub struct SpaceCatalogStatus {
     pub setup_auth_required: bool,
     pub remembered_credentials: bool,
+    pub remembered_username: Option<String>,
     pub configured: bool,
     pub syncing: bool,
     pub usable: bool,
@@ -59,6 +61,7 @@ pub struct SpaceCatalogStatus {
     pub using_cached_fallback: bool,
     pub synced_unix: Option<u64>,
     pub age_seconds: Option<u64>,
+    pub next_sync_unix: Option<u64>,
     pub object_count: usize,
     pub checksum: Option<String>,
     pub error: Option<String>,
@@ -302,13 +305,17 @@ impl SpaceCatalogService {
         SpaceCatalogStatus {
             setup_auth_required: false,
             remembered_credentials: false,
+            remembered_username: None,
             configured: inner.credentials.is_some(),
             syncing: inner.syncing,
             usable: latest.is_some(),
-            stale: age.is_some_and(|seconds| seconds > MIN_SYNC_INTERVAL_SECONDS),
+            stale: age.is_some_and(|seconds| seconds > STALE_AFTER_SECONDS),
             using_cached_fallback: latest.is_some() && inner.error.is_some(),
             synced_unix: latest.map(|snapshot| snapshot.synced_unix),
             age_seconds: age,
+            next_sync_unix: inner
+                .last_successful_sync_unix
+                .map(|last| last.saturating_add(MIN_SYNC_INTERVAL_SECONDS)),
             object_count: latest.map_or(0, |snapshot| snapshot.objects.len()),
             checksum: latest.map(|snapshot| snapshot.checksum.clone()),
             error: inner.error.clone(),
@@ -395,13 +402,14 @@ mod tests {
         error: Option<&str>,
     ) -> SpaceCatalogService {
         let checksum = snapshot.checksum.clone();
+        let synced_unix = snapshot.synced_unix;
         SpaceCatalogService {
             inner: Arc::new(RwLock::new(Inner {
                 credentials: None,
                 snapshots: BTreeMap::from([(checksum.clone(), snapshot)]),
                 latest_checksum: Some(checksum),
                 syncing: false,
-                last_successful_sync_unix: None,
+                last_successful_sync_unix: Some(synced_unix),
                 error: error.map(str::to_owned),
             })),
             client: reqwest::Client::new(),
@@ -450,7 +458,7 @@ mod tests {
     async fn old_cached_snapshots_remain_usable_and_report_fallback() {
         let service = service_with_snapshot(
             SpaceCatalogSnapshot {
-                synced_unix: now_unix().saturating_sub(MIN_SYNC_INTERVAL_SECONDS + 1),
+                synced_unix: now_unix().saturating_sub(STALE_AFTER_SECONDS + 1),
                 source: "test".into(),
                 checksum: "cached-checksum".into(),
                 objects: vec![serde_json::json!({ "NORAD_CAT_ID": "5" })],
@@ -463,6 +471,43 @@ mod tests {
         assert!(status.stale);
         assert!(status.using_cached_fallback);
         assert_eq!(status.checksum.as_deref(), Some("cached-checksum"));
+    }
+
+    #[tokio::test]
+    async fn catalog_does_not_become_stale_at_the_refresh_cooldown() {
+        let service = service_with_snapshot(
+            SpaceCatalogSnapshot {
+                synced_unix: now_unix().saturating_sub(MIN_SYNC_INTERVAL_SECONDS + 1),
+                source: "test".into(),
+                checksum: "recent-checksum".into(),
+                objects: vec![serde_json::json!({ "NORAD_CAT_ID": "25544" })],
+            },
+            None,
+        );
+
+        let status = service.status().await;
+        assert!(status.usable);
+        assert!(!status.stale);
+    }
+
+    #[tokio::test]
+    async fn status_reports_when_the_next_sync_is_allowed() {
+        let synced_unix = now_unix();
+        let service = service_with_snapshot(
+            SpaceCatalogSnapshot {
+                synced_unix,
+                source: "test".into(),
+                checksum: "fresh-checksum".into(),
+                objects: vec![serde_json::json!({ "NORAD_CAT_ID": "25544" })],
+            },
+            None,
+        );
+
+        let status = service.status().await;
+        assert_eq!(
+            status.next_sync_unix,
+            Some(synced_unix + MIN_SYNC_INTERVAL_SECONDS)
+        );
     }
 
     #[test]
