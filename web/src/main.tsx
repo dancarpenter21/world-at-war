@@ -10,6 +10,7 @@ import "./styles.css";
 import type { AuthorityDefinition, AuthorityRequest, Role } from "./AuthorityWorkspace";
 import { AirportLayer, type AirportDetail, type AirportListResponse } from "./airportLayer";
 import { GlobeEntityReconciler, type Projection } from "./globeEntities";
+import { attachMapKeyboardControls, type AttachedMapKeyboardControls } from "./mapKeyboardControls";
 import { MapFilterDialog, type MapFilters } from "./MapFilterDialog";
 import { SpaceAssetLayer } from "./spaceAssetLayer";
 
@@ -88,19 +89,21 @@ function symbolCanvas(sidc: string, size = 32) {
   return canvas;
 }
 
-function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnabled }: {
+function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnabled, keyboardEnabled }: {
   projection: Projection;
   filters: MapFilters;
   gameId: string;
   playerId: string;
   roleId: string;
   spaceCatalogEnabled: boolean;
+  keyboardEnabled: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Viewer | null>(null);
   const reconcilerRef = useRef<GlobeEntityReconciler | null>(null);
   const airportLayerRef = useRef<AirportLayer | null>(null);
   const spaceAssetLayerRef = useRef<SpaceAssetLayer | null>(null);
+  const keyboardControlsRef = useRef<AttachedMapKeyboardControls | null>(null);
   const showSpaceAssetsRef = useRef<() => void>(() => undefined);
   const airportRequestRef = useRef<AbortController | undefined>(undefined);
   const refreshAirportsRef = useRef<() => void>(() => undefined);
@@ -122,6 +125,9 @@ function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnab
     viewer.scene.globe.baseColor = Color.fromCssColorString("#1f3340");
     viewer.camera.setView({ destination: Cartesian3.fromDegrees(-40, 30, 20_000_000) });
     viewerRef.current = viewer;
+    const keyboardControls = attachMapKeyboardControls(viewer.camera, viewer.scene.globe.ellipsoid);
+    keyboardControls.setEnabled(keyboardEnabled);
+    keyboardControlsRef.current = keyboardControls;
     reconcilerRef.current = new GlobeEntityReconciler(viewer.entities, symbolCanvas);
     const airportLayer = new AirportLayer(viewer, (airportId) =>
       request<AirportDetail>(`/v1/airports/${encodeURIComponent(airportId)}`)
@@ -185,17 +191,23 @@ function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnab
       airportRequestRef.current?.abort();
       if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
       viewer.camera.moveEnd.removeEventListener(scheduleAirportRefresh);
+      keyboardControls.destroy();
       spaceAssetLayerRef.current?.destroy();
       airportLayer.destroy();
       airportLayerRef.current = null;
       spaceAssetLayerRef.current = null;
       showSpaceAssetsRef.current = () => undefined;
       refreshAirportsRef.current = () => undefined;
+      keyboardControlsRef.current = null;
       reconcilerRef.current = null;
       viewer.destroy();
       viewerRef.current = null;
     };
   }, [spaceCatalogEnabled]);
+
+  useEffect(() => {
+    keyboardControlsRef.current?.setEnabled(keyboardEnabled);
+  }, [keyboardEnabled]);
 
   useEffect(() => {
     reconcilerRef.current?.reconcile(projection);
@@ -228,7 +240,7 @@ function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnab
     refreshAirportsRef.current();
   }, [filters.runways.visible, filters.runways.minimumLengthM]);
 
-  return <><div className="globe" ref={host} /><div className="map-layer-status"><span>{airportStatus}</span><span>{spaceCatalogEnabled ? spaceAssetStatus : "No orbital catalog in this scenario"}</span></div></>;
+  return <><div className="globe" ref={host} aria-label="Operational map. Use W A S D to move and Q or E to turn." aria-keyshortcuts="W A S D Q E" /><div className="map-layer-status"><span>{airportStatus}</span><span>{spaceCatalogEnabled ? spaceAssetStatus : "No orbital catalog in this scenario"}</span></div><div className="map-controls-hint">WASD MOVE · Q/E TURN</div></>;
 }
 
 function App() {
@@ -485,7 +497,7 @@ function App() {
     {playable && projection && <section className="workspace">
       <aside className="sidebar"><h1>{role.name}</h1><p className="message">{game.title}</p><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command map-filter-launch" onClick={() => setShowMapFilters((value) => !value)}>Map filters</button><h2>Catalog</h2><p className="muted">{game.space_catalog_enabled ? spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status" : "No orbital catalog in this scenario"}</p><button className="secondary" onClick={leave}>Leave scenario</button></aside>
       <section className="map-region">
-        <Globe projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} />
+        <Globe projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} keyboardEnabled={!showAuthority} />
         {showMapFilters && <MapFilterDialog filters={mapFilters} spaceAssetsAvailable={game.space_catalog_enabled} onChange={setMapFilters} onClose={() => setShowMapFilters(false)} />}
         <div className="map-caption">{role.name} · {role.side} · operational picture</div>
       </section>
