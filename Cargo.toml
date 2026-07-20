@@ -18,6 +18,7 @@ anyhow = "1.0"
 axum = { version = "0.8", features = ["json", "ws"] }
 base64 = "0.22"
 bevy_ecs = "0.18"
+c3mesh = { version = "0.1.0", path = "../c3mesh" }
 chacha20poly1305 = "0.10"
 csv = "1.3"
 futures-util = "0.3"

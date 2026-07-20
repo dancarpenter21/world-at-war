@@ -18,7 +18,7 @@ const AuthorityWorkspace = lazy(() => import("./AuthorityWorkspace").then((modul
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 const SAVED_PASSWORD_MASK = "••••••••••••";
 type Scenario = { id: string; title: string; description: string; version: number; authored_entity_count: number; role_count: number; requires_space_catalog: boolean };
-type Game = { id: string; title: string; status: "lobby" | "running" | "paused"; host_player_id: string; player_roles_available: number };
+type Game = { id: string; title: string; status: "lobby" | "running" | "paused"; host_player_id: string; player_roles_available: number; space_catalog_enabled: boolean };
 type SpaceStatus = { setup_auth_required: boolean; remembered_credentials: boolean; remembered_username?: string; configured: boolean; syncing: boolean; usable: boolean; stale: boolean; using_cached_fallback: boolean; synced_unix?: number; age_seconds?: number; next_sync_unix?: number; object_count: number; checksum?: string; error?: string };
 type SpaceTrackFeedback = { kind: "success" | "warning" | "error"; title: string; detail: string };
 
@@ -88,12 +88,13 @@ function symbolCanvas(sidc: string, size = 32) {
   return canvas;
 }
 
-function Globe({ projection, filters, gameId, playerId, roleId }: {
+function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnabled }: {
   projection: Projection;
   filters: MapFilters;
   gameId: string;
   playerId: string;
   roleId: string;
+  spaceCatalogEnabled: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Viewer | null>(null);
@@ -104,6 +105,7 @@ function Globe({ projection, filters, gameId, playerId, roleId }: {
   const airportRequestRef = useRef<AbortController | undefined>(undefined);
   const refreshAirportsRef = useRef<() => void>(() => undefined);
   const filtersRef = useRef(filters);
+  const focusedRef = useRef(false);
   filtersRef.current = filters;
   const [airportStatus, setAirportStatus] = useState("Loading airports");
   const [spaceAssetStatus, setSpaceAssetStatus] = useState("Space assets hidden");
@@ -132,7 +134,7 @@ function Globe({ projection, filters, gameId, playerId, roleId }: {
       spaceAssetLayerRef.current.setFilters(filtersRef.current.spaceAssets);
     };
     showSpaceAssetsRef.current = showSpaceAssets;
-    if (filtersRef.current.spaceAssets.showAll || filtersRef.current.spaceAssets.showStarlink) showSpaceAssets();
+    if (spaceCatalogEnabled && (filtersRef.current.spaceAssets.showAll || filtersRef.current.spaceAssets.showStarlink)) showSpaceAssets();
     let refreshTimer: number | undefined;
     let stopped = false;
 
@@ -193,20 +195,27 @@ function Globe({ projection, filters, gameId, playerId, roleId }: {
       viewer.destroy();
       viewerRef.current = null;
     };
-  }, []);
+  }, [spaceCatalogEnabled]);
 
   useEffect(() => {
     reconcilerRef.current?.reconcile(projection);
+    if (!focusedRef.current && viewerRef.current && reconcilerRef.current) {
+      const entities = reconcilerRef.current.focusEntities();
+      if (entities.length) {
+        focusedRef.current = true;
+        void viewerRef.current.flyTo(entities, { duration: 0 });
+      }
+    }
   }, [projection]);
 
   useEffect(() => {
-    if (filters.spaceAssets.showAll || filters.spaceAssets.showStarlink) {
+    if (spaceCatalogEnabled && (filters.spaceAssets.showAll || filters.spaceAssets.showStarlink)) {
       showSpaceAssetsRef.current();
     } else {
       spaceAssetLayerRef.current?.setFilters(filters.spaceAssets);
       setSpaceAssetStatus("Space assets hidden");
     }
-  }, [filters.spaceAssets.showAll, filters.spaceAssets.showStarlink]);
+  }, [filters.spaceAssets.showAll, filters.spaceAssets.showStarlink, spaceCatalogEnabled]);
 
   useEffect(() => {
     airportRequestRef.current?.abort();
@@ -219,11 +228,12 @@ function Globe({ projection, filters, gameId, playerId, roleId }: {
     refreshAirportsRef.current();
   }, [filters.runways.visible, filters.runways.minimumLengthM]);
 
-  return <><div className="globe" ref={host} /><div className="map-layer-status"><span>{airportStatus}</span><span>{spaceAssetStatus}</span></div></>;
+  return <><div className="globe" ref={host} /><div className="map-layer-status"><span>{airportStatus}</span><span>{spaceCatalogEnabled ? spaceAssetStatus : "No orbital catalog in this scenario"}</span></div></>;
 }
 
 function App() {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
+  const [selectedScenarioId, setSelectedScenarioId] = useState("");
   const [games, setGames] = useState<Game[]>([]);
   const [spaceStatus, setSpaceStatus] = useState<SpaceStatus | null>(null);
   const [game, setGame] = useState<Game | null>(null);
@@ -254,6 +264,7 @@ function App() {
   const playable = game?.status === "running" && role !== null;
   const refreshWaitSeconds = Math.max(0, (spaceStatus?.next_sync_unix ?? 0) - nowUnix);
   const catalogRefreshBlocked = refreshWaitSeconds > 0;
+  const selectedScenario = scenarios.find((scenario) => scenario.id === selectedScenarioId) ?? scenarios[0];
   const usingSavedCredentials = Boolean(spaceStatus?.remembered_credentials && spacePassword === SAVED_PASSWORD_MASK);
   const authorityUnits = useMemo(() => {
     if (projection?.own_units.length) return projection.own_units;
@@ -272,6 +283,7 @@ function App() {
       effectiveStatus = await request<SpaceStatus>("/v1/settings/space-track/credentials", { method: "POST" });
     }
     setScenarios(loadedScenarios); setGames(loadedGames); setSpaceStatus(effectiveStatus);
+    setSelectedScenarioId((current) => current && loadedScenarios.some((scenario) => scenario.id === current) ? current : loadedScenarios[0]?.id ?? "");
     setGame((current) => current
       ? loadedGames.find((candidate) => candidate.id === current.id) ?? current
       : null);
@@ -378,7 +390,7 @@ function App() {
   }
 
   async function createGame() {
-    const scenario = scenarios[0]; if (!scenario) return;
+    const scenario = selectedScenario; if (!scenario) return;
     try {
       const created = await request<{ game: Game }>("/v1/games", { method: "POST", body: JSON.stringify({ scenario_id: scenario.id, title: gameTitle, host_player_id: playerId }) });
       setGame(created.game); setRoles(await request<Role[]>(`/v1/games/${created.game.id}/roles`)); setMessage("Claim a role, then start the scenario.");
@@ -446,10 +458,10 @@ function App() {
         </div>
         {mode === "new" && <div className="modal-body scenario-setup">
           <h2>Scenario</h2>
-          {scenarios.map((scenario) => <div className="scenario-choice" key={scenario.id}><strong>{scenario.title}</strong><p>{scenario.description}</p><small>{scenario.authored_entity_count} authored entities · {scenario.role_count} roles · full public space catalog</small></div>)}
+          {scenarios.map((scenario) => <button type="button" className={`scenario-choice ${selectedScenario?.id === scenario.id ? "selected" : ""}`} key={scenario.id} onClick={() => { setSelectedScenarioId(scenario.id); setGameTitle(scenario.title); }}><strong>{scenario.title}</strong><p>{scenario.description}</p><small>{scenario.authored_entity_count} authored entities · {scenario.role_count} roles · {scenario.requires_space_catalog ? "full public space catalog" : "no orbital catalog required"}</small></button>)}
           <label>Game title<input value={gameTitle} onChange={(event) => setGameTitle(event.target.value)} /></label>
-          <button className="command" disabled={!spaceStatus?.usable} onClick={() => void createGame()}>Create game</button>
-          {!spaceStatus?.usable && <p className="catalog-required">A usable space catalog is required to create a scenario. <button className="text-command" onClick={() => setMode("space")}>Open Space Configuration</button></p>}
+          <button className="command" disabled={!selectedScenario || (selectedScenario.requires_space_catalog && !spaceStatus?.usable)} onClick={() => void createGame()}>Create game</button>
+          {selectedScenario?.requires_space_catalog && !spaceStatus?.usable && <p className="catalog-required">A usable space catalog is required to create this scenario. <button className="text-command" onClick={() => setMode("space")}>Open Space Configuration</button></p>}
         </div>}
         {mode === "join" && <div className="modal-body"><label>Display name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label><h2>Available games</h2><div className="game-list">{games.length ? games.map((item) => <button className="game-row" key={item.id} onClick={() => void selectGame(item)}><span>{item.title}</span><small>{item.status} · {item.player_roles_available} open roles</small></button>) : <p className="muted">No games have been created.</p>}</div></div>}
         {mode === "space" && <div className="modal-body space-configuration">
@@ -471,13 +483,13 @@ function App() {
       {game && <div className="modal-body"><h2>{game.title}</h2><p className="muted">Claim a command role. The operational map remains offline until the scenario starts.</p><div className="role-grid">{roles.map((item) => <button key={item.id} className={`role ${role?.id === item.id ? "selected" : ""}`} disabled={item.ai_controlled || (item.held && role?.id !== item.id)} onClick={() => void claim(item)}><span>{item.name}</span><small>{item.ai_controlled ? "AI" : item.held ? "held" : item.kind.replaceAll("_", " ")}</small></button>)}</div><div className="modal-actions"><button className="secondary" onClick={leave}>Back</button>{game.host_player_id === playerId && <button className="secondary" onClick={() => setShowAuthority(true)}>Configure authorities</button>}{game.host_player_id === playerId && <button className="command" disabled={!role} onClick={() => void start()}>Start scenario</button>}{game.host_player_id !== playerId && <span className="muted">Waiting for host to start</span>}</div></div>}
     </section></div>}
     {playable && projection && <section className="workspace">
-      <aside className="sidebar"><h1>{role.name}</h1><p className="message">{game.title}</p><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command map-filter-launch" onClick={() => setShowMapFilters((value) => !value)}>Map filters</button><h2>Catalog</h2><p className="muted">{spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status"}</p><button className="secondary" onClick={leave}>Leave scenario</button></aside>
+      <aside className="sidebar"><h1>{role.name}</h1><p className="message">{game.title}</p><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command map-filter-launch" onClick={() => setShowMapFilters((value) => !value)}>Map filters</button><h2>Catalog</h2><p className="muted">{game.space_catalog_enabled ? spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status" : "No orbital catalog in this scenario"}</p><button className="secondary" onClick={leave}>Leave scenario</button></aside>
       <section className="map-region">
-        <Globe projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} />
-        {showMapFilters && <MapFilterDialog filters={mapFilters} onChange={setMapFilters} onClose={() => setShowMapFilters(false)} />}
+        <Globe projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} />
+        {showMapFilters && <MapFilterDialog filters={mapFilters} spaceAssetsAvailable={game.space_catalog_enabled} onChange={setMapFilters} onClose={() => setShowMapFilters(false)} />}
         <div className="map-caption">{role.name} · {role.side} · operational picture</div>
       </section>
-      <aside className="inspector"><h2>Operational picture</h2><div className="metric"><span>Own units</span><strong>{projection.own_units.length}</strong></div><div className="metric"><span>Tracks</span><strong>{projection.tracks.length}</strong></div><h2>Actions</h2><button className="command" disabled={!role.command_units.length} onClick={() => void turnNorth()}>Turn north</button><h2>Tracks</h2>{projection.tracks.length ? projection.tracks.map((track) => <div className="track" key={track.track_id}><span>Uncertain {track.target_side} contact</span><small>{Math.round(track.identity_confidence * 100)}% identity</small></div>) : <p className="muted">No reports received.</p>}</aside>
+      <aside className="inspector"><h2>Operational picture</h2><div className="metric"><span>Own units</span><strong>{projection.own_units.length}</strong></div><div className="metric"><span>Tracks</span><strong>{projection.tracks.length}</strong></div><h2>Actions</h2><button className="command" disabled={!role.command_units.length} onClick={() => void turnNorth()}>Turn north</button><h2>Communications</h2>{projection.communication_links.length ? projection.communication_links.map((link) => { const from = projection.own_units.find((unit) => unit.id === link.from_entity_id)?.name ?? link.from_entity_id; const to = projection.own_units.find((unit) => unit.id === link.to_entity_id)?.name ?? link.to_entity_id; return <div className={`communication-status ${link.available ? "available" : "blocked"}`} key={link.id}><span>{from} → {to}</span><small>{link.available ? `${((link.effective_bit_rate_bps ?? 0) / 1_000_000).toFixed(1)} Mbit/s` : `Jammed ${Math.round(link.jammed * 100)}%`}</small></div>; }) : <p className="muted">No monitored links.</p>}<h2>Tracks</h2>{projection.tracks.length ? projection.tracks.map((track) => <div className="track" key={track.track_id}><span>Uncertain {track.target_side} contact</span><small>{Math.round(track.identity_confidence * 100)}% identity</small></div>) : <p className="muted">No reports received.</p>}</aside>
     </section>}
     {showAuthority && authority && game && <Suspense fallback={<div className="authority-loading">Loading authority graph…</div>}><AuthorityWorkspace definition={authority} runtimeRoles={roles} units={authorityUnits} requests={authorityRequests} currentRole={role} isHost={game.host_player_id === playerId} tick={projection?.tick ?? 0} onClose={() => setShowAuthority(false)} onSave={saveAuthority} onCreateRequest={createAuthorityRequest} onDecision={decideAuthorityRequest} /></Suspense>}
   </main>;

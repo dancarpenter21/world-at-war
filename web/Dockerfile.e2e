@@ -1,0 +1,19 @@
+# syntax=docker/dockerfile:1
+FROM rust:1.89-bookworm AS server-build
+WORKDIR /workspace
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+COPY --from=c3mesh Cargo.toml Cargo.lock README.md /c3mesh/
+COPY --from=c3mesh src /c3mesh/src
+COPY --from=c3mesh examples /c3mesh/examples
+RUN cargo build --package world-at-war-server
+
+# Keep this tag aligned with the @playwright/test version in package-lock.json.
+FROM mcr.microsoft.com/playwright:v1.55.1-noble
+WORKDIR /workspace
+COPY web/package.json web/package-lock.json ./web/
+RUN cd web && npm ci
+COPY web ./web
+COPY --from=server-build /workspace/target/debug/world-at-war-server ./target/debug/world-at-war-server
+WORKDIR /workspace/web
+CMD ["sh", "-lc", "npx tsc --project tsconfig.e2e.json && npx playwright test"]

@@ -19,6 +19,8 @@ services:
     build:
       context: .
       dockerfile: crates/server/Dockerfile
+      additional_contexts:
+        c3mesh: ../c3mesh
     environment:
       BIND_ADDR: 0.0.0.0:8000
       ADMIN_SETUP_TOKEN: ${ADMIN_SETUP_TOKEN:-}
@@ -62,6 +64,17 @@ services:
     networks:
       - world-at-war
     restart: unless-stopped
+
+  e2e:
+    profiles: ["test"]
+    image: world-at-war-e2e:test
+    build:
+      context: .
+      dockerfile: web/Dockerfile.e2e
+      additional_contexts:
+        c3mesh: ../c3mesh
+    init: true
+    ipc: host
 
 networks:
   world-at-war:

@@ -144,7 +144,7 @@ test("downloads and persists a Space-Track catalog through the login form", asyn
   });
   const navigation = await page.goto("/");
   expect(navigation?.status()).toBe(200);
-  const spaceConfigurationTab = page.getByRole("button", { name: "Space Configuration" });
+  const spaceConfigurationTab = page.getByRole("button", { name: "Space Configuration", exact: true });
   await expect(spaceConfigurationTab).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".catalog-tab-status.missing")).toBeVisible();
   await spaceConfigurationTab.click();
@@ -170,7 +170,7 @@ test("downloads and persists a Space-Track catalog through the login form", asyn
   await expect(page.getByText("Catalog downloads are limited to once per hour after a successful refresh.")).toBeVisible();
 
   await page.reload();
-  await page.getByRole("button", { name: "Space Configuration" }).click();
+  await page.getByRole("button", { name: "Space Configuration", exact: true }).click();
   await expect(page.getByLabel("Space-Track username")).toHaveValue(liveUsername ?? "integration-user");
   await expect(page.getByLabel("Space-Track password")).toHaveValue(savedPasswordMask);
   await expect(page.getByText("Credentials saved for 30 days")).toBeVisible();

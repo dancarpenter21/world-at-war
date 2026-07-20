@@ -25,7 +25,7 @@ const relationshipColors: Record<string, string> = {
   national_command: "#e7c66c", cocom: "#e58b5f", opcon: "#57b6d6", tacon: "#5fc596",
   adcon: "#a98ad8", support: "#dba459", advisory: "#8d9aa2", transmit: "#d176a7"
 };
-const roleKinds = ["national_command", "defense_secretary", "joint_staff", "combatant_commander", "joint_force_commander", "component_commander", "subordinate_commander", "tactical_commander"];
+const roleKinds = ["pilot", "national_command", "defense_secretary", "joint_staff", "combatant_commander", "joint_force_commander", "component_commander", "subordinate_commander", "tactical_commander"];
 
 type AuthorityNodeData = { label: string; kind: string; side: Side; held: boolean; ai: boolean; unitCount: number };
 function AuthorityNode({ data }: NodeProps<Node<AuthorityNodeData>>) {

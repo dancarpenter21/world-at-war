@@ -35,7 +35,7 @@ use sim_core::{
     AuthorityDefinition, AuthorityPolicy, AuthorityRoleKind, AuthorizationRecord, AuthorizedIntent,
     PlayerIntent, RoleProjection, Side, Simulation,
 };
-use sim_scenario::{global_crisis_scenario, Scenario};
+use sim_scenario::{global_crisis_scenario, jammed_flight_scenario, Scenario};
 use space_assets::{SpaceAssetDetail, SpaceAssetService, SpaceAssetsResponse};
 use space_catalog::{SpaceCatalogService, SpaceCatalogSnapshot, SpaceCatalogStatus};
 use tokio::sync::RwLock;
@@ -71,7 +71,7 @@ struct Game {
     authority_requests: BTreeMap<Uuid, AuthorityRequest>,
     authority_events: Vec<AuthorityEvent>,
     unit_ids: BTreeSet<Uuid>,
-    space_catalog_checksum: String,
+    space_catalog_checksum: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
@@ -117,6 +117,7 @@ struct GameSummary {
     status: GameStatus,
     host_player_id: Uuid,
     player_roles_available: usize,
+    space_catalog_enabled: bool,
 }
 #[derive(Deserialize)]
 struct AirportListQuery {
@@ -351,14 +352,21 @@ type CookieApiResult<T> = Result<(HeaderMap, Json<T>), (StatusCode, Json<ErrorRe
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let scenario = global_crisis_scenario();
-    scenario.validate()?;
+    let scenarios = [global_crisis_scenario(), jammed_flight_scenario()];
+    for scenario in &scenarios {
+        scenario.validate()?;
+    }
     let admin_token = std::env::var("ADMIN_SETUP_TOKEN")
         .ok()
         .filter(|token| !token.trim().is_empty());
     let state = AppState {
         games: Arc::new(RwLock::new(BTreeMap::new())),
-        scenarios: Arc::new(BTreeMap::from([(scenario.id.clone(), scenario)])),
+        scenarios: Arc::new(
+            scenarios
+                .into_iter()
+                .map(|scenario| (scenario.id.clone(), scenario))
+                .collect(),
+        ),
         airport_catalog: AirportCatalogService::load().await,
         space_catalog: SpaceCatalogService::load().await?,
         space_assets: SpaceAssetService::load().await,
@@ -496,21 +504,25 @@ async fn create_game(
             "scenario not found",
         )
     })?;
-    let catalog = state.space_catalog.status().await;
-    if scenario.requires_space_catalog && !catalog.usable {
-        return Err(api_error(
-            StatusCode::CONFLICT,
-            "space_catalog_unavailable",
-            "connect Space-Track and synchronize a current catalog before creating this scenario",
-        ));
-    }
-    let checksum = catalog.checksum.ok_or_else(|| {
-        api_error(
-            StatusCode::CONFLICT,
-            "space_catalog_unavailable",
-            "space catalog snapshot is missing",
-        )
-    })?;
+    let checksum = if scenario.requires_space_catalog {
+        let catalog = state.space_catalog.status().await;
+        if !catalog.usable {
+            return Err(api_error(
+                StatusCode::CONFLICT,
+                "space_catalog_unavailable",
+                "connect Space-Track and synchronize a current catalog before creating this scenario",
+            ));
+        }
+        Some(catalog.checksum.ok_or_else(|| {
+            api_error(
+                StatusCode::CONFLICT,
+                "space_catalog_unavailable",
+                "space catalog snapshot is missing",
+            )
+        })?)
+    } else {
+        None
+    };
     let simulation = scenario.spawn().map_err(|error| {
         api_error(
             StatusCode::UNPROCESSABLE_ENTITY,
@@ -953,7 +965,7 @@ async fn create_satellite_request(
             .get(&game_id)
             .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
         validate_role_lease(game, role_id, request.player_id, request.lease_generation)?;
-        game.space_catalog_checksum.clone()
+        require_game_catalog(game)?
     };
     let snapshot = state
         .space_catalog
@@ -984,7 +996,7 @@ async fn create_satellite_request(
         .get_mut(&game_id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
     validate_role_lease(game, role_id, request.player_id, request.lease_generation)?;
-    if game.space_catalog_checksum != checksum {
+    if game.space_catalog_checksum.as_deref() != Some(checksum.as_str()) {
         return Err(api_error(
             StatusCode::CONFLICT,
             "catalog_pin_changed",
@@ -1468,9 +1480,10 @@ async fn game_space_catalog(
         .get(&game_id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
     authorized_role(game, &query)?;
+    let checksum = require_game_catalog(game)?;
     let snapshot = state
         .space_catalog
-        .snapshot(&game.space_catalog_checksum)
+        .snapshot(&checksum)
         .await
         .ok_or_else(|| {
             api_error(
@@ -1493,7 +1506,7 @@ async fn game_space_assets(
             .get(&game_id)
             .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
         authorized_role(game, &query)?;
-        game.space_catalog_checksum.clone()
+        require_game_catalog(game)?
     };
     let snapshot = state
         .space_catalog
@@ -1530,7 +1543,7 @@ async fn game_space_asset(
             .get(&game_id)
             .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
         authorized_role(game, &query)?;
-        game.space_catalog_checksum.clone()
+        require_game_catalog(game)?
     };
     let snapshot = state
         .space_catalog
@@ -2172,7 +2185,18 @@ fn game_summary(game: &Game) -> GameSummary {
             .values()
             .filter(|role| role.claimable && !role.ai_controlled && role.owner.is_none())
             .count(),
+        space_catalog_enabled: game.space_catalog_checksum.is_some(),
     }
+}
+
+fn require_game_catalog(game: &Game) -> Result<String, (StatusCode, Json<ErrorResponse>)> {
+    game.space_catalog_checksum.clone().ok_or_else(|| {
+        api_error(
+            StatusCode::CONFLICT,
+            "space_catalog_not_enabled",
+            "the selected scenario does not enable an orbital catalog",
+        )
+    })
 }
 fn role_summary(role: &Role) -> RoleSummary {
     RoleSummary {
@@ -2245,7 +2269,7 @@ mod authority_tests {
             authority_requests: BTreeMap::new(),
             authority_events: Vec::new(),
             unit_ids: scenario.units.iter().map(|unit| unit.id).collect(),
-            space_catalog_checksum: String::new(),
+            space_catalog_checksum: Some(String::new()),
         }
     }
 

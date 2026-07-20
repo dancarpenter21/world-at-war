@@ -41,6 +41,22 @@ services:
           path: ./Cargo.lock
           target: /workspace/Cargo.lock
           initial_sync: true
+        - action: sync
+          path: ../c3mesh/src
+          target: /c3mesh/src
+          initial_sync: true
+        - action: sync
+          path: ../c3mesh/Cargo.toml
+          target: /c3mesh/Cargo.toml
+          initial_sync: true
+        - action: sync
+          path: ../c3mesh/Cargo.lock
+          target: /c3mesh/Cargo.lock
+          initial_sync: true
+        - action: sync
+          path: ../c3mesh/README.md
+          target: /c3mesh/README.md
+          initial_sync: true
         - action: sync+restart
           path: ./data/space-cards
           target: /workspace/data/space-cards

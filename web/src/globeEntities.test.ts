@@ -13,8 +13,11 @@ function projection(overrides: Partial<Projection> = {}): Projection {
       name: "Blue One",
       domain: "Air",
       position: { latitude_deg: 34, longitude_deg: -117, altitude_m: 1_000 },
-      sidc: unitSidc
+      sidc: unitSidc,
+      receiver_jammed: false
     }],
+    jamming_regions: [],
+    communication_links: [],
     tracks: [{
       track_id: "track-1",
       target_side: "Red",
@@ -44,7 +47,8 @@ describe("GlobeEntityReconciler", () => {
         name: "Blue One Renamed",
         domain: "Air",
         position: { latitude_deg: 36, longitude_deg: -115, altitude_m: 3_000 },
-        sidc: unitSidc
+        sidc: unitSidc,
+        receiver_jammed: false
       }]
     }));
 
@@ -71,7 +75,8 @@ describe("GlobeEntityReconciler", () => {
         name: "Blue One",
         domain: "Air",
         position: { latitude_deg: 34, longitude_deg: -117, altitude_m: 1_000 },
-        sidc: changedSidc
+        sidc: changedSidc,
+        receiver_jammed: false
       }]
     }));
 
@@ -103,5 +108,31 @@ describe("GlobeEntityReconciler", () => {
     expect(entities.getById("track-1")).toBeUndefined();
     expect(entities.getById("track-2")).toBeDefined();
     expect(entities.values).toHaveLength(1);
+  });
+
+  it("renders jammer regions and aggregates directional link health", () => {
+    const entities = new EntityCollection();
+    const reconciler = new GlobeEntityReconciler(entities, (sidc, size) => `${sidc}:${size}`);
+    const secondUnit = {
+      id: "blue-2", name: "Blue Two", domain: "Air",
+      position: { latitude_deg: 34.1, longitude_deg: -116.9, altitude_m: 1_000 },
+      sidc: unitSidc, receiver_jammed: false
+    };
+    reconciler.reconcile(projection({
+      own_units: [...projection().own_units, secondUnit],
+      jamming_regions: [{
+        id: "jammer", name: "Training Jammer",
+        center: { latitude_deg: 34, longitude_deg: -117, altitude_m: 0 },
+        radius_m: 5_000, band: { lower_hz: 300, upper_hz: 320 }, jammed: 1
+      }],
+      communication_links: [
+        { id: "one-two", from_entity_id: "blue-1", to_entity_id: "blue-2", available: true, jammed: 0, effective_bit_rate_bps: 1_000_000 },
+        { id: "two-one", from_entity_id: "blue-2", to_entity_id: "blue-1", available: false, jammed: 1 }
+      ]
+    }));
+
+    expect(entities.getById("jamming-region:jammer")?.ellipse).toBeDefined();
+    expect(entities.getById("communication-link:blue-1:blue-2")?.polyline).toBeDefined();
+    expect(reconciler.focusEntities()).toHaveLength(4);
   });
 });

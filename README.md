@@ -2,13 +2,14 @@
 
 World At War is a server-authoritative, low-fidelity war-simulation prototype. It combines a Rust entity-component simulation, a Cesium/React operational map, a public Space-Track orbital catalog, and an authority workflow for command decisions.
 
-The current implementation ships one **Global Crisis** scenario with 64 authored entities, thirteen claimable Blue command roles, a basic Red AI, White House and Pentagon command nodes, and a pinned public orbital snapshot. Authored entities and uncertain tracks use MIL-STD-2525D symbols.
+The current implementation ships **Global Crisis**, with 64 authored entities and a pinned public orbital snapshot, plus a compact **Jammed Flight Test** with two pilot-controlled Blue aircraft and directional receiver jamming. Authored entities and uncertain tracks use MIL-STD-2525D symbols.
 
 The broader target architecture, planned simulation fidelity, and acceptance criteria are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Features described there are not necessarily implemented yet.
 
 ## What is implemented
 
 - A deterministic Rust ECS simulation with one-second ticks, platform movement, server-side projections, and simple Red patrol AI.
+- Mandatory per-entity c3mesh network endpoints, deterministic packet delivery, cyclic flight paths, geographic receiver-jamming regions, and directional link status.
 - A lobby that creates and joins games, role claiming, game start/pause controls, and REST/WebSocket state delivery.
 - A Cesium operational map that keeps authored owned units and uncertain tracks visually separate from the public orbital catalog, reconciling entities in place so movement ticks do not recreate or flicker MIL-STD-2525D icons.
 - A lazy full-screen space-asset workspace with worker-based bulk propagation, point-primitive rendering, UTC playback, search/facets, sourced payload cards, and authority-routed satellite requests.
@@ -17,11 +18,12 @@ The broader target architecture, planned simulation fidelity, and acceptance cri
 - A global airport/runway cache using public-domain OurAirports data with an authoritative FAA NASR overlay for U.S. facilities, declared distances, pavement ratings, and reported gross-weight limits.
 - A Docker Compose edge proxy that serves the web client and routes `/health`, `/v1/`, and WebSocket traffic to the Rust server.
 
-Current limitations: communications are an always-reachable gate, sensor and track behavior is intentionally simplified, and the broader platform, terrain, logistics, cyber, and multi-source catalog systems remain planned work.
+Current limitations: Global Crisis authority traffic still uses an always-reachable gate while its detailed network topology is authored, sensor and track behavior is intentionally simplified, and the broader platform, terrain, logistics, cyber, and multi-source catalog systems remain planned work.
 
 ## Prerequisites
 
 - Rust toolchain compatible with the Rust 2021 workspace.
+- The pre-publish `c3mesh` checkout in a sibling directory, so this repository and the crate resolve as `world-at-war/` and `c3mesh/` under the same parent.
 - Node.js 22+ and npm for frontend development.
 - Docker Compose v2 for the container workflows.
 - A Space-Track account only when creating a scenario that requires the public orbital catalog.
@@ -60,7 +62,7 @@ For containerized development with hot reloading, use the development override:
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build --watch
 ```
 
-This workflow requires Docker Compose 2.32 or newer. Open the same edge-proxy URL. Compose Watch syncs browser assets into the Vite container, where polling and HMR update the open page. It also syncs Rust changes for `cargo watch`, restarts Nginx when its development configuration changes, and rebuilds the affected image when a dependency manifest or Dockerfile changes. Named volumes preserve Cargo artifacts/downloads and the Space-Track cache between restarts. Stop either stack with the matching `docker compose ... down` command.
+This workflow requires Docker Compose 2.32 or newer. The server image receives the sibling `c3mesh` checkout through a named build context, and Compose Watch syncs changes from both Rust projects. It also syncs browser assets into the Vite container, restarts Nginx when its development configuration changes, and rebuilds the affected image when a dependency manifest or Dockerfile changes. Named volumes preserve Cargo artifacts/downloads and the Space-Track cache between restarts. Stop either stack with the matching `docker compose ... down` command.
 
 Application, dependency, proxy, and image-definition changes are handled for the running stack. Changes to either Compose YAML file alter the watcher itself, so restart the command after editing those files.
 
@@ -86,12 +88,10 @@ From the setup panel, enter Space-Track credentials and choose whether to rememb
 
 The service loads a valid cached GP snapshot on startup, labels objects for map rendering, and pins its checksum to each game. An explicit Space-Track sign-in attempts to download and atomically save a replacement snapshot. If that refresh fails, the existing cache remains playable and the UI marks it as cached while showing the refresh error. A snapshot becomes marked stale after one week, but staleness does not prevent a game from using it. The synchronization cooldown is one hour **after a successful persisted download only**. Failed authentication, authorization, network, rate-limit, or catalog parsing attempts can be corrected and retried without triggering that local cooldown.
 
-The browser integration test drives the rendered setup form, follows the Rust session-cookie flow, downloads a two-object GP fixture from an in-process Space-Track-compatible server, and verifies the checksum snapshot written under an isolated temporary directory:
+The browser integration test drives the rendered setup form, follows the Rust session-cookie flow, downloads a two-object GP fixture from an in-process Space-Track-compatible server, and verifies the checksum snapshot written under an isolated temporary directory. Run it in the dedicated test container, which pins the browser image to the project's Playwright version and includes Chromium without adding browser dependencies to the production images:
 
 ```sh
-cd web
-npx playwright install chromium
-npm run test:e2e
+docker compose --profile test run --rm --build e2e
 ```
 
 To perform the same test against the live provider, explicitly set `SPACETRACK_E2E_USERNAME` and `SPACETRACK_E2E_PASSWORD`. Live mode makes a real full-catalog GP request, so run it no more than once per hour and never commit or print those values.
@@ -120,8 +120,8 @@ The REST API exposes catalog status at `/v1/airport-catalog/status`, paginated s
 
 ## Gameplay and authority workflow
 
-1. In the scenario lobby, connect Space-Track to refresh and save the catalog; if a previous catalog is cached, it remains available when refresh fails.
-2. Create **Global Crisis**, claim an available Blue role, and start the game as host.
+1. Select a scenario. **Global Crisis** requires a usable Space-Track catalog; **Jammed Flight Test** does not.
+2. Create the game, claim an available command or pilot role, and start it as host.
 3. Use **Configure authorities** to inspect or edit the host-managed authority graph and policies. The saved definition uses optimistic versioning to prevent accidental overwrite.
 4. Submit an order. A policy can execute it directly or create an authority request for the configured approvers. Vacant approver roles resolve deterministically after their configured delay.
 5. Participants see their command-chain view and relevant authority-request inbox; the Cesium map receives periodic state updates and a game-pinned orbital catalog.
@@ -129,7 +129,7 @@ The REST API exposes catalog status at `/v1/airport-catalog/status`, paginated s
 ## Repository layout
 
 - `crates/sim-core/` — deterministic ECS simulation, projections, orders, and authority model.
-- `crates/sim-scenario/` — validated, versioned scenario definitions and the Global Crisis fixture.
+- `crates/sim-scenario/` — validated, versioned Global Crisis and Jammed Flight Test definitions.
 - `crates/sim-ai/` — constrained Red patrol planner that operates on a role projection.
 - `crates/sim-catalog/` — provenance-aware platform, space, airport/runway, importer, and compatibility data types.
 - `crates/server/` — Axum API, game lifecycle, credential cookie, catalog service, and simulation loop.

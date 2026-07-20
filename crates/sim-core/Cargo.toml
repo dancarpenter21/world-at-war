@@ -6,5 +6,7 @@ license.workspace = true
 
 [dependencies]
 bevy_ecs.workspace = true
+c3mesh.workspace = true
 serde.workspace = true
+thiserror.workspace = true
 uuid.workspace = true

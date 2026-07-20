@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+c3mesh.workspace = true
 serde.workspace = true
 sim-core = { path = "../sim-core" }
 thiserror.workspace = true

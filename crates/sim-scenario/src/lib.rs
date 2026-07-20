@@ -1,11 +1,16 @@
 //! Versioned scenario definitions and spawning.
 
+use c3mesh::{
+    ChannelConfig, ChannelId, ChannelState, DeviceConfig, DeviceId, DeviceKind, FrequencyBand,
+    InterferenceResponse, NetworkConfig, RadioChannel,
+};
 use serde::{Deserialize, Serialize};
 use sim_core::{
     AuthorityDecisionStep, AuthorityDefinition, AuthorityPolicy, AuthorityRelationship,
-    AuthorityRelationshipKind, AuthorityRoleDefinition, AuthorityRoleKind, CommunicationNode,
-    Domain, GeoPose, PlatformSpawn, Sensor, Side, Simulation, Velocity, ACTION_ENGAGE, ACTION_MOVE,
-    ACTION_SPACE_SUPPORT, ACTION_STRATEGIC_SATELLITE,
+    AuthorityRelationshipKind, AuthorityRoleDefinition, AuthorityRoleKind,
+    CommunicationLinkDefinition, CommunicationsConfig, CyclicFlightPath, Domain, FlightWaypoint,
+    GeoPose, JammingRegion, PlatformSpawn, Sensor, Side, Simulation, Velocity, ACTION_ENGAGE,
+    ACTION_MOVE, ACTION_SPACE_SUPPORT, ACTION_STRATEGIC_SATELLITE,
 };
 use thiserror::Error;
 use uuid::Uuid;
@@ -18,6 +23,9 @@ pub struct Scenario {
     pub version: u32,
     pub requires_space_catalog: bool,
     pub units: Vec<ScenarioUnit>,
+    pub network: NetworkConfig,
+    pub communication_links: Vec<CommunicationLinkDefinition>,
+    pub jamming_regions: Vec<JammingRegion>,
     pub authority: AuthorityDefinition,
 }
 
@@ -31,28 +39,30 @@ pub struct ScenarioUnit {
     pub position: GeoPose,
     pub velocity: Velocity,
     pub sensor: Option<Sensor>,
-    pub communications: Option<CommunicationNode>,
+    pub network_device_ids: Vec<DeviceId>,
+    pub flight_path: Option<CyclicFlightPath>,
 }
 
 #[derive(Debug, Error)]
 pub enum ScenarioError {
-    #[error("scenario must include a Blue unit")]
-    MissingBlue,
-    #[error("scenario must include a Red unit")]
-    MissingRed,
+    #[error("scenario must include at least one unit")]
+    MissingUnits,
     #[error("scenario includes duplicate unit id {0}")]
     DuplicateUnit(Uuid),
     #[error("entity {0} has an invalid MIL-STD-2525D SIDC")]
     InvalidSidc(Uuid),
     #[error("invalid authority definition: {0}")]
     InvalidAuthority(String),
+    #[error("invalid simulation definition: {0}")]
+    InvalidSimulation(String),
 }
 
 impl Scenario {
     pub fn validate(&self) -> Result<(), ScenarioError> {
         let mut ids = std::collections::BTreeSet::new();
-        let mut blue = false;
-        let mut red = false;
+        if self.units.is_empty() {
+            return Err(ScenarioError::MissingUnits);
+        }
         for unit in &self.units {
             if !ids.insert(unit.id) {
                 return Err(ScenarioError::DuplicateUnit(unit.id));
@@ -65,26 +75,26 @@ impl Scenario {
             {
                 return Err(ScenarioError::InvalidSidc(unit.id));
             }
-            blue |= unit.side == Side::Blue;
-            red |= unit.side == Side::Red;
-        }
-        if !blue {
-            return Err(ScenarioError::MissingBlue);
-        }
-        if !red {
-            return Err(ScenarioError::MissingRed);
         }
         self.authority
             .validate(&ids)
             .map_err(ScenarioError::InvalidAuthority)?;
+        let platforms = self.platforms();
+        Simulation::validate_configuration(&platforms, &self.communications())
+            .map_err(|error| ScenarioError::InvalidSimulation(error.to_string()))?;
         Ok(())
     }
 
     pub fn spawn(&self) -> Result<Simulation, ScenarioError> {
         self.validate()?;
-        let mut simulation = Simulation::new();
-        for unit in &self.units {
-            simulation.spawn_platform(PlatformSpawn {
+        Simulation::new(self.platforms(), self.communications())
+            .map_err(|error| ScenarioError::InvalidSimulation(error.to_string()))
+    }
+
+    fn platforms(&self) -> Vec<PlatformSpawn> {
+        self.units
+            .iter()
+            .map(|unit| PlatformSpawn {
                 id: unit.id,
                 name: unit.name.clone(),
                 side: unit.side,
@@ -92,11 +102,19 @@ impl Scenario {
                 pose: unit.position,
                 velocity: unit.velocity,
                 sensor: unit.sensor,
-                communication: unit.communications,
+                network_device_ids: unit.network_device_ids.clone(),
+                flight_path: unit.flight_path.clone(),
                 sidc: unit.sidc.clone(),
-            });
+            })
+            .collect()
+    }
+
+    fn communications(&self) -> CommunicationsConfig {
+        CommunicationsConfig {
+            network: self.network.clone(),
+            links: self.communication_links.clone(),
+            jamming_regions: self.jamming_regions.clone(),
         }
-        Ok(simulation)
     }
 }
 
@@ -206,6 +224,23 @@ pub fn global_crisis_scenario() -> Scenario {
         ));
     }
     let authority = global_crisis_authority();
+    let network = NetworkConfig {
+        devices: units
+            .iter()
+            .flat_map(|unit| {
+                unit.network_device_ids
+                    .iter()
+                    .cloned()
+                    .map(|id| DeviceConfig {
+                        id,
+                        kind: DeviceKind::Sink,
+                        mobility: Default::default(),
+                        interference: vec![],
+                    })
+            })
+            .collect(),
+        channels: vec![],
+    };
     Scenario {
         id: "global-crisis.v2".into(),
         title: "Global Crisis".into(),
@@ -214,6 +249,9 @@ pub fn global_crisis_scenario() -> Scenario {
         version: 2,
         requires_space_catalog: true,
         units,
+        network,
+        communication_links: vec![],
+        jamming_regions: vec![],
         authority,
     }
 }
@@ -396,7 +434,7 @@ fn global_crisis_authority() -> AuthorityDefinition {
     add_role_edge(105, 110, AuthorityRelationshipKind::Support);
     add_role_edge(110, 112, AuthorityRelationshipKind::Support);
     add_role_edge(201, 202, AuthorityRelationshipKind::Opcon);
-    drop(add_role_edge);
+    let _ = add_role_edge;
 
     let mut add_unit_edge = |superior: u128, unit: u128, kind| {
         relationships.push(AuthorityRelationship {
@@ -432,7 +470,7 @@ fn global_crisis_authority() -> AuthorityDefinition {
     for unit in 50..=64 {
         add_unit_edge(202, unit, AuthorityRelationshipKind::Tacon);
     }
-    drop(add_unit_edge);
+    let _ = add_unit_edge;
 
     let policy = |id,
                   name: &str,
@@ -599,6 +637,281 @@ fn global_crisis_authority() -> AuthorityDefinition {
     }
 }
 
+pub fn jammed_flight_scenario() -> Scenario {
+    const CENTER_LATITUDE: f64 = 36.0;
+    const CENTER_LONGITUDE: f64 = -115.0;
+    const WEST_LONGITUDE: f64 = -115.09;
+    const EAST_LONGITUDE: f64 = -114.91;
+    const SOUTH_LATITUDE: f64 = 35.92;
+    const NORTH_LATITUDE: f64 = 36.12;
+    const ALTITUDE_M: f64 = 8_000.0;
+    const RADIO_BAND: FrequencyBand = FrequencyBand::new(300_000_000, 320_000_000);
+
+    let aircraft_1 = Uuid::from_u128(10_001);
+    let aircraft_2 = Uuid::from_u128(10_002);
+    let pilot_1 = Uuid::from_u128(10_101);
+    let pilot_2 = Uuid::from_u128(10_102);
+    let aircraft_1_tx = DeviceId::new("jam-flight-aircraft-1-tx");
+    let aircraft_1_rx = DeviceId::new("jam-flight-aircraft-1-rx");
+    let aircraft_2_tx = DeviceId::new("jam-flight-aircraft-2-tx");
+    let aircraft_2_rx = DeviceId::new("jam-flight-aircraft-2-rx");
+    let aircraft_1_channel = ChannelId::new("jam-flight-aircraft-1-to-2");
+    let aircraft_2_channel = ChannelId::new("jam-flight-aircraft-2-to-1");
+
+    let flight_path = |north_latitude: f64, south_latitude: f64| CyclicFlightPath {
+        period_ticks: 50,
+        waypoints: vec![
+            FlightWaypoint {
+                at_tick: 0,
+                position: GeoPose {
+                    latitude_deg: north_latitude,
+                    longitude_deg: WEST_LONGITUDE,
+                    altitude_m: ALTITUDE_M,
+                },
+            },
+            FlightWaypoint {
+                at_tick: 10,
+                position: GeoPose {
+                    latitude_deg: north_latitude,
+                    longitude_deg: CENTER_LONGITUDE,
+                    altitude_m: ALTITUDE_M,
+                },
+            },
+            FlightWaypoint {
+                at_tick: 20,
+                position: GeoPose {
+                    latitude_deg: north_latitude,
+                    longitude_deg: EAST_LONGITUDE,
+                    altitude_m: ALTITUDE_M,
+                },
+            },
+            FlightWaypoint {
+                at_tick: 30,
+                position: GeoPose {
+                    latitude_deg: south_latitude,
+                    longitude_deg: EAST_LONGITUDE,
+                    altitude_m: ALTITUDE_M,
+                },
+            },
+            FlightWaypoint {
+                at_tick: 40,
+                position: GeoPose {
+                    latitude_deg: south_latitude,
+                    longitude_deg: WEST_LONGITUDE,
+                    altitude_m: ALTITUDE_M,
+                },
+            },
+        ],
+    };
+    let units = vec![
+        ScenarioUnit {
+            id: aircraft_1,
+            name: "Blue Flight 1".into(),
+            side: Side::Blue,
+            domain: Domain::Air,
+            sidc: sidc(Side::Blue, Domain::Air).into(),
+            position: GeoPose {
+                latitude_deg: CENTER_LATITUDE,
+                longitude_deg: WEST_LONGITUDE,
+                altitude_m: ALTITUDE_M,
+            },
+            velocity: Velocity {
+                north_mps: 0.0,
+                east_mps: 0.0,
+                climb_mps: 0.0,
+            },
+            sensor: None,
+            network_device_ids: vec![aircraft_1_tx.clone(), aircraft_1_rx.clone()],
+            flight_path: Some(flight_path(CENTER_LATITUDE, SOUTH_LATITUDE)),
+        },
+        ScenarioUnit {
+            id: aircraft_2,
+            name: "Blue Flight 2".into(),
+            side: Side::Blue,
+            domain: Domain::Air,
+            sidc: sidc(Side::Blue, Domain::Air).into(),
+            position: GeoPose {
+                latitude_deg: NORTH_LATITUDE,
+                longitude_deg: WEST_LONGITUDE,
+                altitude_m: ALTITUDE_M,
+            },
+            velocity: Velocity {
+                north_mps: 0.0,
+                east_mps: 0.0,
+                climb_mps: 0.0,
+            },
+            sensor: None,
+            network_device_ids: vec![aircraft_2_tx.clone(), aircraft_2_rx.clone()],
+            flight_path: Some(flight_path(NORTH_LATITUDE, NORTH_LATITUDE + 0.08)),
+        },
+    ];
+    let network = NetworkConfig {
+        devices: vec![
+            DeviceConfig {
+                id: aircraft_1_tx.clone(),
+                kind: DeviceKind::Source {
+                    egress: aircraft_1_channel.clone(),
+                },
+                mobility: Default::default(),
+                interference: vec![],
+            },
+            DeviceConfig {
+                id: aircraft_1_rx.clone(),
+                kind: DeviceKind::Sink,
+                mobility: Default::default(),
+                interference: vec![],
+            },
+            DeviceConfig {
+                id: aircraft_2_tx.clone(),
+                kind: DeviceKind::Source {
+                    egress: aircraft_2_channel.clone(),
+                },
+                mobility: Default::default(),
+                interference: vec![],
+            },
+            DeviceConfig {
+                id: aircraft_2_rx.clone(),
+                kind: DeviceKind::Sink,
+                mobility: Default::default(),
+                interference: vec![],
+            },
+        ],
+        channels: vec![
+            ChannelConfig {
+                id: aircraft_1_channel.clone(),
+                endpoints: [aircraft_1_tx.clone(), aircraft_2_rx.clone()],
+                bit_rate_bps: 1_000_000,
+                propagation_delay_ns: 100_000,
+                state: ChannelState::Operational,
+                distance: None,
+                radio: Some(RadioChannel {
+                    band: RADIO_BAND,
+                    interference_response: InterferenceResponse::default(),
+                }),
+            },
+            ChannelConfig {
+                id: aircraft_2_channel.clone(),
+                endpoints: [aircraft_2_tx.clone(), aircraft_1_rx.clone()],
+                bit_rate_bps: 1_000_000,
+                propagation_delay_ns: 100_000,
+                state: ChannelState::Operational,
+                distance: None,
+                radio: Some(RadioChannel {
+                    band: RADIO_BAND,
+                    interference_response: InterferenceResponse::default(),
+                }),
+            },
+        ],
+    };
+    let communication_links = vec![
+        CommunicationLinkDefinition {
+            id: "aircraft-1-to-aircraft-2".into(),
+            from_entity_id: aircraft_1,
+            to_entity_id: aircraft_2,
+            source_device_id: aircraft_1_tx,
+            destination_device_id: aircraft_2_rx,
+            channel_id: aircraft_1_channel,
+        },
+        CommunicationLinkDefinition {
+            id: "aircraft-2-to-aircraft-1".into(),
+            from_entity_id: aircraft_2,
+            to_entity_id: aircraft_1,
+            source_device_id: aircraft_2_tx,
+            destination_device_id: aircraft_1_rx,
+            channel_id: aircraft_2_channel,
+        },
+    ];
+    let authority = AuthorityDefinition {
+        version: 1,
+        roles: vec![
+            AuthorityRoleDefinition {
+                id: pilot_1,
+                name: "Pilot, Blue Flight 1".into(),
+                side: Side::Blue,
+                kind: AuthorityRoleKind::Pilot,
+                location_unit_id: aircraft_1,
+                claimable: true,
+                ai_controlled: false,
+            },
+            AuthorityRoleDefinition {
+                id: pilot_2,
+                name: "Pilot, Blue Flight 2".into(),
+                side: Side::Blue,
+                kind: AuthorityRoleKind::Pilot,
+                location_unit_id: aircraft_2,
+                claimable: true,
+                ai_controlled: false,
+            },
+        ],
+        relationships: vec![
+            AuthorityRelationship {
+                id: Uuid::from_u128(10_201),
+                superior_role_id: pilot_1,
+                subordinate_role_id: None,
+                subordinate_unit_id: Some(aircraft_1),
+                kind: AuthorityRelationshipKind::Tacon,
+            },
+            AuthorityRelationship {
+                id: Uuid::from_u128(10_202),
+                superior_role_id: pilot_2,
+                subordinate_role_id: None,
+                subordinate_unit_id: Some(aircraft_2),
+                kind: AuthorityRelationshipKind::Tacon,
+            },
+        ],
+        policies: vec![
+            AuthorityPolicy {
+                id: Uuid::from_u128(10_301),
+                name: "Blue Flight 1 movement authority".into(),
+                action: ACTION_MOVE.into(),
+                target_unit_ids: vec![aircraft_1],
+                direct_role_ids: vec![pilot_1],
+                request_role_ids: vec![],
+                decision_steps: vec![],
+                notify_role_ids: vec![],
+                executable: true,
+            },
+            AuthorityPolicy {
+                id: Uuid::from_u128(10_302),
+                name: "Blue Flight 2 movement authority".into(),
+                action: ACTION_MOVE.into(),
+                target_unit_ids: vec![aircraft_2],
+                direct_role_ids: vec![pilot_2],
+                request_role_ids: vec![],
+                decision_steps: vec![],
+                notify_role_ids: vec![],
+                executable: true,
+            },
+        ],
+    };
+
+    Scenario {
+        id: "jammed-flight.v1".into(),
+        title: "Jammed Flight Test".into(),
+        description:
+            "Two Blue aircraft repeatedly cross a receiver-jamming region while testing a directional radio link."
+                .into(),
+        version: 1,
+        requires_space_catalog: false,
+        units,
+        network,
+        communication_links,
+        jamming_regions: vec![JammingRegion {
+            id: "training-jammer".into(),
+            name: "Training Jammer".into(),
+            center: GeoPose {
+                latitude_deg: CENTER_LATITUDE,
+                longitude_deg: CENTER_LONGITUDE,
+                altitude_m: 0.0,
+            },
+            radius_m: 5_000.0,
+            band: RADIO_BAND,
+            jammed: 1.0,
+        }],
+        authority,
+    }
+}
+
 fn unit(
     id: u128,
     name: &str,
@@ -608,8 +921,9 @@ fn unit(
     longitude: f64,
 ) -> ScenarioUnit {
     let airborne = domain == Domain::Air;
+    let entity_id = Uuid::from_u128(id);
     ScenarioUnit {
-        id: Uuid::from_u128(id),
+        id: entity_id,
         name: name.into(),
         side,
         domain,
@@ -628,10 +942,8 @@ fn unit(
             range_m: if airborne { 180_000.0 } else { 80_000.0 },
             identification_range_m: 35_000.0,
         }),
-        communications: Some(CommunicationNode {
-            range_m: 500_000.0,
-            operational: true,
-        }),
+        network_device_ids: vec![DeviceId::new(format!("entity-{entity_id}-network"))],
+        flight_path: None,
     }
 }
 
@@ -655,6 +967,8 @@ fn sidc(side: Side, domain: Domain) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use c3mesh::DropReason;
+    use sim_core::CommunicationOutcome;
 
     #[test]
     fn global_crisis_has_required_entities_and_roles() {
@@ -670,5 +984,113 @@ mod tests {
             .units
             .iter()
             .any(|unit| unit.name.contains("Pentagon")));
+        assert!(scenario
+            .units
+            .iter()
+            .all(|unit| !unit.network_device_ids.is_empty()));
+        assert_eq!(scenario.network.devices.len(), scenario.units.len());
+    }
+
+    #[test]
+    fn jammed_flight_is_directional_and_recovers() {
+        let scenario = jammed_flight_scenario();
+        scenario.validate().unwrap();
+        assert_eq!(scenario.units.len(), 2);
+        assert_eq!(scenario.authority.roles.len(), 2);
+        assert!(scenario
+            .authority
+            .roles
+            .iter()
+            .all(|role| role.kind == AuthorityRoleKind::Pilot));
+        let aircraft_1 = scenario.units[0].id;
+        let aircraft_2 = scenario.units[1].id;
+        let mut simulation = scenario.spawn().unwrap();
+
+        assert!(matches!(
+            simulation
+                .transmit(aircraft_1, aircraft_2, b"initial one to two".to_vec())
+                .unwrap(),
+            CommunicationOutcome::Delivered { .. }
+        ));
+        assert!(matches!(
+            simulation
+                .transmit(aircraft_2, aircraft_1, b"initial two to one".to_vec())
+                .unwrap(),
+            CommunicationOutcome::Delivered { .. }
+        ));
+
+        for _ in 0..10 {
+            simulation.step();
+        }
+        let projection = simulation.projection_for(aircraft_1, Side::Blue);
+        assert!(
+            projection
+                .own_units
+                .iter()
+                .find(|unit| unit.id == aircraft_1)
+                .unwrap()
+                .receiver_jammed
+        );
+        assert!(
+            projection
+                .communication_links
+                .iter()
+                .find(|link| link.from_entity_id == aircraft_1)
+                .unwrap()
+                .available
+        );
+        assert!(
+            !projection
+                .communication_links
+                .iter()
+                .find(|link| link.from_entity_id == aircraft_2)
+                .unwrap()
+                .available
+        );
+        assert!(matches!(
+            simulation
+                .transmit(aircraft_1, aircraft_2, b"jammed one to two".to_vec())
+                .unwrap(),
+            CommunicationOutcome::Delivered { .. }
+        ));
+        assert!(matches!(
+            simulation
+                .transmit(aircraft_2, aircraft_1, b"jammed two to one".to_vec())
+                .unwrap(),
+            CommunicationOutcome::Dropped {
+                reason: DropReason::ReceiverInterference { .. },
+                ..
+            }
+        ));
+
+        for _ in 0..10 {
+            simulation.step();
+        }
+        let projection = simulation.projection_for(aircraft_1, Side::Blue);
+        assert!(projection
+            .own_units
+            .iter()
+            .all(|unit| !unit.receiver_jammed));
+        assert!(projection
+            .communication_links
+            .iter()
+            .all(|link| link.available));
+        assert!(matches!(
+            simulation
+                .transmit(aircraft_2, aircraft_1, b"recovered".to_vec())
+                .unwrap(),
+            CommunicationOutcome::Delivered { .. }
+        ));
+    }
+
+    #[test]
+    fn scenario_rejects_an_entity_without_a_network_device() {
+        let mut scenario = jammed_flight_scenario();
+        scenario.units[0].network_device_ids.clear();
+        assert!(matches!(
+            scenario.validate(),
+            Err(ScenarioError::InvalidSimulation(message))
+                if message.contains("has no c3mesh devices")
+        ));
     }
 }

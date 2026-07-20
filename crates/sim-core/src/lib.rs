@@ -3,7 +3,12 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use bevy_ecs::prelude::*;
+use c3mesh::{
+    ChannelId, DeviceId, DeviceKind, DropReason, FrequencyBand, NetworkConfig, NetworkEvent,
+    ReceiverInterference, SimTime as NetworkTime, Simulator as NetworkSimulator,
+};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use uuid::Uuid;
 
 pub const TICK_SECONDS: u64 = 1;
@@ -53,12 +58,6 @@ pub struct Sensor {
     pub identification_range_m: f64,
 }
 
-#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct CommunicationNode {
-    pub range_m: f64,
-    pub operational: bool,
-}
-
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct PlatformName(pub String);
 
@@ -79,6 +78,7 @@ pub const ACTION_STRATEGIC_SATELLITE: &str = "strategic_satellite_maneuver";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AuthorityRoleKind {
+    Pilot,
     NationalCommand,
     DefenseSecretary,
     JointStaff,
@@ -87,6 +87,51 @@ pub enum AuthorityRoleKind {
     ComponentCommander,
     SubordinateCommander,
     TacticalCommander,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlightWaypoint {
+    pub at_tick: u64,
+    pub position: GeoPose,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CyclicFlightPath {
+    pub period_ticks: u64,
+    pub waypoints: Vec<FlightWaypoint>,
+}
+
+#[derive(Component, Debug, Clone)]
+struct CyclicFlightPathState {
+    path: CyclicFlightPath,
+    active: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JammingRegion {
+    pub id: String,
+    pub name: String,
+    pub center: GeoPose,
+    pub radius_m: f64,
+    pub band: FrequencyBand,
+    pub jammed: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommunicationLinkDefinition {
+    pub id: String,
+    pub from_entity_id: Uuid,
+    pub to_entity_id: Uuid,
+    pub source_device_id: DeviceId,
+    pub destination_device_id: DeviceId,
+    pub channel_id: ChannelId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommunicationsConfig {
+    pub network: NetworkConfig,
+    pub links: Vec<CommunicationLinkDefinition>,
+    pub jamming_regions: Vec<JammingRegion>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -232,9 +277,11 @@ impl AuthorityDefinition {
             let root = roles
                 .get(&cursor)
                 .ok_or_else(|| format!("unit {unit_id} has no command root"))?;
-            if root.kind != AuthorityRoleKind::NationalCommand {
+            if root.kind != AuthorityRoleKind::NationalCommand
+                && !(root.kind == AuthorityRoleKind::Pilot && root.location_unit_id == *unit_id)
+            {
                 return Err(format!(
-                    "unit {unit_id} does not terminate at national command"
+                    "unit {unit_id} does not terminate at national command or its colocated pilot"
                 ));
             }
         }
@@ -420,7 +467,8 @@ pub struct PlatformSpawn {
     pub pose: GeoPose,
     pub velocity: Velocity,
     pub sensor: Option<Sensor>,
-    pub communication: Option<CommunicationNode>,
+    pub network_device_ids: Vec<DeviceId>,
+    pub flight_path: Option<CyclicFlightPath>,
     pub sidc: String,
 }
 
@@ -442,13 +490,219 @@ pub struct PendingIntents(pub VecDeque<AuthorizedIntent>);
 #[derive(Resource, Debug, Default)]
 pub struct OrderResults(pub Vec<OrderResult>);
 
+#[derive(Debug, Error)]
+pub enum SimulationBuildError {
+    #[error("invalid simulation configuration: {0}")]
+    InvalidConfiguration(String),
+    #[error("invalid c3mesh network: {0}")]
+    Network(#[from] c3mesh::SimulationError),
+}
+
+#[derive(Debug, Error)]
+pub enum CommunicationError {
+    #[error("no configured communication link from {from} to {to}")]
+    NoLink { from: Uuid, to: Uuid },
+    #[error("c3mesh communication failed: {0}")]
+    Network(#[from] c3mesh::SimulationError),
+    #[error("c3mesh became idle before packet {0} reached a terminal state")]
+    MissingTerminalEvent(u64),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum CommunicationOutcome {
+    Delivered { at_ns: u64 },
+    Dropped { at_ns: u64, reason: DropReason },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommunicationLinkStatus {
+    pub id: String,
+    pub from_entity_id: Uuid,
+    pub to_entity_id: Uuid,
+    pub available: bool,
+    pub jammed: f64,
+    pub effective_bit_rate_bps: Option<u64>,
+}
+
+struct CommunicationsRuntime {
+    simulator: NetworkSimulator,
+    entity_devices: BTreeMap<Uuid, Vec<DeviceId>>,
+    baseline_interference: BTreeMap<DeviceId, Vec<ReceiverInterference>>,
+    links: Vec<CommunicationLinkDefinition>,
+    jamming_regions: Vec<JammingRegion>,
+}
+
 pub struct Simulation {
     world: World,
     schedule: Schedule,
+    communications: CommunicationsRuntime,
 }
 
 impl Simulation {
-    pub fn new() -> Self {
+    pub fn validate_configuration(
+        platforms: &[PlatformSpawn],
+        communications: &CommunicationsConfig,
+    ) -> Result<(), SimulationBuildError> {
+        communications
+            .network
+            .validate()
+            .map_err(|error| SimulationBuildError::InvalidConfiguration(error.to_string()))?;
+
+        let mut platform_ids = BTreeSet::new();
+        let devices: BTreeMap<_, _> = communications
+            .network
+            .devices
+            .iter()
+            .map(|device| (device.id.clone(), device))
+            .collect();
+        let mut device_owners = BTreeMap::new();
+        for platform in platforms {
+            if !platform_ids.insert(platform.id) {
+                return Err(SimulationBuildError::InvalidConfiguration(format!(
+                    "duplicate platform id {}",
+                    platform.id
+                )));
+            }
+            if platform.network_device_ids.is_empty() {
+                return Err(SimulationBuildError::InvalidConfiguration(format!(
+                    "platform {} has no c3mesh devices",
+                    platform.id
+                )));
+            }
+            if let Some(path) = &platform.flight_path {
+                validate_flight_path(platform.id, path)?;
+            }
+            for device_id in &platform.network_device_ids {
+                if !devices.contains_key(device_id) {
+                    return Err(SimulationBuildError::InvalidConfiguration(format!(
+                        "platform {} references unknown device {}",
+                        platform.id, device_id
+                    )));
+                }
+                if device_owners
+                    .insert(device_id.clone(), platform.id)
+                    .is_some()
+                {
+                    return Err(SimulationBuildError::InvalidConfiguration(format!(
+                        "device {device_id} is assigned to multiple platforms"
+                    )));
+                }
+            }
+        }
+        if device_owners.len() != devices.len() {
+            let unowned = devices
+                .keys()
+                .find(|device| !device_owners.contains_key(*device))
+                .expect("different device counts imply an unowned device");
+            return Err(SimulationBuildError::InvalidConfiguration(format!(
+                "device {unowned} is not assigned to a platform"
+            )));
+        }
+
+        let channels: BTreeMap<_, _> = communications
+            .network
+            .channels
+            .iter()
+            .map(|channel| (channel.id.clone(), channel))
+            .collect();
+        let mut link_ids = BTreeSet::new();
+        let mut entity_pairs = BTreeSet::new();
+        for link in &communications.links {
+            if link.id.trim().is_empty() || !link_ids.insert(link.id.clone()) {
+                return Err(SimulationBuildError::InvalidConfiguration(
+                    "communication link ids must be non-empty and unique".into(),
+                ));
+            }
+            if !entity_pairs.insert((link.from_entity_id, link.to_entity_id)) {
+                return Err(SimulationBuildError::InvalidConfiguration(format!(
+                    "multiple default links are configured from {} to {}",
+                    link.from_entity_id, link.to_entity_id
+                )));
+            }
+            if device_owners.get(&link.source_device_id) != Some(&link.from_entity_id)
+                || device_owners.get(&link.destination_device_id) != Some(&link.to_entity_id)
+            {
+                return Err(SimulationBuildError::InvalidConfiguration(format!(
+                    "link {} device ownership does not match its entities",
+                    link.id
+                )));
+            }
+            let Some(source) = devices.get(&link.source_device_id) else {
+                return Err(SimulationBuildError::InvalidConfiguration(format!(
+                    "link {} references an unknown source",
+                    link.id
+                )));
+            };
+            let Some(destination) = devices.get(&link.destination_device_id) else {
+                return Err(SimulationBuildError::InvalidConfiguration(format!(
+                    "link {} references an unknown destination",
+                    link.id
+                )));
+            };
+            if !matches!(destination.kind, DeviceKind::Sink)
+                || !matches!(
+                    &source.kind,
+                    DeviceKind::Source { egress } if egress == &link.channel_id
+                )
+            {
+                return Err(SimulationBuildError::InvalidConfiguration(format!(
+                    "link {} must connect a source's egress to a sink",
+                    link.id
+                )));
+            }
+            let Some(channel) = channels.get(&link.channel_id) else {
+                return Err(SimulationBuildError::InvalidConfiguration(format!(
+                    "link {} references an unknown channel",
+                    link.id
+                )));
+            };
+            if !channel.endpoints.contains(&link.source_device_id)
+                || !channel.endpoints.contains(&link.destination_device_id)
+            {
+                return Err(SimulationBuildError::InvalidConfiguration(format!(
+                    "link {} devices are not the endpoints of channel {}",
+                    link.id, link.channel_id
+                )));
+            }
+        }
+
+        let mut region_ids = BTreeSet::new();
+        for region in &communications.jamming_regions {
+            if region.id.trim().is_empty()
+                || !region_ids.insert(region.id.clone())
+                || !geo_pose_is_finite(region.center)
+                || !region.radius_m.is_finite()
+                || region.radius_m <= 0.0
+                || region.band.lower_hz >= region.band.upper_hz
+                || !region.jammed.is_finite()
+                || !(0.0..=1.0).contains(&region.jammed)
+            {
+                return Err(SimulationBuildError::InvalidConfiguration(format!(
+                    "jamming region {} is invalid",
+                    region.id
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn new(
+        platforms: Vec<PlatformSpawn>,
+        communications: CommunicationsConfig,
+    ) -> Result<Self, SimulationBuildError> {
+        Self::validate_configuration(&platforms, &communications)?;
+        let entity_devices = platforms
+            .iter()
+            .map(|platform| (platform.id, platform.network_device_ids.clone()))
+            .collect();
+        let baseline_interference = communications
+            .network
+            .devices
+            .iter()
+            .map(|device| (device.id.clone(), device.interference.clone()))
+            .collect();
+        let simulator = NetworkSimulator::new(communications.network)?;
         let mut world = World::new();
         world.insert_resource(SimClock { tick: 0 });
         world.insert_resource(Observations::default());
@@ -464,10 +718,25 @@ impl Simulation {
             detect_contacts.after(move_platforms),
             deliver_reports.after(detect_contacts),
         ));
-        Self { world, schedule }
+        let mut simulation = Self {
+            world,
+            schedule,
+            communications: CommunicationsRuntime {
+                simulator,
+                entity_devices,
+                baseline_interference,
+                links: communications.links,
+                jamming_regions: communications.jamming_regions,
+            },
+        };
+        for platform in platforms {
+            simulation.spawn_platform(platform);
+        }
+        simulation.sync_network_interference()?;
+        Ok(simulation)
     }
 
-    pub fn spawn_platform(&mut self, platform: PlatformSpawn) {
+    fn spawn_platform(&mut self, platform: PlatformSpawn) {
         let mut entity = self.world.spawn((
             SimEntityId(platform.id),
             PlatformName(platform.name),
@@ -484,8 +753,8 @@ impl Simulation {
         if let Some(sensor) = platform.sensor {
             entity.insert(sensor);
         }
-        if let Some(communication) = platform.communication {
-            entity.insert(communication);
+        if let Some(path) = platform.flight_path {
+            entity.insert(CyclicFlightPathState { path, active: true });
         }
     }
 
@@ -498,6 +767,8 @@ impl Simulation {
 
     pub fn step(&mut self) {
         self.schedule.run(&mut self.world);
+        self.sync_network_interference()
+            .expect("validated network must accept tick interference");
     }
 
     pub fn tick(&self) -> u64 {
@@ -506,6 +777,50 @@ impl Simulation {
 
     pub fn drain_order_results(&mut self) -> Vec<OrderResult> {
         std::mem::take(&mut self.world.resource_mut::<OrderResults>().0)
+    }
+
+    pub fn transmit(
+        &mut self,
+        from_entity_id: Uuid,
+        to_entity_id: Uuid,
+        payload: Vec<u8>,
+    ) -> Result<CommunicationOutcome, CommunicationError> {
+        let link = self
+            .communications
+            .links
+            .iter()
+            .find(|link| link.from_entity_id == from_entity_id && link.to_entity_id == to_entity_id)
+            .cloned()
+            .ok_or(CommunicationError::NoLink {
+                from: from_entity_id,
+                to: to_entity_id,
+            })?;
+        let at = self.network_time();
+        let packet_id = self.communications.simulator.schedule_send(
+            at,
+            link.source_device_id,
+            link.destination_device_id,
+            payload,
+        )?;
+        while let Some(event) = self.communications.simulator.step()? {
+            match event {
+                NetworkEvent::PacketDelivered { at, packet, .. } if packet.id() == packet_id => {
+                    return Ok(CommunicationOutcome::Delivered {
+                        at_ns: at.as_nanos(),
+                    });
+                }
+                NetworkEvent::PacketDropped {
+                    at, packet, reason, ..
+                } if packet.id() == packet_id => {
+                    return Ok(CommunicationOutcome::Dropped {
+                        at_ns: at.as_nanos(),
+                        reason,
+                    });
+                }
+                _ => {}
+            }
+        }
+        Err(CommunicationError::MissingTerminalEvent(packet_id.get()))
     }
 
     /// Builds a projection from the knowledge held by the role's assigned command node.
@@ -518,6 +833,19 @@ impl Simulation {
             .get(&knowledge_owner)
             .cloned()
             .unwrap_or_default();
+        let link_statuses = self.communication_link_statuses();
+        let network_time = self.network_time();
+        let receiver_jammed: BTreeMap<_, _> = self
+            .communications
+            .entity_devices
+            .keys()
+            .map(|entity_id| {
+                (
+                    *entity_id,
+                    self.entity_receiver_jammed(*entity_id, network_time),
+                )
+            })
+            .collect();
         let mut own_units = Vec::new();
         let mut query = self.world.query::<(
             &SimEntityId,
@@ -535,6 +863,7 @@ impl Simulation {
                     domain: domain.0,
                     position: *pose,
                     sidc: sidc.0.clone(),
+                    receiver_jammed: receiver_jammed.get(&id.0).copied().unwrap_or(false),
                 });
             }
         }
@@ -542,13 +871,96 @@ impl Simulation {
             tick: self.tick(),
             own_units,
             tracks,
+            jamming_regions: self.communications.jamming_regions.clone(),
+            communication_links: link_statuses,
         }
     }
-}
 
-impl Default for Simulation {
-    fn default() -> Self {
-        Self::new()
+    fn network_time(&self) -> NetworkTime {
+        let tick_ns = self
+            .tick()
+            .saturating_mul(TICK_SECONDS)
+            .saturating_mul(1_000_000_000);
+        NetworkTime::from_nanos(tick_ns.max(self.communications.simulator.now().as_nanos()))
+    }
+
+    fn sync_network_interference(&mut self) -> Result<(), c3mesh::SimulationError> {
+        let at = self.network_time();
+        let mut query = self.world.query::<(&SimEntityId, &GeoPose)>();
+        let positions: BTreeMap<_, _> = query
+            .iter(&self.world)
+            .map(|(id, pose)| (id.0, *pose))
+            .collect();
+        for (entity_id, device_ids) in &self.communications.entity_devices {
+            let Some(position) = positions.get(entity_id) else {
+                continue;
+            };
+            for device_id in device_ids {
+                let mut snapshot = self
+                    .communications
+                    .baseline_interference
+                    .get(device_id)
+                    .cloned()
+                    .unwrap_or_default();
+                for region in &self.communications.jamming_regions {
+                    if great_circle_distance_m(*position, region.center) <= region.radius_m {
+                        snapshot.push(ReceiverInterference {
+                            band: region.band,
+                            jammed: region.jammed,
+                        });
+                    }
+                }
+                self.communications
+                    .simulator
+                    .schedule_receiver_interference(at, device_id.clone(), snapshot)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn entity_receiver_jammed(&self, entity_id: Uuid, at: NetworkTime) -> bool {
+        self.communications
+            .entity_devices
+            .get(&entity_id)
+            .into_iter()
+            .flatten()
+            .any(|device_id| {
+                self.communications
+                    .simulator
+                    .receiver_interference_at(device_id.clone(), at)
+                    .is_ok_and(|snapshot| snapshot.iter().any(|item| item.jammed > 0.0))
+            })
+    }
+
+    fn communication_link_statuses(&self) -> Vec<CommunicationLinkStatus> {
+        let at = self.network_time();
+        self.communications
+            .links
+            .iter()
+            .map(|link| {
+                let metrics = self
+                    .communications
+                    .simulator
+                    .transmission_metrics_at(
+                        link.channel_id.clone(),
+                        link.source_device_id.clone(),
+                        at,
+                    )
+                    .expect("validated monitored link must remain queryable");
+                CommunicationLinkStatus {
+                    id: link.id.clone(),
+                    from_entity_id: link.from_entity_id,
+                    to_entity_id: link.to_entity_id,
+                    available: metrics.available,
+                    jammed: if metrics.jammed == 0.0 {
+                        0.0
+                    } else {
+                        metrics.jammed
+                    },
+                    effective_bit_rate_bps: metrics.effective_bit_rate_bps,
+                }
+            })
+            .collect()
     }
 }
 
@@ -559,6 +971,7 @@ pub struct VisibleUnit {
     pub domain: Domain,
     pub position: GeoPose,
     pub sidc: String,
+    pub receiver_jammed: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -566,6 +979,8 @@ pub struct RoleProjection {
     pub tick: u64,
     pub own_units: Vec<VisibleUnit>,
     pub tracks: Vec<Track>,
+    pub jamming_regions: Vec<JammingRegion>,
+    pub communication_links: Vec<CommunicationLinkStatus>,
 }
 
 fn advance_clock(mut clock: ResMut<SimClock>) {
@@ -576,7 +991,12 @@ fn apply_orders(
     clock: Res<SimClock>,
     mut pending: ResMut<PendingIntents>,
     mut results: ResMut<OrderResults>,
-    mut units: Query<(&SimEntityId, &AuthorityNode, &mut Velocity)>,
+    mut units: Query<(
+        &SimEntityId,
+        &AuthorityNode,
+        &mut Velocity,
+        Option<&mut CyclicFlightPathState>,
+    )>,
 ) {
     let mut deferred = VecDeque::new();
     while let Some(authorized) = pending.0.pop_front() {
@@ -588,8 +1008,8 @@ fn apply_orders(
             });
             continue;
         }
-        let Some((_, authority, mut velocity)) =
-            units.iter_mut().find(|(id, _, _)| id.0 == intent.target)
+        let Some((_, authority, mut velocity, mut flight_path)) =
+            units.iter_mut().find(|(id, _, _, _)| id.0 == intent.target)
         else {
             results.0.push(OrderResult {
                 intent_id: intent.intent_id,
@@ -611,6 +1031,9 @@ fn apply_orders(
             } => {
                 velocity.north_mps = north_mps;
                 velocity.east_mps = east_mps;
+                if let Some(path) = flight_path.as_deref_mut() {
+                    path.active = false;
+                }
                 results.0.push(OrderResult {
                     intent_id: intent.intent_id,
                     status: OrderStatus::Accepted,
@@ -627,13 +1050,90 @@ fn apply_orders(
     pending.0 = deferred;
 }
 
-fn move_platforms(mut units: Query<(&mut GeoPose, &Velocity)>) {
-    for (mut pose, velocity) in &mut units {
+fn move_platforms(
+    clock: Res<SimClock>,
+    mut units: Query<(&mut GeoPose, &Velocity, Option<&CyclicFlightPathState>)>,
+) {
+    for (mut pose, velocity, flight_path) in &mut units {
+        if let Some(path) = flight_path.filter(|path| path.active) {
+            *pose = position_on_flight_path(&path.path, clock.tick);
+            continue;
+        }
         pose.latitude_deg += velocity.north_mps * TICK_SECONDS as f64 / 111_320.0;
         let longitude_scale = 111_320.0 * pose.latitude_deg.to_radians().cos().abs().max(0.01);
         pose.longitude_deg += velocity.east_mps * TICK_SECONDS as f64 / longitude_scale;
         pose.altitude_m = (pose.altitude_m + velocity.climb_mps * TICK_SECONDS as f64).max(0.0);
     }
+}
+
+fn validate_flight_path(
+    platform_id: Uuid,
+    path: &CyclicFlightPath,
+) -> Result<(), SimulationBuildError> {
+    let valid = path.period_ticks > 0
+        && path.waypoints.len() >= 2
+        && path
+            .waypoints
+            .first()
+            .is_some_and(|waypoint| waypoint.at_tick == 0)
+        && path
+            .waypoints
+            .windows(2)
+            .all(|pair| pair[0].at_tick < pair[1].at_tick)
+        && path
+            .waypoints
+            .last()
+            .is_some_and(|waypoint| waypoint.at_tick < path.period_ticks)
+        && path
+            .waypoints
+            .iter()
+            .all(|waypoint| geo_pose_is_finite(waypoint.position));
+    if valid {
+        Ok(())
+    } else {
+        Err(SimulationBuildError::InvalidConfiguration(format!(
+            "platform {platform_id} has an invalid cyclic flight path"
+        )))
+    }
+}
+
+fn position_on_flight_path(path: &CyclicFlightPath, tick: u64) -> GeoPose {
+    let cycle_tick = tick % path.period_ticks;
+    let upper_index = path
+        .waypoints
+        .partition_point(|waypoint| waypoint.at_tick <= cycle_tick);
+    let (lower, upper, upper_tick) = if upper_index < path.waypoints.len() {
+        (
+            &path.waypoints[upper_index - 1],
+            &path.waypoints[upper_index],
+            path.waypoints[upper_index].at_tick,
+        )
+    } else {
+        (
+            path.waypoints.last().expect("validated path has waypoints"),
+            path.waypoints
+                .first()
+                .expect("validated path has waypoints"),
+            path.period_ticks,
+        )
+    };
+    let fraction = (cycle_tick - lower.at_tick) as f64 / (upper_tick - lower.at_tick) as f64;
+    GeoPose {
+        latitude_deg: lower.position.latitude_deg
+            + (upper.position.latitude_deg - lower.position.latitude_deg) * fraction,
+        longitude_deg: lower.position.longitude_deg
+            + (upper.position.longitude_deg - lower.position.longitude_deg) * fraction,
+        altitude_m: lower.position.altitude_m
+            + (upper.position.altitude_m - lower.position.altitude_m) * fraction,
+    }
+}
+
+fn geo_pose_is_finite(position: GeoPose) -> bool {
+    position.latitude_deg.is_finite()
+        && position.longitude_deg.is_finite()
+        && position.altitude_m.is_finite()
+        && (-90.0..=90.0).contains(&position.latitude_deg)
+        && (-180.0..=180.0).contains(&position.longitude_deg)
 }
 
 fn detect_contacts(
@@ -718,51 +1218,84 @@ fn great_circle_distance_m(a: GeoPose, b: GeoPose) -> f64 {
 mod tests {
     use super::*;
 
+    fn test_device_id(id: Uuid) -> DeviceId {
+        DeviceId::new(format!("test-{id}-network"))
+    }
+
+    fn test_simulation(platforms: Vec<PlatformSpawn>) -> Simulation {
+        let devices = platforms
+            .iter()
+            .flat_map(|platform| platform.network_device_ids.iter().cloned())
+            .map(|id| c3mesh::DeviceConfig {
+                id,
+                kind: DeviceKind::Sink,
+                mobility: Default::default(),
+                interference: vec![],
+            })
+            .collect();
+        Simulation::new(
+            platforms,
+            CommunicationsConfig {
+                network: NetworkConfig {
+                    devices,
+                    channels: vec![],
+                },
+                links: vec![],
+                jamming_regions: vec![],
+            },
+        )
+        .unwrap()
+    }
+
     #[test]
     fn detects_unit_when_inside_sensor_range() {
-        let mut sim = Simulation::new();
         let blue = Uuid::new_v4();
-        sim.spawn_platform(PlatformSpawn {
-            id: blue,
-            name: "Blue sensor".into(),
-            side: Side::Blue,
-            domain: Domain::Air,
-            pose: GeoPose {
-                latitude_deg: 0.0,
-                longitude_deg: 0.0,
-                altitude_m: 1000.0,
+        let red = Uuid::new_v4();
+        let mut sim = test_simulation(vec![
+            PlatformSpawn {
+                id: blue,
+                name: "Blue sensor".into(),
+                side: Side::Blue,
+                domain: Domain::Air,
+                pose: GeoPose {
+                    latitude_deg: 0.0,
+                    longitude_deg: 0.0,
+                    altitude_m: 1000.0,
+                },
+                velocity: Velocity {
+                    north_mps: 0.0,
+                    east_mps: 0.0,
+                    climb_mps: 0.0,
+                },
+                sensor: Some(Sensor {
+                    range_m: 20_000.0,
+                    identification_range_m: 5_000.0,
+                }),
+                network_device_ids: vec![test_device_id(blue)],
+                flight_path: None,
+                sidc: "100301000011010000000000000000".into(),
             },
-            velocity: Velocity {
-                north_mps: 0.0,
-                east_mps: 0.0,
-                climb_mps: 0.0,
+            PlatformSpawn {
+                id: red,
+                name: "Red target".into(),
+                side: Side::Red,
+                domain: Domain::Air,
+                pose: GeoPose {
+                    latitude_deg: 0.05,
+                    longitude_deg: 0.0,
+                    altitude_m: 1000.0,
+                },
+                velocity: Velocity {
+                    north_mps: 0.0,
+                    east_mps: 0.0,
+                    climb_mps: 0.0,
+                },
+                sensor: None,
+                network_device_ids: vec![test_device_id(red)],
+                flight_path: None,
+                sidc: "100601000011010000000000000000".into(),
             },
-            sensor: Some(Sensor {
-                range_m: 20_000.0,
-                identification_range_m: 5_000.0,
-            }),
-            communication: None,
-            sidc: "100301000011010000000000000000".into(),
-        });
-        sim.spawn_platform(PlatformSpawn {
-            id: Uuid::new_v4(),
-            name: "Red target".into(),
-            side: Side::Red,
-            domain: Domain::Air,
-            pose: GeoPose {
-                latitude_deg: 0.05,
-                longitude_deg: 0.0,
-                altitude_m: 1000.0,
-            },
-            velocity: Velocity {
-                north_mps: 0.0,
-                east_mps: 0.0,
-                climb_mps: 0.0,
-            },
-            sensor: None,
-            communication: None,
-            sidc: "100601000011010000000000000000".into(),
-        });
+        ]);
         sim.step();
         let projection = sim.projection_for(blue, Side::Blue);
         assert_eq!(projection.tracks.len(), 1);
@@ -775,46 +1308,50 @@ mod tests {
 
     #[test]
     fn projection_does_not_include_enemy_units_without_tracks() {
-        let mut sim = Simulation::new();
         let blue = Uuid::new_v4();
-        sim.spawn_platform(PlatformSpawn {
-            id: blue,
-            name: "Blue".into(),
-            side: Side::Blue,
-            domain: Domain::Land,
-            pose: GeoPose {
-                latitude_deg: 0.0,
-                longitude_deg: 0.0,
-                altitude_m: 0.0,
+        let red = Uuid::new_v4();
+        let mut sim = test_simulation(vec![
+            PlatformSpawn {
+                id: blue,
+                name: "Blue".into(),
+                side: Side::Blue,
+                domain: Domain::Land,
+                pose: GeoPose {
+                    latitude_deg: 0.0,
+                    longitude_deg: 0.0,
+                    altitude_m: 0.0,
+                },
+                velocity: Velocity {
+                    north_mps: 0.0,
+                    east_mps: 0.0,
+                    climb_mps: 0.0,
+                },
+                sensor: None,
+                network_device_ids: vec![test_device_id(blue)],
+                flight_path: None,
+                sidc: "100310000012110000000000000000".into(),
             },
-            velocity: Velocity {
-                north_mps: 0.0,
-                east_mps: 0.0,
-                climb_mps: 0.0,
+            PlatformSpawn {
+                id: red,
+                name: "Red".into(),
+                side: Side::Red,
+                domain: Domain::Land,
+                pose: GeoPose {
+                    latitude_deg: 0.0,
+                    longitude_deg: 0.0,
+                    altitude_m: 0.0,
+                },
+                velocity: Velocity {
+                    north_mps: 0.0,
+                    east_mps: 0.0,
+                    climb_mps: 0.0,
+                },
+                sensor: None,
+                network_device_ids: vec![test_device_id(red)],
+                flight_path: None,
+                sidc: "100610000012110000000000000000".into(),
             },
-            sensor: None,
-            communication: None,
-            sidc: "100310000012110000000000000000".into(),
-        });
-        sim.spawn_platform(PlatformSpawn {
-            id: Uuid::new_v4(),
-            name: "Red".into(),
-            side: Side::Red,
-            domain: Domain::Land,
-            pose: GeoPose {
-                latitude_deg: 0.0,
-                longitude_deg: 0.0,
-                altitude_m: 0.0,
-            },
-            velocity: Velocity {
-                north_mps: 0.0,
-                east_mps: 0.0,
-                climb_mps: 0.0,
-            },
-            sensor: None,
-            communication: None,
-            sidc: "100610000012110000000000000000".into(),
-        });
+        ]);
         assert_eq!(sim.projection_for(blue, Side::Blue).own_units.len(), 1);
         assert!(sim.projection_for(blue, Side::Blue).tracks.is_empty());
     }
@@ -896,8 +1433,7 @@ mod tests {
     #[test]
     fn simulation_only_executes_authorized_intents() {
         let (definition, _, commander, unit) = authority_fixture();
-        let mut sim = Simulation::new();
-        sim.spawn_platform(PlatformSpawn {
+        let mut sim = test_simulation(vec![PlatformSpawn {
             id: unit,
             name: "Unit".into(),
             side: Side::Blue,
@@ -913,9 +1449,10 @@ mod tests {
                 climb_mps: 0.0,
             },
             sensor: None,
-            communication: None,
+            network_device_ids: vec![test_device_id(unit)],
+            flight_path: None,
             sidc: "100310000012110000000000000000".into(),
-        });
+        }]);
         let intent_id = Uuid::from_u128(30);
         sim.queue_authorized_intent(AuthorizedIntent {
             intent: PlayerIntent {
@@ -949,5 +1486,80 @@ mod tests {
                 .abs()
                 < 0.00001
         );
+    }
+
+    #[test]
+    fn accepted_move_order_cancels_a_cyclic_flight_path() {
+        let unit = Uuid::from_u128(40);
+        let mut sim = test_simulation(vec![PlatformSpawn {
+            id: unit,
+            name: "Scripted aircraft".into(),
+            side: Side::Blue,
+            domain: Domain::Air,
+            pose: GeoPose {
+                latitude_deg: 0.0,
+                longitude_deg: 0.0,
+                altitude_m: 1_000.0,
+            },
+            velocity: Velocity {
+                north_mps: 0.0,
+                east_mps: 0.0,
+                climb_mps: 0.0,
+            },
+            sensor: None,
+            network_device_ids: vec![test_device_id(unit)],
+            flight_path: Some(CyclicFlightPath {
+                period_ticks: 20,
+                waypoints: vec![
+                    FlightWaypoint {
+                        at_tick: 0,
+                        position: GeoPose {
+                            latitude_deg: 0.0,
+                            longitude_deg: 0.0,
+                            altitude_m: 1_000.0,
+                        },
+                    },
+                    FlightWaypoint {
+                        at_tick: 10,
+                        position: GeoPose {
+                            latitude_deg: 0.0,
+                            longitude_deg: 10.0,
+                            altitude_m: 1_000.0,
+                        },
+                    },
+                ],
+            }),
+            sidc: "100301000011010000000000000000".into(),
+        }]);
+        sim.step();
+        assert_eq!(
+            sim.projection_for(unit, Side::Blue).own_units[0]
+                .position
+                .longitude_deg,
+            1.0
+        );
+        sim.queue_authorized_intent(AuthorizedIntent {
+            intent: PlayerIntent {
+                intent_id: Uuid::from_u128(41),
+                issuer_role: Uuid::from_u128(42),
+                target: unit,
+                kind: OrderKind::Move {
+                    north_mps: 111.32,
+                    east_mps: 0.0,
+                },
+                requested_tick: 2,
+            },
+            authorization: AuthorizationRecord {
+                policy_id: Uuid::from_u128(43),
+                policy_version: 1,
+                requester_role_id: Uuid::from_u128(42),
+                granting_role_id: Uuid::from_u128(42),
+                request_id: None,
+            },
+        });
+        sim.step();
+        let position = sim.projection_for(unit, Side::Blue).own_units[0].position;
+        assert!((position.latitude_deg - 0.001).abs() < 0.00001);
+        assert_eq!(position.longitude_deg, 1.0);
     }
 }

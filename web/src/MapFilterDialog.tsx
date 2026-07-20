@@ -13,8 +13,9 @@ export type MapFilters = {
 
 type FilterTabId = "space-assets" | "runways";
 
-export function MapFilterDialog({ filters, onChange, onClose }: {
+export function MapFilterDialog({ filters, spaceAssetsAvailable, onChange, onClose }: {
   filters: MapFilters;
+  spaceAssetsAvailable: boolean;
   onChange: (filters: MapFilters) => void;
   onClose: () => void;
 }) {
@@ -29,6 +30,7 @@ export function MapFilterDialog({ filters, onChange, onClose }: {
           <input
             aria-label="Show all space assets"
             type="checkbox"
+            disabled={!spaceAssetsAvailable}
             checked={filters.spaceAssets.showAll}
             onChange={(event) => onChange({
               ...filters,
@@ -41,6 +43,7 @@ export function MapFilterDialog({ filters, onChange, onClose }: {
           <input
             aria-label="Show Starlink"
             type="checkbox"
+            disabled={!spaceAssetsAvailable}
             checked={filters.spaceAssets.showStarlink}
             onChange={(event) => onChange({
               ...filters,
@@ -48,6 +51,7 @@ export function MapFilterDialog({ filters, onChange, onClose }: {
             })}
           />
         </label>
+        {!spaceAssetsAvailable && <p className="muted">The selected scenario does not include an orbital catalog.</p>}
       </div>
     },
     {
