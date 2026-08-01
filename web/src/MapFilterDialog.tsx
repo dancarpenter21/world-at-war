@@ -9,9 +9,10 @@ export type MapFilters = {
     visible: boolean;
     minimumLengthM: number;
   };
+  network: { visible: boolean };
 };
 
-type FilterTabId = "space-assets" | "runways";
+type FilterTabId = "space-assets" | "runways" | "network";
 
 export function MapFilterDialog({ filters, spaceAssetsAvailable, onChange, onClose }: {
   filters: MapFilters;
@@ -53,6 +54,14 @@ export function MapFilterDialog({ filters, spaceAssetsAvailable, onChange, onClo
         </label>
         {!spaceAssetsAvailable && <p className="muted">The selected scenario does not include an orbital catalog.</p>}
       </div>
+    },
+    {
+      id: "network",
+      label: "Network",
+      content: <div className="filter-panel"><label className="filter-toggle">
+        <span><strong>C2 network overlay</strong><small>Render role-visible communication links over the operational map.</small></span>
+        <input aria-label="Show C2 network overlay" type="checkbox" checked={filters.network.visible} onChange={(event) => onChange({ ...filters, network: { visible: event.target.checked } })} />
+      </label></div>
     },
     {
       id: "runways",

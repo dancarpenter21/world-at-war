@@ -108,7 +108,8 @@ test.beforeAll(async () => {
       ...process.env,
       ...providerEnvironment,
       BIND_ADDR: "0.0.0.0:18101",
-      ADMIN_SETUP_TOKEN: ""
+      ADMIN_SETUP_TOKEN: "",
+      COMMUNICATIONS_CATALOG_PATH: path.join(repoRoot, "data/communications/catalog.yaml")
     },
     stdio: ["ignore", "pipe", "pipe"]
   });

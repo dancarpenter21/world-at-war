@@ -1,0 +1,221 @@
+version: 1
+as_of: "2026-08-01"
+sources:
+  - id: dla-mil-std-6016
+    title: Tactical Data Link 16 Message Standard metadata
+    url: https://quicksearch.dla.mil/qsDocDetails.aspx?ident_number=123964
+    retrieved_on: "2026-08-01"
+    license: U.S. Government metadata; detailed standard not redistributed
+  - id: usaf-fact-sheets
+    title: United States Air Force aircraft fact sheets
+    url: https://www.af.mil/About-Us/Fact-Sheets/
+    retrieved_on: "2026-08-01"
+    license: U.S. Government public information
+  - id: navy-fact-files
+    title: United States Navy fact files
+    url: https://www.navy.mil/Resources/Fact-Files/
+    retrieved_on: "2026-08-01"
+    license: U.S. Government public information
+  - id: army-public
+    title: U.S. Army public communications portfolio
+    url: https://www.peoc3n.army.mil/
+    retrieved_on: "2026-08-01"
+    license: U.S. Government public information
+
+devices:
+  - id: facility-secure-ip
+    display_name: Secure facility IP gateway
+    kind: router
+    radio_modes: []
+    queue_capacity_packets: 8192
+    queue_capacity_bytes: 16777216
+    processing_delay_ns: 50000
+    confidence: estimate
+    source_ids: [army-public]
+    estimate_rationale: Public facilities are represented by a conservative managed-IP gateway, not a classified architecture.
+  - id: facility-satcom
+    display_name: Fixed high-bandwidth SATCOM terminal
+    kind: satcom
+    radio_modes:
+      - id: shf-wideband-public-profile
+        band: { lower_hz: 7250000000, upper_hz: 8400000000 }
+        nominal_bit_rate_bps: 50000000
+        max_range_m: 45000000
+        shared_medium: true
+    queue_capacity_packets: 4096
+    queue_capacity_bytes: 8388608
+    processing_delay_ns: 200000
+    confidence: estimate
+    source_ids: [army-public]
+    estimate_rationale: Exact terminal variants and service plans are not consistently public; values are scenario-level SHF abstractions.
+  - id: link16-air-terminal
+    display_name: Public-profile Link 16 terminal
+    kind: tactical_data_link
+    radio_modes:
+      - id: link16-public-profile
+        band: { lower_hz: 960000000, upper_hz: 1215000000 }
+        nominal_bit_rate_bps: 1000000
+        max_range_m: 550000
+        shared_medium: true
+    queue_capacity_packets: 512
+    queue_capacity_bytes: 1048576
+    processing_delay_ns: 100000
+    confidence: estimate
+    source_ids: [dla-mil-std-6016, usaf-fact-sheets]
+    estimate_rationale: Membership is publicly reported for these platform classes; rate and range are conservative non-waveform simulation values.
+  - id: airborne-satcom
+    display_name: Airborne beyond-line-of-sight SATCOM terminal
+    kind: satcom
+    radio_modes:
+      - id: airborne-satcom-public-profile
+        band: { lower_hz: 7250000000, upper_hz: 8400000000 }
+        nominal_bit_rate_bps: 5000000
+        max_range_m: 45000000
+        shared_medium: true
+    queue_capacity_packets: 1024
+    queue_capacity_bytes: 2097152
+    processing_delay_ns: 250000
+    confidence: estimate
+    source_ids: [usaf-fact-sheets]
+    estimate_rationale: Exact aircraft terminal modes are variant- and upgrade-dependent.
+  - id: naval-multiband-ip
+    display_name: Naval multiband IP communications suite
+    kind: router
+    radio_modes:
+      - id: naval-uhf-public-profile
+        band: { lower_hz: 225000000, upper_hz: 400000000 }
+        nominal_bit_rate_bps: 2000000
+        max_range_m: 450000
+        shared_medium: true
+      - id: naval-satcom-public-profile
+        band: { lower_hz: 7250000000, upper_hz: 8400000000 }
+        nominal_bit_rate_bps: 20000000
+        max_range_m: 45000000
+        shared_medium: true
+    queue_capacity_packets: 4096
+    queue_capacity_bytes: 8388608
+    processing_delay_ns: 150000
+    confidence: estimate
+    source_ids: [navy-fact-files]
+    estimate_rationale: The suite aggregates public capabilities without reproducing ship-specific protected configurations.
+  - id: ground-tactical-ip
+    display_name: Ground tactical IP radio/router
+    kind: router
+    radio_modes:
+      - id: tactical-uhf-public-profile
+        band: { lower_hz: 225000000, upper_hz: 450000000 }
+        nominal_bit_rate_bps: 2000000
+        max_range_m: 80000
+        shared_medium: true
+    queue_capacity_packets: 1024
+    queue_capacity_bytes: 2097152
+    processing_delay_ns: 200000
+    confidence: estimate
+    source_ids: [army-public]
+    estimate_rationale: Generic formations lack a single known fit; this is a conservative tactical-network archetype.
+  - id: red-generic-terminal
+    display_name: Generic opposing-force tactical terminal
+    kind: router
+    radio_modes:
+      - id: opposing-vhf-uhf-estimate
+        band: { lower_hz: 100000000, upper_hz: 450000000 }
+        nominal_bit_rate_bps: 1000000
+        max_range_m: 100000
+        shared_medium: true
+    queue_capacity_packets: 512
+    queue_capacity_bytes: 1048576
+    processing_delay_ns: 300000
+    confidence: estimate
+    source_ids: []
+    estimate_rationale: Scenario entities are generic rather than identified variants, so no exact equipment claim is made.
+
+platforms:
+  - { id: strategic-facility, display_name: Strategic command facility, device_ids: [facility-secure-ip, facility-satcom] }
+  - { id: military-facility, display_name: Military base or operations facility, device_ids: [facility-secure-ip, facility-satcom, ground-tactical-ip] }
+  - { id: tactical-aircraft, display_name: Tactical aircraft, device_ids: [link16-air-terminal, airborne-satcom] }
+  - { id: airborne-c2, display_name: Airborne C2 or ISR aircraft, device_ids: [link16-air-terminal, airborne-satcom] }
+  - { id: naval-major, display_name: Major naval vessel, device_ids: [naval-multiband-ip, link16-air-terminal] }
+  - { id: naval-undersea, display_name: Undersea vessel public profile, device_ids: [naval-multiband-ip] }
+  - { id: ground-formation, display_name: Ground formation, device_ids: [ground-tactical-ip] }
+  - { id: red-generic, display_name: Generic opposing-force platform, device_ids: [red-generic-terminal] }
+
+assignments:
+  - { entity_name: White House Situation Room, platform_profile_id: strategic-facility }
+  - { entity_name: Pentagon NMCC, platform_profile_id: strategic-facility }
+  - { entity_name: Joint Base Andrews, platform_profile_id: military-facility }
+  - { entity_name: Naval Station Norfolk, platform_profile_id: military-facility }
+  - { entity_name: Andersen Air Force Base, platform_profile_id: military-facility }
+  - { entity_name: Joint Base Pearl Harbor, platform_profile_id: military-facility }
+  - { entity_name: Ramstein Air Base, platform_profile_id: military-facility }
+  - { entity_name: Yokota Air Base, platform_profile_id: military-facility }
+  - { entity_name: Diego Garcia Support Facility, platform_profile_id: military-facility }
+  - { entity_name: Cheyenne Mountain Station, platform_profile_id: strategic-facility }
+  - { entity_name: F-35A CAP Alpha 1, platform_profile_id: tactical-aircraft }
+  - { entity_name: F-35A CAP Alpha 2, platform_profile_id: tactical-aircraft }
+  - { entity_name: F-35C Pacific 1, platform_profile_id: tactical-aircraft }
+  - { entity_name: F-35C Pacific 2, platform_profile_id: tactical-aircraft }
+  - { entity_name: F-15EX Europe 1, platform_profile_id: tactical-aircraft }
+  - { entity_name: F-15EX Europe 2, platform_profile_id: tactical-aircraft }
+  - { entity_name: B-2A Spirit 1, platform_profile_id: tactical-aircraft }
+  - { entity_name: B-52H Global 1, platform_profile_id: tactical-aircraft }
+  - { entity_name: E-3G Sentry Atlantic, platform_profile_id: airborne-c2 }
+  - { entity_name: E-2D Hawkeye Pacific, platform_profile_id: airborne-c2 }
+  - { entity_name: KC-46A Atlantic 1, platform_profile_id: tactical-aircraft }
+  - { entity_name: KC-46A Pacific 1, platform_profile_id: tactical-aircraft }
+  - { entity_name: P-8A Poseidon Atlantic, platform_profile_id: airborne-c2 }
+  - { entity_name: P-8A Poseidon Pacific, platform_profile_id: airborne-c2 }
+  - { entity_name: MQ-9A Europe, platform_profile_id: airborne-c2 }
+  - { entity_name: RQ-4 Global Hawk, platform_profile_id: airborne-c2 }
+  - { entity_name: USS Gerald R. Ford, platform_profile_id: naval-major }
+  - { entity_name: USS Arleigh Burke, platform_profile_id: naval-major }
+  - { entity_name: USS Thomas Hudner, platform_profile_id: naval-major }
+  - { entity_name: USS Ronald Reagan, platform_profile_id: naval-major }
+  - { entity_name: USS John Finn, platform_profile_id: naval-major }
+  - { entity_name: USS Rafael Peralta, platform_profile_id: naval-major }
+  - { entity_name: USS Virginia, platform_profile_id: naval-undersea }
+  - { entity_name: USS Hawaii, platform_profile_id: naval-undersea }
+  - { entity_name: USNS John Lewis, platform_profile_id: naval-major }
+  - { entity_name: USNS Supply, platform_profile_id: naval-major }
+  - { entity_name: 1st Armored Brigade, platform_profile_id: ground-formation }
+  - { entity_name: 2nd Stryker Brigade, platform_profile_id: ground-formation }
+  - { entity_name: Marine Littoral Regiment, platform_profile_id: ground-formation }
+  - { entity_name: HIMARS Battalion Pacific, platform_profile_id: ground-formation }
+  - { entity_name: Patriot Battalion Europe, platform_profile_id: ground-formation }
+  - { entity_name: THAAD Battery Guam, platform_profile_id: ground-formation }
+  - { entity_name: JTAC Team Saber, platform_profile_id: ground-formation }
+  - { entity_name: Joint Logistics Group, platform_profile_id: ground-formation }
+  - { entity_name: Cyber Mission Force, platform_profile_id: strategic-facility }
+  - { entity_name: Defensive Network Cell, platform_profile_id: strategic-facility }
+  - { entity_name: SATCOM Control Element, platform_profile_id: strategic-facility }
+  - { entity_name: Space Domain Awareness Cell, platform_profile_id: strategic-facility }
+  - { entity_name: Red National Command, platform_profile_id: red-generic }
+  - { entity_name: Red Air Operations Center, platform_profile_id: red-generic }
+  - { entity_name: Red Fighter Flight 1, platform_profile_id: red-generic }
+  - { entity_name: Red Fighter Flight 2, platform_profile_id: red-generic }
+  - { entity_name: Red Bomber Flight, platform_profile_id: red-generic }
+  - { entity_name: Red AEW Aircraft, platform_profile_id: red-generic }
+  - { entity_name: Red Tanker, platform_profile_id: red-generic }
+  - { entity_name: Red Surface Group Flag, platform_profile_id: red-generic }
+  - { entity_name: Red Surface Escort 1, platform_profile_id: red-generic }
+  - { entity_name: Red Surface Escort 2, platform_profile_id: red-generic }
+  - { entity_name: Red Attack Submarine, platform_profile_id: red-generic }
+  - { entity_name: Red Armor Brigade, platform_profile_id: red-generic }
+  - { entity_name: Red Missile Brigade, platform_profile_id: red-generic }
+  - { entity_name: Red Air Defense Regiment, platform_profile_id: red-generic }
+  - { entity_name: Red EW Battalion, platform_profile_id: red-generic }
+  - { entity_name: Red Cyber Unit, platform_profile_id: red-generic }
+  - { entity_name: Blue Flight 1, platform_profile_id: tactical-aircraft }
+  - { entity_name: Blue Flight 2, platform_profile_id: tactical-aircraft }
+
+messages:
+  - { id: public-safe.jseries.move-order.v1, family: j_series_public_safe, display_name: Movement order, default_priority: 220, ttl_hops: 64, expiry_ticks: 120, reliable: true }
+  - { id: public-safe.jseries.engage-order.v1, family: j_series_public_safe, display_name: Engagement order, default_priority: 250, ttl_hops: 64, expiry_ticks: 60, reliable: true }
+  - { id: public-safe.usmtf.authority-request.v1, family: usmtf_public_safe, display_name: Authority request, default_priority: 230, ttl_hops: 64, expiry_ticks: 300, reliable: true }
+  - { id: public-safe.usmtf.authority-decision.v1, family: usmtf_public_safe, display_name: Authority decision, default_priority: 240, ttl_hops: 64, expiry_ticks: 300, reliable: true }
+  - { id: public-safe.jseries.track-report.v1, family: j_series_public_safe, display_name: Track report, default_priority: 120, ttl_hops: 32, expiry_ticks: 30, reliable: false }
+  - { id: public-safe.network.ack.v1, family: network_control, display_name: Acknowledgement, default_priority: 245, ttl_hops: 64, expiry_ticks: 120, reliable: false }
+
+policies:
+  - { id: fifo.v1, display_name: FIFO, queue_discipline: fifo }
+  - { id: content-priority.v1, display_name: Content-aware strict priority, queue_discipline: strict_priority }
+  - { id: weighted-fair.v1, display_name: Traffic-class weighted fair, queue_discipline: weighted_fair }

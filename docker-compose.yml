@@ -30,12 +30,16 @@ services:
       SPACE_CARDS_DIR: /app/data/generated/space-cards
       AIRPORT_CACHE_DIR: /app/data/cache/airports
       AIRPORT_REFRESH_MAX_AGE_SECONDS: ${AIRPORT_REFRESH_MAX_AGE_SECONDS:-86400}
+      COMMUNICATIONS_CATALOG_PATH: /app/data/communications/catalog.yaml
+      NETWORK_EVENT_DIR: /app/var/network-events
       FAA_NASR_APT_URL: ${FAA_NASR_APT_URL:-}
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     volumes:
       - ./data/cache/space-track:/app/data/cache/space-track
       - ./data/cache/airports:/app/data/cache/airports
       - ./data/generated/space-cards:/app/data/generated/space-cards:ro
+      - ./data/communications:/app/data/communications:ro
+      - ./var/network-events:/app/var/network-events
     expose:
       - "8000"
     healthcheck:

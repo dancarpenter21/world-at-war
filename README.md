@@ -9,7 +9,7 @@ The broader target architecture, planned simulation fidelity, and acceptance cri
 ## What is implemented
 
 - A deterministic Rust ECS simulation with one-second ticks, platform movement, server-side projections, and simple Red patrol AI.
-- Mandatory per-entity c3mesh network endpoints, deterministic packet delivery, cyclic flight paths, geographic receiver-jamming regions, and directional link status.
+- Mandatory per-entity c3mesh network endpoints, bounded packet queues, deterministic loss and weighted scheduling, cyclic flight paths, geographic receiver-jamming regions, and directional link status.
 - A lobby that creates and joins games, role claiming, game start/pause controls, and REST/WebSocket state delivery.
 - A Cesium operational map that keeps authored owned units and uncertain tracks visually separate from the public orbital catalog, reconciling entities in place so movement ticks do not recreate or flicker MIL-STD-2525D icons.
 - A lazy full-screen space-asset workspace with worker-based bulk propagation, point-primitive rendering, UTC playback, search/facets, sourced payload cards, and authority-routed satellite requests.
@@ -17,8 +17,9 @@ The broader target architecture, planned simulation fidelity, and acceptance cri
 - A Space-Track GP catalog integration with encrypted remembered credentials, cached snapshots, clear diagnostics for credential/access/service failures, and per-game catalog pinning.
 - A global airport/runway cache using public-domain OurAirports data with an authoritative FAA NASR overlay for U.S. facilities, declared distances, pavement ratings, and reported gross-weight limits.
 - A Docker Compose edge proxy that serves the web client and routes `/health`, `/v1/`, and WebSocket traffic to the Rust server.
+- A versioned public-safe communications catalog, per-game seed/policy/checksum pinning, append-only message events, and role-filtered map and full-screen network views.
 
-Current limitations: Global Crisis authority traffic still uses an always-reachable gate while its detailed network topology is authored, sensor and track behavior is intentionally simplified, and the broader platform, terrain, logistics, cyber, and multi-source catalog systems remain planned work.
+Current limitations: command messages traverse the active packet topology, but fragmentation/reassembly, bounded application retries, acknowledgements, controller ground-truth privileges, and durable packet-level history remain planned. Sensor and track behavior is intentionally simplified, and the broader platform, terrain, logistics, cyber, and multi-source catalog systems remain planned work.
 
 ## Prerequisites
 
@@ -83,6 +84,8 @@ Copy [`.env.example`](.env.example) to an ignored root `.env` file for Compose c
 | `AIRPORT_CACHE_DIR` | Airport raw-source and normalized snapshot cache; defaults to `data/cache/airports`. |
 | `AIRPORT_REFRESH_MAX_AGE_SECONDS` | Age after which startup schedules a background airport refresh; defaults to `86400`. |
 | `FAA_NASR_APT_URL` | Optional URL pin for a specific FAA APT CSV archive; otherwise the current cycle is discovered automatically. |
+| `COMMUNICATIONS_CATALOG_PATH` | Versioned public-safe equipment, message, and network-policy catalog; defaults to `data/communications/catalog.yaml`. |
+| `NETWORK_EVENT_DIR` | Writable append-only per-game network event directory; defaults to `var/network-events`. A write failure pauses the affected game. |
 
 From the setup panel, enter Space-Track credentials and choose whether to remember them. Credentials are held in server memory for the running process. Remembering them stores encrypted data in a 30-day `HttpOnly`, `SameSite=Strict` cookie; its encryption key and catalog cache are retained in `data/cache/space-track/`. Compose bind-mounts that directory, so a catalog downloaded by `space-track-test.sh` is available when the Docker server starts. The remembered username may be returned to populate the setup form; the plaintext password is never returned by the server.
 
@@ -126,12 +129,25 @@ The REST API exposes catalog status at `/v1/airport-catalog/status`, paginated s
 4. Submit an order. A policy can execute it directly or create an authority request for the configured approvers. Vacant approver roles resolve deterministically after their configured delay.
 5. Participants see their command-chain view and relevant authority-request inbox; the Cesium map receives periodic state updates and a game-pinned orbital catalog.
 
+## Communications catalog and network APIs
+
+Validate the committed catalog and print its checksums and entity coverage with:
+
+```sh
+cargo run -p sim-comms --bin comms-catalog-validate -- data/communications/catalog.yaml
+```
+
+The structural schema is checked in at `data/communications/schema/catalog.schema.json`; startup also performs semantic validation for duplicate IDs, unresolved references, estimates without rationale, invalid bands/rates, and empty queues. Game creation accepts optional `seed` and `network_policy_id` fields and returns the pinned scenario version, catalog and message-pack checksums, seed, and policy in the game summary.
+
+Role-held network access is available at `/v1/games/{id}/network`, the sequenced WebSocket `/v1/games/{id}/network/stream`, cursor-paginated `/v1/games/{id}/network/events`, and authorized `/v1/games/{id}/network/messages/{message_id}`. Message content is limited to originating roles and destination roles in this delivery.
+
 ## Repository layout
 
 - `crates/sim-core/` — deterministic ECS simulation, projections, orders, and authority model.
 - `crates/sim-scenario/` — validated, versioned Global Crisis and Jammed Flight Test definitions.
 - `crates/sim-ai/` — constrained Red patrol planner that operates on a role projection.
 - `crates/sim-catalog/` — provenance-aware platform, space, airport/runway, importer, and compatibility data types.
+- `crates/sim-comms/` — communications catalogs, validation, checksums, and public-safe C2 message types.
 - `crates/server/` — Axum API, game lifecycle, credential cookie, catalog service, and simulation loop.
 - `web/` — React, TypeScript, Cesium, persistent MIL-STD-2525D entity rendering, authority and space-asset workspaces, and Vitest frontend regression tests.
 - `deploy/nginx/` — production and development edge-proxy configurations.
@@ -141,8 +157,8 @@ The REST API exposes catalog status at `/v1/airport-catalog/status`, paginated s
 
 ```sh
 cargo fmt --check
-cargo check
-cargo test
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
 
 cd web
 npm test

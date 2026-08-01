@@ -17,6 +17,7 @@ secrecy.workspace = true
 sha2.workspace = true
 sim-ai = { path = "../sim-ai" }
 sim-catalog = { path = "../sim-catalog" }
+sim-comms = { path = "../sim-comms" }
 sim-core = { path = "../sim-core" }
 sim-scenario = { path = "../sim-scenario" }
 tokio.workspace = true

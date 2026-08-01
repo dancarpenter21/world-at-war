@@ -14,6 +14,7 @@ WORKDIR /workspace
 COPY web/package.json web/package-lock.json ./web/
 RUN cd web && npm ci
 COPY web ./web
+COPY data/communications ./data/communications
 COPY --from=server-build /workspace/target/debug/world-at-war-server ./target/debug/world-at-war-server
 WORKDIR /workspace/web
 CMD ["sh", "-lc", "npx tsc --project tsconfig.e2e.json && npx playwright test"]

@@ -14,7 +14,7 @@ export type Position = { latitude_deg: number; longitude_deg: number; altitude_m
 export type Unit = { id: string; name: string; domain: string; position: Position; sidc: string; receiver_jammed: boolean };
 export type Track = { track_id: string; target_side: Side; position: Position; identity_confidence: number; observed_tick: number; received_tick: number; observed_sidc: string };
 export type JammingRegion = { id: string; name: string; center: Position; radius_m: number; band: { lower_hz: number; upper_hz: number }; jammed: number };
-export type CommunicationLink = { id: string; from_entity_id: string; to_entity_id: string; available: boolean; jammed: number; effective_bit_rate_bps?: number };
+export type CommunicationLink = { id: string; from_entity_id: string; to_entity_id: string; available: boolean; jammed: number; effective_bit_rate_bps?: number; queued_packets?: number; queued_bytes?: number };
 export type Projection = { tick: number; own_units: Unit[]; tracks: Track[]; jamming_regions: JammingRegion[]; communication_links: CommunicationLink[] };
 
 type SymbolImage = string | HTMLImageElement | HTMLCanvasElement;

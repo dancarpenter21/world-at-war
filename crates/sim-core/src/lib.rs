@@ -5,7 +5,8 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use bevy_ecs::prelude::*;
 use c3mesh::{
     ChannelId, DeviceId, DeviceKind, DropReason, FrequencyBand, NetworkConfig, NetworkEvent,
-    ReceiverInterference, SimTime as NetworkTime, Simulator as NetworkSimulator,
+    PacketId, ReceiverInterference, SimTime as NetworkTime, Simulator as NetworkSimulator,
+    SimulatorOptions,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -130,6 +131,7 @@ pub struct CommunicationLinkDefinition {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommunicationsConfig {
     pub network: NetworkConfig,
+    pub simulator_options: SimulatorOptions,
     pub links: Vec<CommunicationLinkDefinition>,
     pub jamming_regions: Vec<JammingRegion>,
 }
@@ -523,6 +525,8 @@ pub struct CommunicationLinkStatus {
     pub available: bool,
     pub jammed: f64,
     pub effective_bit_rate_bps: Option<u64>,
+    pub queued_packets: usize,
+    pub queued_bytes: usize,
 }
 
 struct CommunicationsRuntime {
@@ -702,7 +706,10 @@ impl Simulation {
             .iter()
             .map(|device| (device.id.clone(), device.interference.clone()))
             .collect();
-        let simulator = NetworkSimulator::new(communications.network)?;
+        let simulator = NetworkSimulator::new_with_options(
+            communications.network,
+            communications.simulator_options,
+        )?;
         let mut world = World::new();
         world.insert_resource(SimClock { tick: 0 });
         world.insert_resource(Observations::default());
@@ -823,6 +830,37 @@ impl Simulation {
         Err(CommunicationError::MissingTerminalEvent(packet_id.get()))
     }
 
+    /// Queues a packet without advancing virtual network time.
+    pub fn queue_transmission(
+        &mut self,
+        from_entity_id: Uuid,
+        to_entity_id: Uuid,
+        payload: Vec<u8>,
+    ) -> Result<PacketId, CommunicationError> {
+        let link = self
+            .communications
+            .links
+            .iter()
+            .find(|link| link.from_entity_id == from_entity_id && link.to_entity_id == to_entity_id)
+            .ok_or(CommunicationError::NoLink {
+                from: from_entity_id,
+                to: to_entity_id,
+            })?;
+        Ok(self.communications.simulator.schedule_send(
+            self.network_time(),
+            link.source_device_id.clone(),
+            link.destination_device_id.clone(),
+            payload,
+        )?)
+    }
+
+    /// Advances pending network traffic to the current ECS tick boundary.
+    pub fn advance_network(&mut self) -> Result<Vec<NetworkEvent>, c3mesh::SimulationError> {
+        self.communications
+            .simulator
+            .advance_to(self.network_time())
+    }
+
     /// Builds a projection from the knowledge held by the role's assigned command node.
     /// Higher-echelon aggregation is added by the communications system, not by visibility code.
     pub fn projection_for(&mut self, knowledge_owner: Uuid, side: Side) -> RoleProjection {
@@ -867,6 +905,14 @@ impl Simulation {
                 });
             }
         }
+        let visible_ids: BTreeSet<_> = own_units.iter().map(|unit| unit.id).collect();
+        let link_statuses = link_statuses
+            .into_iter()
+            .filter(|link| {
+                visible_ids.contains(&link.from_entity_id)
+                    && visible_ids.contains(&link.to_entity_id)
+            })
+            .collect();
         RoleProjection {
             tick: self.tick(),
             own_units,
@@ -958,6 +1004,22 @@ impl Simulation {
                         metrics.jammed
                     },
                     effective_bit_rate_bps: metrics.effective_bit_rate_bps,
+                    queued_packets: {
+                        let queue = self
+                            .communications
+                            .simulator
+                            .channel_queue_metrics(link.channel_id.clone())
+                            .expect("validated monitored link queue must remain queryable");
+                        queue.packets_0_to_1 + queue.packets_1_to_0
+                    },
+                    queued_bytes: {
+                        let queue = self
+                            .communications
+                            .simulator
+                            .channel_queue_metrics(link.channel_id.clone())
+                            .expect("validated monitored link queue must remain queryable");
+                        queue.bytes_0_to_1 + queue.bytes_1_to_0
+                    },
                 }
             })
             .collect()
@@ -1240,6 +1302,7 @@ mod tests {
                     devices,
                     channels: vec![],
                 },
+                simulator_options: SimulatorOptions::default(),
                 links: vec![],
                 jamming_regions: vec![],
             },

@@ -15,6 +15,7 @@ import { MapFilterDialog, type MapFilters } from "./MapFilterDialog";
 import { SpaceAssetLayer } from "./spaceAssetLayer";
 
 const AuthorityWorkspace = lazy(() => import("./AuthorityWorkspace").then((module) => ({ default: module.AuthorityWorkspace })));
+const NetworkWorkspace = lazy(() => import("./NetworkWorkspace").then((module) => ({ default: module.NetworkWorkspace })));
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 const SAVED_PASSWORD_MASK = "••••••••••••";
@@ -210,7 +211,10 @@ function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnab
   }, [keyboardEnabled]);
 
   useEffect(() => {
-    reconcilerRef.current?.reconcile(projection);
+    reconcilerRef.current?.reconcile({
+      ...projection,
+      communication_links: filters.network.visible ? projection.communication_links : []
+    });
     if (!focusedRef.current && viewerRef.current && reconcilerRef.current) {
       const entities = reconcilerRef.current.focusEntities();
       if (entities.length) {
@@ -218,7 +222,7 @@ function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnab
         void viewerRef.current.flyTo(entities, { duration: 0 });
       }
     }
-  }, [projection]);
+  }, [projection, filters.network.visible]);
 
   useEffect(() => {
     if (spaceCatalogEnabled && (filters.spaceAssets.showAll || filters.spaceAssets.showStarlink)) {
@@ -264,10 +268,12 @@ function App() {
   const [spaceTrackFeedback, setSpaceTrackFeedback] = useState<SpaceTrackFeedback | null>(null);
   const [nowUnix, setNowUnix] = useState(() => Math.floor(Date.now() / 1000));
   const [showAuthority, setShowAuthority] = useState(false);
+  const [showNetwork, setShowNetwork] = useState(false);
   const [showMapFilters, setShowMapFilters] = useState(false);
   const [mapFilters, setMapFilters] = useState<MapFilters>({
     spaceAssets: { showAll: false, showStarlink: false },
-    runways: { visible: true, minimumLengthM: 0 }
+    runways: { visible: true, minimumLengthM: 0 },
+    network: { visible: false }
   });
   const [authority, setAuthority] = useState<AuthorityDefinition | null>(null);
   const [authorityRequests, setAuthorityRequests] = useState<AuthorityRequest[]>([]);
@@ -495,7 +501,7 @@ function App() {
       {game && <div className="modal-body"><h2>{game.title}</h2><p className="muted">Claim a command role. The operational map remains offline until the scenario starts.</p><div className="role-grid">{roles.map((item) => <button key={item.id} className={`role ${role?.id === item.id ? "selected" : ""}`} disabled={item.ai_controlled || (item.held && role?.id !== item.id)} onClick={() => void claim(item)}><span>{item.name}</span><small>{item.ai_controlled ? "AI" : item.held ? "held" : item.kind.replaceAll("_", " ")}</small></button>)}</div><div className="modal-actions"><button className="secondary" onClick={leave}>Back</button>{game.host_player_id === playerId && <button className="secondary" onClick={() => setShowAuthority(true)}>Configure authorities</button>}{game.host_player_id === playerId && <button className="command" disabled={!role} onClick={() => void start()}>Start scenario</button>}{game.host_player_id !== playerId && <span className="muted">Waiting for host to start</span>}</div></div>}
     </section></div>}
     {playable && projection && <section className="workspace">
-      <aside className="sidebar"><h1>{role.name}</h1><p className="message">{game.title}</p><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command map-filter-launch" onClick={() => setShowMapFilters((value) => !value)}>Map filters</button><h2>Catalog</h2><p className="muted">{game.space_catalog_enabled ? spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status" : "No orbital catalog in this scenario"}</p><button className="secondary" onClick={leave}>Leave scenario</button></aside>
+      <aside className="sidebar"><h1>{role.name}</h1><p className="message">{game.title}</p><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command network-launch" onClick={() => setShowNetwork(true)}>Network</button><button className="command map-filter-launch" onClick={() => setShowMapFilters((value) => !value)}>Map filters</button><h2>Catalog</h2><p className="muted">{game.space_catalog_enabled ? spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status" : "No orbital catalog in this scenario"}</p><button className="secondary" onClick={leave}>Leave scenario</button></aside>
       <section className="map-region">
         <Globe projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} keyboardEnabled={!showAuthority} />
         {showMapFilters && <MapFilterDialog filters={mapFilters} spaceAssetsAvailable={game.space_catalog_enabled} onChange={setMapFilters} onClose={() => setShowMapFilters(false)} />}
@@ -504,6 +510,7 @@ function App() {
       <aside className="inspector"><h2>Operational picture</h2><div className="metric"><span>Own units</span><strong>{projection.own_units.length}</strong></div><div className="metric"><span>Tracks</span><strong>{projection.tracks.length}</strong></div><h2>Actions</h2><button className="command" disabled={!role.command_units.length} onClick={() => void turnNorth()}>Turn north</button><h2>Communications</h2>{projection.communication_links.length ? projection.communication_links.map((link) => { const from = projection.own_units.find((unit) => unit.id === link.from_entity_id)?.name ?? link.from_entity_id; const to = projection.own_units.find((unit) => unit.id === link.to_entity_id)?.name ?? link.to_entity_id; return <div className={`communication-status ${link.available ? "available" : "blocked"}`} key={link.id}><span>{from} → {to}</span><small>{link.available ? `${((link.effective_bit_rate_bps ?? 0) / 1_000_000).toFixed(1)} Mbit/s` : `Jammed ${Math.round(link.jammed * 100)}%`}</small></div>; }) : <p className="muted">No monitored links.</p>}<h2>Tracks</h2>{projection.tracks.length ? projection.tracks.map((track) => <div className="track" key={track.track_id}><span>Uncertain {track.target_side} contact</span><small>{Math.round(track.identity_confidence * 100)}% identity</small></div>) : <p className="muted">No reports received.</p>}</aside>
     </section>}
     {showAuthority && authority && game && <Suspense fallback={<div className="authority-loading">Loading authority graph…</div>}><AuthorityWorkspace definition={authority} runtimeRoles={roles} units={authorityUnits} requests={authorityRequests} currentRole={role} isHost={game.host_player_id === playerId} tick={projection?.tick ?? 0} onClose={() => setShowAuthority(false)} onSave={saveAuthority} onCreateRequest={createAuthorityRequest} onDecision={decideAuthorityRequest} /></Suspense>}
+    {showNetwork && game && role && <Suspense fallback={<div className="authority-loading">Loading C2 network…</div>}><NetworkWorkspace apiBase={API_BASE} gameId={game.id} playerId={playerId} roleId={role.id} onClose={() => setShowNetwork(false)} /></Suspense>}
   </main>;
 }
 

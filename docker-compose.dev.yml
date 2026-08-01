@@ -61,6 +61,10 @@ services:
           path: ./data/space-cards
           target: /workspace/data/space-cards
           initial_sync: true
+        - action: sync+restart
+          path: ./data/communications
+          target: /workspace/data/communications
+          initial_sync: true
         - action: rebuild
           path: ./crates/server/Dockerfile
 

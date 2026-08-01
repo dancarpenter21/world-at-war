@@ -1,8 +1,11 @@
 //! Versioned scenario definitions and spawning.
 
+use std::collections::BTreeMap;
+
 use c3mesh::{
-    ChannelConfig, ChannelId, ChannelState, DeviceConfig, DeviceId, DeviceKind, FrequencyBand,
-    InterferenceResponse, NetworkConfig, RadioChannel,
+    ChannelConfig, ChannelId, ChannelOptions, ChannelState, DeviceConfig, DeviceId, DeviceKind,
+    FrequencyBand, InterferenceResponse, NetworkConfig, QueueConfig, QueueDiscipline, RadioChannel,
+    SimulatorOptions,
 };
 use serde::{Deserialize, Serialize};
 use sim_core::{
@@ -24,6 +27,7 @@ pub struct Scenario {
     pub requires_space_catalog: bool,
     pub units: Vec<ScenarioUnit>,
     pub network: NetworkConfig,
+    pub simulator_options: SimulatorOptions,
     pub communication_links: Vec<CommunicationLinkDefinition>,
     pub jamming_regions: Vec<JammingRegion>,
     pub authority: AuthorityDefinition,
@@ -86,8 +90,27 @@ impl Scenario {
     }
 
     pub fn spawn(&self) -> Result<Simulation, ScenarioError> {
+        self.spawn_with_seed(self.simulator_options.seed)
+    }
+
+    pub fn spawn_with_seed(&self, seed: u64) -> Result<Simulation, ScenarioError> {
+        self.spawn_with_network_policy(seed, None)
+    }
+
+    pub fn spawn_with_network_policy(
+        &self,
+        seed: u64,
+        queue_discipline: Option<QueueDiscipline>,
+    ) -> Result<Simulation, ScenarioError> {
         self.validate()?;
-        Simulation::new(self.platforms(), self.communications())
+        let mut communications = self.communications();
+        communications.simulator_options.seed = seed;
+        if let Some(discipline) = queue_discipline {
+            for channel in communications.simulator_options.channels.values_mut() {
+                channel.queue.discipline = discipline;
+            }
+        }
+        Simulation::new(self.platforms(), communications)
             .map_err(|error| ScenarioError::InvalidSimulation(error.to_string()))
     }
 
@@ -112,6 +135,7 @@ impl Scenario {
     fn communications(&self) -> CommunicationsConfig {
         CommunicationsConfig {
             network: self.network.clone(),
+            simulator_options: self.simulator_options.clone(),
             links: self.communication_links.clone(),
             jamming_regions: self.jamming_regions.clone(),
         }
@@ -224,23 +248,7 @@ pub fn global_crisis_scenario() -> Scenario {
         ));
     }
     let authority = global_crisis_authority();
-    let network = NetworkConfig {
-        devices: units
-            .iter()
-            .flat_map(|unit| {
-                unit.network_device_ids
-                    .iter()
-                    .cloned()
-                    .map(|id| DeviceConfig {
-                        id,
-                        kind: DeviceKind::Sink,
-                        mobility: Default::default(),
-                        interference: vec![],
-                    })
-            })
-            .collect(),
-        channels: vec![],
-    };
+    let (network, communication_links, simulator_options) = global_communications(&mut units);
     Scenario {
         id: "global-crisis.v2".into(),
         title: "Global Crisis".into(),
@@ -250,10 +258,131 @@ pub fn global_crisis_scenario() -> Scenario {
         requires_space_catalog: true,
         units,
         network,
-        communication_links: vec![],
+        simulator_options,
+        communication_links,
         jamming_regions: vec![],
         authority,
     }
+}
+
+fn global_communications(
+    units: &mut [ScenarioUnit],
+) -> (
+    NetworkConfig,
+    Vec<CommunicationLinkDefinition>,
+    SimulatorOptions,
+) {
+    for unit in units.iter_mut() {
+        unit.network_device_ids.clear();
+    }
+    let mut devices = Vec::new();
+    let mut channels = Vec::new();
+    let mut links = Vec::new();
+    let mut channel_options = BTreeMap::new();
+    for from_index in 0..units.len() {
+        for to_index in 0..units.len() {
+            if from_index == to_index || units[from_index].side != units[to_index].side {
+                continue;
+            }
+            let from = units[from_index].id;
+            let to = units[to_index].id;
+            let tx = DeviceId::new(format!("entity-{from}-to-{to}-tx"));
+            let rx = DeviceId::new(format!("entity-{from}-to-{to}-rx"));
+            let channel = ChannelId::new(format!("entity-{from}-to-{to}-channel"));
+            let (bit_rate_bps, radio, shared_medium) =
+                communication_mode(units[from_index].domain, units[to_index].domain, from);
+            devices.push(DeviceConfig {
+                id: tx.clone(),
+                kind: DeviceKind::Source {
+                    egress: channel.clone(),
+                },
+                mobility: Default::default(),
+                interference: vec![],
+            });
+            devices.push(DeviceConfig {
+                id: rx.clone(),
+                kind: DeviceKind::Sink,
+                mobility: Default::default(),
+                interference: vec![],
+            });
+            units[from_index].network_device_ids.push(tx.clone());
+            units[to_index].network_device_ids.push(rx.clone());
+            channels.push(ChannelConfig {
+                id: channel.clone(),
+                endpoints: [tx.clone(), rx.clone()],
+                bit_rate_bps,
+                propagation_delay_ns: if radio.is_some() {
+                    5_000_000
+                } else {
+                    2_000_000
+                },
+                state: ChannelState::Operational,
+                distance: None,
+                radio,
+            });
+            channel_options.insert(
+                channel.clone(),
+                ChannelOptions {
+                    mtu_bytes: Some(if bit_rate_bps >= 100_000_000 {
+                        1500
+                    } else {
+                        1200
+                    }),
+                    queue: QueueConfig {
+                        max_packets: Some(512),
+                        max_bytes: Some(2_097_152),
+                        discipline: QueueDiscipline::Fifo,
+                    },
+                    shared_medium,
+                    ..Default::default()
+                },
+            );
+            links.push(CommunicationLinkDefinition {
+                id: format!("{from}-to-{to}"),
+                from_entity_id: from,
+                to_entity_id: to,
+                source_device_id: tx,
+                destination_device_id: rx,
+                channel_id: channel,
+            });
+        }
+    }
+    (
+        NetworkConfig { devices, channels },
+        links,
+        SimulatorOptions {
+            seed: 0xC3_2026,
+            channels: channel_options,
+            ..Default::default()
+        },
+    )
+}
+
+fn communication_mode(
+    from: Domain,
+    to: Domain,
+    from_entity: Uuid,
+) -> (u64, Option<RadioChannel>, Option<String>) {
+    if matches!(from, Domain::Land | Domain::Cyber | Domain::Space)
+        && matches!(to, Domain::Land | Domain::Cyber | Domain::Space)
+    {
+        return (1_000_000_000, None, None);
+    }
+    let (rate, band) = if matches!(from, Domain::Air) || matches!(to, Domain::Air) {
+        (1_000_000, FrequencyBand::new(960_000_000, 1_215_000_000))
+    } else if matches!(from, Domain::Undersea) || matches!(to, Domain::Undersea) {
+        (64_000, FrequencyBand::new(225_000_000, 400_000_000))
+    } else {
+        (2_000_000, FrequencyBand::new(225_000_000, 450_000_000))
+    };
+    (
+        rate,
+        Some(RadioChannel {
+            band,
+            interference_response: InterferenceResponse::default(),
+        }),
+        Some(format!("entity-{from_entity}-radio-medium")),
+    )
 }
 
 fn global_crisis_authority() -> AuthorityDefinition {
@@ -810,7 +939,7 @@ pub fn jammed_flight_scenario() -> Scenario {
             to_entity_id: aircraft_2,
             source_device_id: aircraft_1_tx,
             destination_device_id: aircraft_2_rx,
-            channel_id: aircraft_1_channel,
+            channel_id: aircraft_1_channel.clone(),
         },
         CommunicationLinkDefinition {
             id: "aircraft-2-to-aircraft-1".into(),
@@ -818,7 +947,7 @@ pub fn jammed_flight_scenario() -> Scenario {
             to_entity_id: aircraft_1,
             source_device_id: aircraft_2_tx,
             destination_device_id: aircraft_1_rx,
-            channel_id: aircraft_2_channel,
+            channel_id: aircraft_2_channel.clone(),
         },
     ];
     let authority = AuthorityDefinition {
@@ -895,6 +1024,37 @@ pub fn jammed_flight_scenario() -> Scenario {
         requires_space_catalog: false,
         units,
         network,
+        simulator_options: SimulatorOptions {
+            channels: BTreeMap::from([
+                (
+                    aircraft_1_channel.clone(),
+                    ChannelOptions {
+                        mtu_bytes: Some(1200),
+                        queue: QueueConfig {
+                            max_packets: Some(256),
+                            max_bytes: Some(1_048_576),
+                            discipline: QueueDiscipline::Fifo,
+                        },
+                        shared_medium: Some("jammed-flight-link16".into()),
+                        ..Default::default()
+                    },
+                ),
+                (
+                    aircraft_2_channel.clone(),
+                    ChannelOptions {
+                        mtu_bytes: Some(1200),
+                        queue: QueueConfig {
+                            max_packets: Some(256),
+                            max_bytes: Some(1_048_576),
+                            discipline: QueueDiscipline::Fifo,
+                        },
+                        shared_medium: Some("jammed-flight-link16".into()),
+                        ..Default::default()
+                    },
+                ),
+            ]),
+            ..Default::default()
+        },
         communication_links,
         jamming_regions: vec![JammingRegion {
             id: "training-jammer".into(),
@@ -968,6 +1128,7 @@ fn sidc(side: Side, domain: Domain) -> &'static str {
 mod tests {
     use super::*;
     use c3mesh::DropReason;
+    use sim_comms::CommunicationsCatalog;
     use sim_core::CommunicationOutcome;
 
     #[test]
@@ -988,7 +1149,31 @@ mod tests {
             .units
             .iter()
             .all(|unit| !unit.network_device_ids.is_empty()));
-        assert_eq!(scenario.network.devices.len(), scenario.units.len());
+        assert_eq!(scenario.network.devices.len(), 4_992);
+        assert_eq!(scenario.communication_links.len(), 2_496);
+        assert!(scenario
+            .simulator_options
+            .channels
+            .values()
+            .all(|options| options.queue.max_packets == Some(512)));
+    }
+
+    #[test]
+    fn communications_catalog_covers_every_authored_entity() {
+        let catalog_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../data/communications/catalog.yaml");
+        let catalog = CommunicationsCatalog::load(catalog_path).unwrap();
+        let scenarios = [global_crisis_scenario(), jammed_flight_scenario()];
+        let missing: Vec<_> = scenarios
+            .iter()
+            .flat_map(|scenario| &scenario.units)
+            .filter(|unit| catalog.assignment_for(&unit.name).is_none())
+            .map(|unit| unit.name.as_str())
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "missing terminal assignments: {missing:?}"
+        );
     }
 
     #[test]
