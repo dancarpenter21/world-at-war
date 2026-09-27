@@ -1,0 +1,7 @@
+{
+  "plan_id":"00000000-0000-0000-0000-000000000400","revision":1,
+  "missions":[
+    {"id":"00000000-0000-0000-0000-000000000401","name":"Red local defensive patrol","kind":"patrol","unit_id":"00000000-0000-0000-0000-000000000033","issuer_role_id":"00000000-0000-0000-0000-0000000000fb","objective_id":"00000000-0000-0000-0000-000000000402","start_tick":1,"end_tick":2400,"route":[{"latitude_deg":38,"longitude_deg":-76.45,"altitude_m":8000},{"latitude_deg":38.15,"longitude_deg":-76.3,"altitude_m":8000}],"speed_mps":160,"home":{"latitude_deg":38,"longitude_deg":-76.45,"altitude_m":8000},"depends_on":[],"lost_comms":"continue","engagement":{"weapons_release":true,"minimum_identification":0.8,"max_track_age_ticks":15,"authorized_objective":"00000000-0000-0000-0000-000000000402"},"clearance_airspace_ids":[]},
+    {"id":"00000000-0000-0000-0000-000000000403","name":"Red local air defense","kind":"defend","unit_id":"00000000-0000-0000-0000-00000000003e","issuer_role_id":"00000000-0000-0000-0000-0000000000fb","objective_id":"00000000-0000-0000-0000-000000000402","start_tick":1,"end_tick":2400,"route":[{"latitude_deg":38.15,"longitude_deg":-76.3,"altitude_m":0}],"speed_mps":1,"home":{"latitude_deg":38.15,"longitude_deg":-76.3,"altitude_m":0},"depends_on":[],"lost_comms":"continue","engagement":{"weapons_release":true,"minimum_identification":0.8,"max_track_age_ticks":15,"authorized_objective":"00000000-0000-0000-0000-000000000402"},"clearance_airspace_ids":[]}
+  ]
+}

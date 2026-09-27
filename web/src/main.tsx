@@ -13,6 +13,9 @@ import { GlobeEntityReconciler, type Projection } from "./globeEntities";
 import { attachMapKeyboardControls, type AttachedMapKeyboardControls } from "./mapKeyboardControls";
 import { MapFilterDialog, type MapFilters } from "./MapFilterDialog";
 import { SpaceAssetLayer } from "./spaceAssetLayer";
+import { OperationsLayer } from "./OperationsLayer";
+import type { PlanningView } from "./PlanningWorkspace";
+const PlanningWorkspace = lazy(() => import("./PlanningWorkspace").then(m => ({ default: m.PlanningWorkspace })));
 
 const AuthorityWorkspace = lazy(() => import("./AuthorityWorkspace").then((module) => ({ default: module.AuthorityWorkspace })));
 const NetworkWorkspace = lazy(() => import("./NetworkWorkspace").then((module) => ({ default: module.NetworkWorkspace })));
@@ -126,6 +129,11 @@ function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnab
     viewer.scene.globe.baseColor = Color.fromCssColorString("#1f3340");
     viewer.camera.setView({ destination: Cartesian3.fromDegrees(-40, 30, 20_000_000) });
     viewerRef.current = viewer;
+    const operations = new OperationsLayer(viewer.entities);
+    let planningStopped = false;
+    const refreshPlanning = () => void request<PlanningView>(`/v1/games/${gameId}/planning?player_id=${playerId}&role_id=${roleId}`).then(view => { if (!planningStopped) operations.update(view); }).catch(() => undefined);
+    refreshPlanning();
+    const planningTimer = window.setInterval(refreshPlanning, 2000);
     const keyboardControls = attachMapKeyboardControls(viewer.camera, viewer.scene.globe.ellipsoid);
     keyboardControls.setEnabled(keyboardEnabled);
     keyboardControlsRef.current = keyboardControls;
@@ -188,6 +196,9 @@ function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnab
     viewer.camera.moveEnd.addEventListener(scheduleAirportRefresh);
     void refreshAirports();
     return () => {
+      planningStopped = true;
+      window.clearInterval(planningTimer);
+      operations.clear();
       stopped = true;
       airportRequestRef.current?.abort();
       if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
@@ -269,6 +280,7 @@ function App() {
   const [nowUnix, setNowUnix] = useState(() => Math.floor(Date.now() / 1000));
   const [showAuthority, setShowAuthority] = useState(false);
   const [showNetwork, setShowNetwork] = useState(false);
+  const [showPlanning, setShowPlanning] = useState(false);
   const [showMapFilters, setShowMapFilters] = useState(false);
   const [mapFilters, setMapFilters] = useState<MapFilters>({
     spaceAssets: { showAll: false, showStarlink: false },
@@ -503,7 +515,8 @@ function App() {
     {playable && projection && <section className="workspace">
       <aside className="sidebar"><h1>{role.name}</h1><p className="message">{game.title}</p><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command network-launch" onClick={() => setShowNetwork(true)}>Network</button><button className="command map-filter-launch" onClick={() => setShowMapFilters((value) => !value)}>Map filters</button><h2>Catalog</h2><p className="muted">{game.space_catalog_enabled ? spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status" : "No orbital catalog in this scenario"}</p><button className="secondary" onClick={leave}>Leave scenario</button></aside>
       <section className="map-region">
-        <Globe projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} keyboardEnabled={!showAuthority} />
+        <button className="planning-launch" onClick={() => setShowPlanning(true)}>Joint planning</button>
+        <Globe projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} keyboardEnabled={!showAuthority && !showPlanning && !showNetwork} />
         {showMapFilters && <MapFilterDialog filters={mapFilters} spaceAssetsAvailable={game.space_catalog_enabled} onChange={setMapFilters} onClose={() => setShowMapFilters(false)} />}
         <div className="map-caption">{role.name} · {role.side} · operational picture</div>
       </section>
@@ -511,6 +524,7 @@ function App() {
     </section>}
     {showAuthority && authority && game && <Suspense fallback={<div className="authority-loading">Loading authority graph…</div>}><AuthorityWorkspace definition={authority} runtimeRoles={roles} units={authorityUnits} requests={authorityRequests} currentRole={role} isHost={game.host_player_id === playerId} tick={projection?.tick ?? 0} onClose={() => setShowAuthority(false)} onSave={saveAuthority} onCreateRequest={createAuthorityRequest} onDecision={decideAuthorityRequest} /></Suspense>}
     {showNetwork && game && role && <Suspense fallback={<div className="authority-loading">Loading C2 network…</div>}><NetworkWorkspace apiBase={API_BASE} gameId={game.id} playerId={playerId} roleId={role.id} onClose={() => setShowNetwork(false)} /></Suspense>}
+    {showPlanning && game && role && <Suspense fallback={<div className="authority-loading">Loading joint planning…</div>}><PlanningWorkspace apiBase={API_BASE} gameId={game.id} playerId={playerId} role={role} roles={roles} onClose={() => setShowPlanning(false)} /></Suspense>}
   </main>;
 }
 

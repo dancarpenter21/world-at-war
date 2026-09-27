@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository currently contains the project brief in `README.md`. The intended system is a realistic low-fidelity war simulator with a Rust simulation core, a Cesium web client, and Docker-based local runtime. As implementation is added, keep the layout predictable:
+This repository contains a Rust simulation/server workspace, a Cesium/React web client, scenario fixtures, and Docker-based local runtime. `README.md` describes implemented behavior; `IMPLEMENTATION_PLAN.md` distinguishes the current checkpoint from the broader target. Keep the layout predictable:
 
 - `crates/` or `src/`: Rust entity-component simulation, line-of-sight, sensors, movement, communications, and authority logic.
 - `web/`: Cesium map client and browser-facing assets.
@@ -14,10 +14,13 @@ Keep domain data separate from executable code so simulation logic can be tested
 
 ## Build, Test, and Development Commands
 
-No build manifests are present yet. Add commands here when `Cargo.toml`, `package.json`, or Docker files are introduced. Expected commands:
+Run Rust commands at the repository root and npm commands from `web/`. The workspace requires the sibling `../c3mesh` checkout. Commands:
 
 - `cargo test`: run Rust unit and integration tests.
 - `cargo check`: validate Rust compilation quickly during development.
+- `cargo fmt --check` and `cargo clippy --workspace --all-targets -- -D warnings`: formatting and lint checks.
+- `npm test` and `npm run build`: frontend tests, TypeScript checking and production build.
+- `npm run test:e2e`: browser tests with Playwright Chromium; avoid live Space-Track test variables unless explicitly testing the provider.
 - `npm install` and `npm run dev` from `web/`: install and run the Cesium client.
 - `docker compose up --build`: start the full local stack.
 - `docker compose run --rm <service> <command>`: run service-scoped tests or maintenance.

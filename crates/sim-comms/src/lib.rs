@@ -357,6 +357,7 @@ pub enum MessageState {
     Retrying,
     Dropped,
     Expired,
+    Unacknowledged,
 }
 
 #[cfg(test)]

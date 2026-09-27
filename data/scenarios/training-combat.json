@@ -1,0 +1,1 @@
+{"fuel_seconds":3600,"ammunition":2,"weapon_range_m":40000,"weapon_speed_mps":800,"hit_probability_bps":6500,"source":"Explicit gameplay estimate for generic training platforms, not a real aircraft or weapon specification. Fuel is abstract endurance; hit probability is a seeded Bernoulli trial; damage is binary."}

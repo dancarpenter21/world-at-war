@@ -11,8 +11,8 @@ import {
 
 export type Side = "Blue" | "Red";
 export type Position = { latitude_deg: number; longitude_deg: number; altitude_m: number };
-export type Unit = { id: string; name: string; domain: string; position: Position; sidc: string; receiver_jammed: boolean };
-export type Track = { track_id: string; target_side: Side; position: Position; identity_confidence: number; observed_tick: number; received_tick: number; observed_sidc: string };
+export type Unit = { id: string; name: string; domain: string; position: Position; sidc: string; receiver_jammed: boolean; observed_tick?: number; received_tick?: number };
+export type Track = { track_id: string; target_side: Side | null; position: Position; identity_confidence: number; observed_tick: number; received_tick: number; observed_sidc: string; uncertainty_m?: number; assessed_destroyed?: boolean | null };
 export type JammingRegion = { id: string; name: string; center: Position; radius_m: number; band: { lower_hz: number; upper_hz: number }; jammed: number };
 export type CommunicationLink = { id: string; from_entity_id: string; to_entity_id: string; available: boolean; jammed: number; effective_bit_rate_bps?: number; queued_packets?: number; queued_bytes?: number };
 export type Projection = { tick: number; own_units: Unit[]; tracks: Track[]; jamming_regions: JammingRegion[]; communication_links: CommunicationLink[] };
@@ -71,12 +71,15 @@ export class GlobeEntityReconciler {
           this.updateSymbol(record, unit.sidc, 36);
           record.color?.setValue(unit.receiver_jammed ? Color.ORANGE : Color.WHITE);
         }
+        const age = projection.tick - (unit.observed_tick ?? projection.tick);
+        record.labelText?.setValue(age > 10 ? `${unit.name} · ${age}s old` : unit.name);
+        if (age > 10) record.color?.setValue(Color.GRAY);
       }
 
       for (const track of projection.tracks) {
         visibleIds.add(track.track_id);
         const position = Cartesian3.fromDegrees(track.position.longitude_deg, track.position.latitude_deg, track.position.altitude_m);
-        const name = `Uncertain ${track.target_side} track`;
+        const name = `Uncertain ${track.target_side ?? "unidentified"} track`;
         let record = this.recordFor(track.track_id, "track");
         if (!record) {
           const positionProperty = new ConstantPositionProperty(position);
@@ -94,6 +97,10 @@ export class GlobeEntityReconciler {
           record.position.setValue(position);
           this.updateName(record, name);
           this.updateSymbol(record, track.observed_sidc, 34);
+        }
+        if (track.uncertainty_m !== undefined && record.entity.ellipse) {
+          record.entity.ellipse.semiMajorAxis = new ConstantProperty(track.uncertainty_m);
+          record.entity.ellipse.semiMinorAxis = new ConstantProperty(track.uncertainty_m);
         }
       }
 

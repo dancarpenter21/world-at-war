@@ -1,5 +1,9 @@
 //! Deterministic, server-authoritative primitives for World At War.
 
+pub mod operations;
+mod transport;
+pub use transport::{DeliveryEvent, DeliveryState};
+
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use bevy_ecs::prelude::*;
@@ -57,6 +61,16 @@ pub struct Velocity {
 pub struct Sensor {
     pub range_m: f64,
     pub identification_range_m: f64,
+    #[serde(default = "default_scan_interval")]
+    pub scan_interval_ticks: u64,
+    #[serde(default = "default_field_of_regard")]
+    pub field_of_regard_deg: f64,
+}
+fn default_scan_interval() -> u64 {
+    5
+}
+fn default_field_of_regard() -> f64 {
+    360.0
 }
 
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
@@ -279,11 +293,15 @@ impl AuthorityDefinition {
             let root = roles
                 .get(&cursor)
                 .ok_or_else(|| format!("unit {unit_id} has no command root"))?;
-            if root.kind != AuthorityRoleKind::NationalCommand
-                && !(root.kind == AuthorityRoleKind::Pilot && root.location_unit_id == *unit_id)
+            if !(matches!(
+                root.kind,
+                AuthorityRoleKind::NationalCommand
+                    | AuthorityRoleKind::JointForceCommander
+                    | AuthorityRoleKind::CombatantCommander
+            ) || (root.kind == AuthorityRoleKind::Pilot && root.location_unit_id == *unit_id))
             {
                 return Err(format!(
-                    "unit {unit_id} does not terminate at national command or its colocated pilot"
+                    "unit {unit_id} does not terminate at a national/joint command root or its colocated pilot"
                 ));
             }
         }
@@ -402,6 +420,8 @@ pub struct Contact {
     pub observed_tick: u64,
     pub position: GeoPose,
     pub identity_confidence: f32,
+    pub assessed_destroyed: Option<bool>,
+    pub observed_domain: Option<Domain>,
 }
 
 #[derive(Resource, Debug, Default)]
@@ -410,16 +430,33 @@ pub struct Observations(pub Vec<Contact>);
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Track {
     pub track_id: Uuid,
-    pub target_side: Side,
+    pub target_side: Option<Side>,
     pub position: GeoPose,
     pub identity_confidence: f32,
     pub observed_tick: u64,
     pub received_tick: u64,
     pub observed_sidc: String,
+    pub uncertainty_m: f64,
+    pub assessed_destroyed: Option<bool>,
+    pub observed_domain: Option<Domain>,
 }
 
 #[derive(Resource, Debug, Default)]
 pub struct KnowledgeBases(pub BTreeMap<Uuid, Vec<Track>>);
+
+#[derive(Resource, Default)]
+struct ReportKnowledge {
+    friendly: BTreeMap<Uuid, BTreeMap<Uuid, VisibleUnit>>,
+    targets: BTreeMap<(Uuid, Uuid), Uuid>,
+    messages: BTreeSet<Uuid>,
+    sequence: u128,
+}
+
+#[derive(Serialize, Deserialize)]
+struct KnowledgeReport {
+    friendly: Vec<VisibleUnit>,
+    contacts: Vec<(Uuid, Track)>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OrderKind {
@@ -491,6 +528,8 @@ pub struct PendingIntents(pub VecDeque<AuthorizedIntent>);
 
 #[derive(Resource, Debug, Default)]
 pub struct OrderResults(pub Vec<OrderResult>);
+#[derive(Resource, Default)]
+struct AppliedIntents(BTreeMap<Uuid, OrderStatus>);
 
 #[derive(Debug, Error)]
 pub enum SimulationBuildError {
@@ -535,12 +574,14 @@ struct CommunicationsRuntime {
     baseline_interference: BTreeMap<DeviceId, Vec<ReceiverInterference>>,
     links: Vec<CommunicationLinkDefinition>,
     jamming_regions: Vec<JammingRegion>,
+    radio_channels: BTreeMap<ChannelId, FrequencyBand>,
 }
 
 pub struct Simulation {
     world: World,
     schedule: Schedule,
     communications: CommunicationsRuntime,
+    transport: transport::Transport,
 }
 
 impl Simulation {
@@ -573,6 +614,21 @@ impl Simulation {
                     "platform {} has no c3mesh devices",
                     platform.id
                 )));
+            }
+            if let Some(sensor) = platform.sensor {
+                if !sensor.range_m.is_finite()
+                    || sensor.range_m <= 0.0
+                    || !sensor.identification_range_m.is_finite()
+                    || !(0.0..=sensor.range_m).contains(&sensor.identification_range_m)
+                    || sensor.scan_interval_ticks == 0
+                    || !sensor.field_of_regard_deg.is_finite()
+                    || !(0.0..=360.0).contains(&sensor.field_of_regard_deg)
+                {
+                    return Err(SimulationBuildError::InvalidConfiguration(format!(
+                        "platform {} has invalid sensor parameters",
+                        platform.id
+                    )));
+                }
             }
             if let Some(path) = &platform.flight_path {
                 validate_flight_path(platform.id, path)?;
@@ -706,6 +762,18 @@ impl Simulation {
             .iter()
             .map(|device| (device.id.clone(), device.interference.clone()))
             .collect();
+        let radio_channels = communications
+            .network
+            .channels
+            .iter()
+            .filter_map(|channel| {
+                channel
+                    .radio
+                    .as_ref()
+                    .map(|radio| (channel.id.clone(), radio.band))
+            })
+            .collect();
+        let seed = communications.simulator_options.seed;
         let simulator = NetworkSimulator::new_with_options(
             communications.network,
             communications.simulator_options,
@@ -714,26 +782,32 @@ impl Simulation {
         world.insert_resource(SimClock { tick: 0 });
         world.insert_resource(Observations::default());
         world.insert_resource(KnowledgeBases::default());
+        world.insert_resource(ReportKnowledge::default());
         world.insert_resource(PendingIntents::default());
         world.insert_resource(OrderResults::default());
+        world.insert_resource(AppliedIntents::default());
+        world.insert_resource(operations::Operations::new(seed));
 
         let mut schedule = Schedule::default();
         schedule.add_systems((
             advance_clock,
             apply_orders.after(advance_clock),
-            move_platforms.after(apply_orders),
+            operations::advance_operations.after(apply_orders),
+            move_platforms.after(operations::advance_operations),
             detect_contacts.after(move_platforms),
             deliver_reports.after(detect_contacts),
         ));
         let mut simulation = Self {
             world,
             schedule,
+            transport: transport::Transport::default(),
             communications: CommunicationsRuntime {
                 simulator,
                 entity_devices,
                 baseline_interference,
                 links: communications.links,
                 jamming_regions: communications.jamming_regions,
+                radio_channels,
             },
         };
         for platform in platforms {
@@ -756,6 +830,10 @@ impl Simulation {
                 echelon: 1,
                 can_order: true,
             },
+            operations::CombatState {
+                profile: operations::CombatProfile::default(),
+                destroyed: false,
+            },
         ));
         if let Some(sensor) = platform.sensor {
             entity.insert(sensor);
@@ -776,10 +854,176 @@ impl Simulation {
         self.schedule.run(&mut self.world);
         self.sync_network_interference()
             .expect("validated network must accept tick interference");
+        self.advance_messages();
+        self.update_reports();
     }
 
     pub fn tick(&self) -> u64 {
         self.world.resource::<SimClock>().tick
+    }
+
+    fn update_reports(&mut self) {
+        let tick = self.tick();
+        let events = std::mem::take(&mut self.transport.events);
+        for event in events {
+            if !self
+                .world
+                .resource::<ReportKnowledge>()
+                .messages
+                .contains(&event.id)
+            {
+                self.transport.events.push(event);
+                continue;
+            }
+            if matches!(
+                event.state,
+                DeliveryState::Acknowledged
+                    | DeliveryState::Dropped
+                    | DeliveryState::Expired
+                    | DeliveryState::Unacknowledged
+            ) {
+                self.world
+                    .resource_mut::<ReportKnowledge>()
+                    .messages
+                    .remove(&event.id);
+            }
+            if event.state != DeliveryState::Delivered {
+                continue;
+            }
+            let Ok(report) = serde_json::from_slice::<KnowledgeReport>(&event.payload) else {
+                continue;
+            };
+            for mut unit in report.friendly {
+                unit.received_tick = tick;
+                unit.receiver_jammed = false;
+                let mut knowledge = self.world.resource_mut::<ReportKnowledge>();
+                let units = knowledge.friendly.entry(event.recipient).or_default();
+                if units
+                    .get(&unit.id)
+                    .is_none_or(|old| old.observed_tick < unit.observed_tick)
+                {
+                    units.insert(unit.id, unit);
+                }
+            }
+            for (target, mut track) in report.contacts {
+                let mut reports = self.world.resource_mut::<ReportKnowledge>();
+                let next = Uuid::from_u128(
+                    (1u128 << 126)
+                        | (reports
+                            .targets
+                            .keys()
+                            .filter(|(owner, _)| *owner == event.recipient)
+                            .count() as u128
+                            + 1),
+                );
+                track.track_id = *reports
+                    .targets
+                    .entry((event.recipient, target))
+                    .or_insert(next);
+                track.received_tick = tick;
+                let mut knowledge = self.world.resource_mut::<KnowledgeBases>();
+                let tracks = knowledge.0.entry(event.recipient).or_default();
+                if let Some(old) = tracks.iter_mut().find(|old| old.track_id == track.track_id) {
+                    if old.observed_tick < track.observed_tick {
+                        *old = track;
+                    }
+                } else {
+                    tracks.push(track);
+                }
+            }
+        }
+        if tick != 1 && !tick.is_multiple_of(5) {
+            return;
+        }
+        let mut query = self.world.query::<(
+            &SimEntityId,
+            &Ownership,
+            &PlatformName,
+            &DomainKind,
+            &GeoPose,
+            &PlatformSidc,
+            &operations::CombatState,
+        )>();
+        let units: BTreeMap<_, _> = query
+            .iter(&self.world)
+            .filter(|(_, _, _, _, _, _, combat)| !combat.destroyed)
+            .map(|(id, side, name, domain, pose, sidc, _)| {
+                (
+                    id.0,
+                    (
+                        side.0,
+                        VisibleUnit {
+                            id: id.0,
+                            name: name.0.clone(),
+                            domain: domain.0,
+                            position: *pose,
+                            sidc: sidc.0.clone(),
+                            receiver_jammed: false,
+                            observed_tick: tick,
+                            received_tick: tick,
+                        },
+                    ),
+                )
+            })
+            .collect();
+        let links = self.communications.links.clone();
+        for link in links {
+            let (Some((side, unit)), Some((other_side, _))) = (
+                units.get(&link.from_entity_id),
+                units.get(&link.to_entity_id),
+            ) else {
+                continue;
+            };
+            if side != other_side {
+                continue;
+            }
+            let report_knowledge = self.world.resource::<ReportKnowledge>();
+            let mut friendly: Vec<_> = report_knowledge
+                .friendly
+                .get(&link.from_entity_id)
+                .map(|v| {
+                    v.values()
+                        .filter(|u| u.id != unit.id && tick.saturating_sub(u.observed_tick) < 120)
+                        .cloned()
+                        .collect()
+                })
+                .unwrap_or_default();
+            friendly.push(unit.clone());
+            let contacts = self
+                .world
+                .resource::<KnowledgeBases>()
+                .0
+                .get(&link.from_entity_id)
+                .map(|tracks| {
+                    tracks
+                        .iter()
+                        .filter(|t| tick.saturating_sub(t.observed_tick) < 120)
+                        .filter_map(|track| {
+                            report_knowledge
+                                .targets
+                                .iter()
+                                .find(|((owner, _), id)| {
+                                    *owner == link.from_entity_id && **id == track.track_id
+                                })
+                                .map(|((_, target), _)| (*target, track.clone()))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            let payload = serde_json::to_vec(&KnowledgeReport { friendly, contacts })
+                .expect("finite observations");
+            let mut reports = self.world.resource_mut::<ReportKnowledge>();
+            reports.sequence += 1;
+            let id = Uuid::from_u128((1u128 << 127) | reports.sequence);
+            reports.messages.insert(id);
+            let _ = self.send_message(
+                id,
+                link.from_entity_id,
+                link.to_entity_id,
+                payload,
+                tick + 30,
+            );
+        }
     }
 
     pub fn drain_order_results(&mut self) -> Vec<OrderResult> {
@@ -864,13 +1108,19 @@ impl Simulation {
     /// Builds a projection from the knowledge held by the role's assigned command node.
     /// Higher-echelon aggregation is added by the communications system, not by visibility code.
     pub fn projection_for(&mut self, knowledge_owner: Uuid, side: Side) -> RoleProjection {
-        let tracks = self
+        let mut tracks = self
             .world
             .resource::<KnowledgeBases>()
             .0
             .get(&knowledge_owner)
             .cloned()
             .unwrap_or_default();
+        for track in &mut tracks {
+            let age = self.tick().saturating_sub(track.observed_tick);
+            track.uncertainty_m = 100.0 + age as f64 * 250.0;
+            track.identity_confidence *= (1.0 - age as f32 / 120.0).max(0.0);
+        }
+        tracks.retain(|track| self.tick().saturating_sub(track.observed_tick) <= 120);
         let link_statuses = self.communication_link_statuses();
         let network_time = self.network_time();
         let receiver_jammed: BTreeMap<_, _> = self
@@ -884,7 +1134,15 @@ impl Simulation {
                 )
             })
             .collect();
-        let mut own_units = Vec::new();
+        let mut own_units: Vec<_> = self
+            .world
+            .resource::<ReportKnowledge>()
+            .friendly
+            .get(&knowledge_owner)
+            .map(|units| units.values().cloned().collect())
+            .unwrap_or_default();
+        own_units.retain(|unit| unit.id != knowledge_owner);
+        let tick = self.tick();
         let mut query = self.world.query::<(
             &SimEntityId,
             &PlatformName,
@@ -894,7 +1152,7 @@ impl Simulation {
             &PlatformSidc,
         )>();
         for (id, name, ownership, domain, pose, sidc) in query.iter(&self.world) {
-            if ownership.0 == side {
+            if ownership.0 == side && id.0 == knowledge_owner {
                 own_units.push(VisibleUnit {
                     id: id.0,
                     name: name.0.clone(),
@@ -902,6 +1160,8 @@ impl Simulation {
                     position: *pose,
                     sidc: sidc.0.clone(),
                     receiver_jammed: receiver_jammed.get(&id.0).copied().unwrap_or(false),
+                    observed_tick: tick,
+                    received_tick: tick,
                 });
             }
         }
@@ -909,15 +1169,14 @@ impl Simulation {
         let link_statuses = link_statuses
             .into_iter()
             .filter(|link| {
-                visible_ids.contains(&link.from_entity_id)
-                    && visible_ids.contains(&link.to_entity_id)
+                link.to_entity_id == knowledge_owner && visible_ids.contains(&link.from_entity_id)
             })
             .collect();
         RoleProjection {
             tick: self.tick(),
             own_units,
             tracks,
-            jamming_regions: self.communications.jamming_regions.clone(),
+            jamming_regions: Vec::new(),
             communication_links: link_statuses,
         }
     }
@@ -954,6 +1213,26 @@ impl Simulation {
                             band: region.band,
                             jammed: region.jammed,
                         });
+                    }
+                }
+                for link in self
+                    .communications
+                    .links
+                    .iter()
+                    .filter(|link| &link.destination_device_id == device_id)
+                {
+                    if let (Some(band), Some(source)) = (
+                        self.communications.radio_channels.get(&link.channel_id),
+                        positions.get(&link.from_entity_id),
+                    ) {
+                        if !line_of_sight(*source, *position)
+                            || great_circle_distance_m(*source, *position) > 550_000.0
+                        {
+                            snapshot.push(ReceiverInterference {
+                                band: *band,
+                                jammed: 1.0,
+                            });
+                        }
                     }
                 }
                 self.communications
@@ -1034,6 +1313,8 @@ pub struct VisibleUnit {
     pub position: GeoPose,
     pub sidc: String,
     pub receiver_jammed: bool,
+    pub observed_tick: u64,
+    pub received_tick: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1049,15 +1330,23 @@ fn advance_clock(mut clock: ResMut<SimClock>) {
     clock.tick += 1;
 }
 
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn apply_orders(
     clock: Res<SimClock>,
     mut pending: ResMut<PendingIntents>,
     mut results: ResMut<OrderResults>,
+    mut operations: ResMut<operations::Operations>,
+    knowledge: Res<KnowledgeBases>,
+    reports: Res<ReportKnowledge>,
+    mut applied: ResMut<AppliedIntents>,
     mut units: Query<(
         &SimEntityId,
         &AuthorityNode,
         &mut Velocity,
         Option<&mut CyclicFlightPathState>,
+        &GeoPose,
+        &Ownership,
+        &mut operations::CombatState,
     )>,
 ) {
     let mut deferred = VecDeque::new();
@@ -1070,8 +1359,20 @@ fn apply_orders(
             });
             continue;
         }
-        let Some((_, authority, mut velocity, mut flight_path)) =
-            units.iter_mut().find(|(id, _, _, _)| id.0 == intent.target)
+        if let Some(status) = applied.0.get(&intent.intent_id) {
+            results.0.push(OrderResult {
+                intent_id: intent.intent_id,
+                status: status.clone(),
+            });
+            continue;
+        }
+        // Reserve the id before applying any side effect, including failed prerequisites.
+        applied.0.insert(
+            intent.intent_id,
+            OrderStatus::Rejected("previously processed intent".into()),
+        );
+        let Some((_, authority, mut velocity, mut flight_path, pose, side, mut combat)) =
+            units.iter_mut().find(|(id, ..)| id.0 == intent.target)
         else {
             results.0.push(OrderResult {
                 intent_id: intent.intent_id,
@@ -1079,7 +1380,7 @@ fn apply_orders(
             });
             continue;
         };
-        if !authority.can_order {
+        if !authority.can_order || combat.destroyed {
             results.0.push(OrderResult {
                 intent_id: intent.intent_id,
                 status: OrderStatus::Rejected("target cannot accept orders".into()),
@@ -1091,6 +1392,17 @@ fn apply_orders(
                 north_mps,
                 east_mps,
             } => {
+                if !north_mps.is_finite()
+                    || !east_mps.is_finite()
+                    || north_mps.hypot(east_mps) > 700.0
+                {
+                    results.0.push(OrderResult {
+                        intent_id: intent.intent_id,
+                        status: OrderStatus::Rejected("invalid movement speed".into()),
+                    });
+                    continue;
+                }
+                operations.tactical_move(intent.target);
                 velocity.north_mps = north_mps;
                 velocity.east_mps = east_mps;
                 if let Some(path) = flight_path.as_deref_mut() {
@@ -1100,13 +1412,43 @@ fn apply_orders(
                     intent_id: intent.intent_id,
                     status: OrderStatus::Accepted,
                 });
+                applied.0.insert(intent.intent_id, OrderStatus::Accepted);
             }
-            OrderKind::Engage { .. } => results.0.push(OrderResult {
-                intent_id: intent.intent_id,
-                status: OrderStatus::Rejected(
-                    "engagement modelling is not available in the training slice".into(),
-                ),
-            }),
+            OrderKind::Engage { track_id } => {
+                let contact = knowledge
+                    .0
+                    .get(&intent.target)
+                    .into_iter()
+                    .flatten()
+                    .find(|t| {
+                        t.track_id == track_id && t.target_side.is_some_and(|other| other != side.0)
+                    });
+                let target = reports
+                    .targets
+                    .iter()
+                    .find(|((owner, _), id)| *owner == intent.target && **id == track_id)
+                    .map(|((_, target), _)| *target);
+                let result = match (contact, target) {
+                    (Some(track), Some(target)) => operations.engage(
+                        intent.target,
+                        *pose,
+                        &mut combat,
+                        track,
+                        target,
+                        clock.tick,
+                    ),
+                    _ => Err("track is not identified in executor's local picture".into()),
+                };
+                results.0.push(OrderResult {
+                    intent_id: intent.intent_id,
+                    status: result
+                        .map(|_| OrderStatus::Accepted)
+                        .unwrap_or_else(OrderStatus::Rejected),
+                });
+                if let Some(result) = results.0.last() {
+                    applied.0.insert(intent.intent_id, result.status.clone());
+                }
+            }
         }
     }
     pending.0 = deferred;
@@ -1198,20 +1540,51 @@ fn geo_pose_is_finite(position: GeoPose) -> bool {
         && (-180.0..=180.0).contains(&position.longitude_deg)
 }
 
+#[allow(clippy::type_complexity)]
 fn detect_contacts(
     clock: Res<SimClock>,
     mut observations: ResMut<Observations>,
-    sensors: Query<(&SimEntityId, &Ownership, &GeoPose, &Sensor)>,
-    targets: Query<(&SimEntityId, &Ownership, &GeoPose)>,
+    sensors: Query<(
+        &SimEntityId,
+        &Ownership,
+        &GeoPose,
+        &Sensor,
+        &Velocity,
+        &operations::CombatState,
+    )>,
+    targets: Query<(
+        &SimEntityId,
+        &Ownership,
+        &GeoPose,
+        &operations::CombatState,
+        &DomainKind,
+    )>,
 ) {
     observations.0.clear();
-    for (observer_id, observer_side, observer_pose, sensor) in &sensors {
-        for (target_id, target_side, target_pose) in &targets {
+    for (observer_id, observer_side, observer_pose, sensor, velocity, observer_combat) in &sensors {
+        if observer_combat.destroyed {
+            continue;
+        }
+        for (target_id, target_side, target_pose, target_combat, target_domain) in &targets {
             if observer_side.0 == target_side.0 {
                 continue;
             }
-            let range = great_circle_distance_m(*observer_pose, *target_pose);
-            if range <= sensor.range_m {
+            let surface = great_circle_distance_m(*observer_pose, *target_pose);
+            let range = surface.hypot(observer_pose.altitude_m - target_pose.altitude_m);
+            let bearing = ((target_pose.longitude_deg - observer_pose.longitude_deg)
+                * observer_pose.latitude_deg.to_radians().cos())
+            .atan2(target_pose.latitude_deg - observer_pose.latitude_deg);
+            let heading = velocity.east_mps.atan2(velocity.north_mps);
+            let offset = (bearing - heading)
+                .sin()
+                .atan2((bearing - heading).cos())
+                .abs()
+                .to_degrees();
+            if (clock.tick == 1 || clock.tick.is_multiple_of(sensor.scan_interval_ticks.max(1)))
+                && range <= sensor.range_m
+                && line_of_sight(*observer_pose, *target_pose)
+                && offset <= sensor.field_of_regard_deg / 2.0
+            {
                 observations.0.push(Contact {
                     observer: observer_id.0,
                     target: target_id.0,
@@ -1223,6 +1596,10 @@ fn detect_contacts(
                     } else {
                         0.45
                     },
+                    assessed_destroyed: (range <= sensor.identification_range_m)
+                        .then_some(target_combat.destroyed),
+                    observed_domain: (range <= sensor.identification_range_m)
+                        .then_some(target_domain.0),
                 });
             }
         }
@@ -1233,36 +1610,51 @@ fn deliver_reports(
     clock: Res<SimClock>,
     observations: Res<Observations>,
     mut knowledge: ResMut<KnowledgeBases>,
+    mut reports: ResMut<ReportKnowledge>,
 ) {
     for contact in &observations.0 {
+        let next = Uuid::from_u128(
+            (1u128 << 126)
+                | (reports
+                    .targets
+                    .keys()
+                    .filter(|(owner, _)| *owner == contact.observer)
+                    .count() as u128
+                    + 1),
+        );
+        let track_id = *reports
+            .targets
+            .entry((contact.observer, contact.target))
+            .or_insert(next);
         let tracks = knowledge.0.entry(contact.observer).or_default();
-        if let Some(track) = tracks
-            .iter_mut()
-            .find(|track| track.track_id == contact.target)
-        {
+        if let Some(track) = tracks.iter_mut().find(|track| track.track_id == track_id) {
             track.position = contact.position;
             track.identity_confidence = contact.identity_confidence;
             track.observed_tick = contact.observed_tick;
             track.received_tick = clock.tick;
+            track.target_side = (contact.identity_confidence >= 0.8).then_some(contact.side);
+            track.assessed_destroyed = contact.assessed_destroyed;
+            track.observed_domain = contact.observed_domain;
         } else {
             tracks.push(Track {
-                track_id: contact.target,
-                target_side: contact.side,
+                track_id,
+                target_side: (contact.identity_confidence >= 0.8).then_some(contact.side),
                 position: contact.position,
                 identity_confidence: contact.identity_confidence,
                 observed_tick: contact.observed_tick,
                 received_tick: clock.tick,
-                observed_sidc: unknown_sidc(contact.side).into(),
+                observed_sidc: "100101000000000000000000000000".into(),
+                uncertainty_m: 100.0,
+                assessed_destroyed: contact.assessed_destroyed,
+                observed_domain: contact.observed_domain,
             });
         }
     }
 }
 
-fn unknown_sidc(side: Side) -> &'static str {
-    match side {
-        Side::Blue => "100301000000000000000000000000",
-        Side::Red => "100601000000000000000000000000",
-    }
+pub fn line_of_sight(a: GeoPose, b: GeoPose) -> bool {
+    let horizon = |height: f64| (2.0 * 6_371_000.0 * height.max(0.0)).sqrt();
+    great_circle_distance_m(a, b) <= horizon(a.altitude_m + 10.0) + horizon(b.altitude_m + 10.0)
 }
 
 fn great_circle_distance_m(a: GeoPose, b: GeoPose) -> f64 {
@@ -1333,6 +1725,8 @@ mod tests {
                 sensor: Some(Sensor {
                     range_m: 20_000.0,
                     identification_range_m: 5_000.0,
+                    scan_interval_ticks: 5,
+                    field_of_regard_deg: 360.0,
                 }),
                 network_device_ids: vec![test_device_id(blue)],
                 flight_path: None,

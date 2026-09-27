@@ -20,6 +20,8 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Scenario {
+    #[serde(default)]
+    pub campaign: Option<sim_core::operations::CampaignPlan>,
     pub id: String,
     pub title: String,
     pub description: String,
@@ -83,6 +85,11 @@ impl Scenario {
         self.authority
             .validate(&ids)
             .map_err(ScenarioError::InvalidAuthority)?;
+        if let Some(campaign) = &self.campaign {
+            campaign
+                .validate(&self.authority, &ids)
+                .map_err(ScenarioError::InvalidAuthority)?;
+        }
         let platforms = self.platforms();
         Simulation::validate_configuration(&platforms, &self.communications())
             .map_err(|error| ScenarioError::InvalidSimulation(error.to_string()))?;
@@ -110,8 +117,33 @@ impl Scenario {
                 channel.queue.discipline = discipline;
             }
         }
-        Simulation::new(self.platforms(), communications)
-            .map_err(|error| ScenarioError::InvalidSimulation(error.to_string()))
+        let mut simulation = Simulation::new(self.platforms(), communications)
+            .map_err(|error| ScenarioError::InvalidSimulation(error.to_string()))?;
+        if self.campaign.is_some() {
+            let profile: sim_core::operations::CombatProfile =
+                serde_json::from_str(include_str!("../../../data/scenarios/training-combat.json"))
+                    .expect("committed combat fixture");
+            for unit in &self.units {
+                simulation
+                    .set_combat_profile(unit.id, profile.clone())
+                    .map_err(ScenarioError::InvalidSimulation)?;
+            }
+            let defensive_orders: sim_core::operations::AirTaskingOrder = serde_json::from_str(
+                include_str!("../../../data/scenarios/regional-defense.json"),
+            )
+            .expect("committed defensive tasking");
+            let aco = sim_core::operations::AirspaceControlOrder {
+                plan_id: defensive_orders.plan_id,
+                revision: defensive_orders.revision,
+                volumes: vec![],
+            };
+            for unit in &self.units {
+                if unit.side == Side::Red {
+                    simulation.receive_tasking(unit.id, &aco, &defensive_orders);
+                }
+            }
+        }
+        Ok(simulation)
     }
 
     fn platforms(&self) -> Vec<PlatformSpawn> {
@@ -140,6 +172,157 @@ impl Scenario {
             jamming_regions: self.jamming_regions.clone(),
         }
     }
+}
+
+pub fn regional_campaign_scenario() -> Scenario {
+    let campaign: sim_core::operations::CampaignPlan = serde_json::from_str(include_str!(
+        "../../../data/scenarios/regional-campaign.json"
+    ))
+    .expect("committed campaign fixture");
+    let mut units: Vec<_> = global_crisis_scenario()
+        .units
+        .into_iter()
+        .filter(|u| [1, 2, 7, 8, 11, 12, 19, 27, 37, 51, 61, 62].contains(&u.id.as_u128()))
+        .collect();
+    for u in &mut units {
+        let (lat, lon) = match u.id.as_u128() {
+            11 => (38.0, -77.05),
+            12 => (38.12, -77.05),
+            19 => (38.3, -76.8),
+            8 => (38.0, -76.3),
+            27 => (37.9, -76.9),
+            37 => (38.15, -76.9),
+            51 => (38.0, -76.45),
+            61 => (38.12, -76.3),
+            62 => (38.15, -76.3),
+            _ => (38.0, -77.0),
+        };
+        u.position.latitude_deg = lat;
+        u.position.longitude_deg = lon;
+        if u.id.as_u128() == 12 {
+            u.position.altitude_m = 7000.0;
+        }
+        u.velocity = Velocity {
+            north_mps: 0.0,
+            east_mps: 0.0,
+            climb_mps: 0.0,
+        };
+    }
+    let specs = [
+        (
+            201,
+            "Joint Force Commander",
+            AuthorityRoleKind::JointForceCommander,
+            1,
+        ),
+        (
+            202,
+            "Air Component / Airspace Authority",
+            AuthorityRoleKind::ComponentCommander,
+            2,
+        ),
+        (
+            203,
+            "Land Component",
+            AuthorityRoleKind::ComponentCommander,
+            37,
+        ),
+        (
+            204,
+            "Maritime Component",
+            AuthorityRoleKind::ComponentCommander,
+            27,
+        ),
+        (
+            205,
+            "West Sector Controller",
+            AuthorityRoleKind::TacticalCommander,
+            7,
+        ),
+        (
+            206,
+            "East Sector Controller",
+            AuthorityRoleKind::TacticalCommander,
+            8,
+        ),
+        (211, "Intercept Pilot", AuthorityRoleKind::Pilot, 11),
+        (212, "Strike Pilot", AuthorityRoleKind::Pilot, 12),
+        (219, "Surveillance Operator", AuthorityRoleKind::Pilot, 19),
+        (251, "Red Commander", AuthorityRoleKind::NationalCommand, 51),
+    ];
+    let roles: Vec<_> = specs
+        .iter()
+        .map(|(id, name, kind, unit)| AuthorityRoleDefinition {
+            id: Uuid::from_u128(*id),
+            name: (*name).into(),
+            side: if *id == 251 { Side::Red } else { Side::Blue },
+            kind: *kind,
+            location_unit_id: Uuid::from_u128(*unit),
+            claimable: *id != 251,
+            ai_controlled: false,
+        })
+        .collect();
+    let mut relationships = Vec::new();
+    for (id, _, _, unit) in specs {
+        if id != 201 && id != 251 {
+            relationships.push(AuthorityRelationship {
+                id: Uuid::from_u128(10000 + id),
+                superior_role_id: Uuid::from_u128(if [202, 203, 204].contains(&id) {
+                    201
+                } else {
+                    202
+                }),
+                subordinate_role_id: Some(Uuid::from_u128(id)),
+                subordinate_unit_id: None,
+                kind: AuthorityRelationshipKind::Opcon,
+            });
+        }
+        relationships.push(AuthorityRelationship {
+            id: Uuid::from_u128(20000 + id),
+            superior_role_id: Uuid::from_u128(id),
+            subordinate_role_id: None,
+            subordinate_unit_id: Some(Uuid::from_u128(unit)),
+            kind: AuthorityRelationshipKind::Tacon,
+        });
+    }
+    for id in [61, 62] {
+        relationships.push(AuthorityRelationship {
+            id: Uuid::from_u128(30000 + id),
+            superior_role_id: Uuid::from_u128(251),
+            subordinate_role_id: None,
+            subordinate_unit_id: Some(Uuid::from_u128(id)),
+            kind: AuthorityRelationshipKind::Tacon,
+        });
+    }
+    let mut authority = AuthorityDefinition {
+        version: 1,
+        roles,
+        relationships,
+        policies: vec![],
+    };
+    for (i, action) in [ACTION_MOVE, ACTION_ENGAGE].into_iter().enumerate() {
+        for u in &units {
+            let direct_role_ids = authority
+                .roles
+                .iter()
+                .filter(|r| authority.role_is_in_unit_chain(r.id, u.id))
+                .map(|r| r.id)
+                .collect();
+            authority.policies.push(AuthorityPolicy {
+                id: Uuid::from_u128(40000 + i as u128 * 100 + u.id.as_u128()),
+                name: format!("{action}: {}", u.name),
+                action: action.into(),
+                target_unit_ids: vec![u.id],
+                direct_role_ids,
+                request_role_ids: vec![],
+                decision_steps: vec![],
+                notify_role_ids: vec![],
+                executable: true,
+            });
+        }
+    }
+    let (network, communication_links, simulator_options) = global_communications(&mut units);
+    Scenario { campaign: Some(campaign), id: "regional-campaign.v1".into(), title: "Regional Joint Campaign".into(), description: "Two delegated sectors, competing joint plans, interception and strike under communications disruption. Offline training estimates.".into(), version: 1, requires_space_catalog: false, units, network, simulator_options, communication_links, authority, jamming_regions: vec![JammingRegion { id: "sector-boundary-outage".into(), name: "Receiver interference near sector boundary".into(), center: GeoPose { latitude_deg: 38.1, longitude_deg: -76.55, altitude_m: 0.0 }, radius_m: 8000.0, band: FrequencyBand::new(960_000_000,1_215_000_000), jammed: 1.0 }] }
 }
 
 pub fn global_crisis_scenario() -> Scenario {
@@ -250,6 +433,7 @@ pub fn global_crisis_scenario() -> Scenario {
     let authority = global_crisis_authority();
     let (network, communication_links, simulator_options) = global_communications(&mut units);
     Scenario {
+        campaign: None,
         id: "global-crisis.v2".into(),
         title: "Global Crisis".into(),
         description: "A combined-domain global crisis directed from the White House and Pentagon."
@@ -334,7 +518,6 @@ fn global_communications(
                         discipline: QueueDiscipline::Fifo,
                     },
                     shared_medium,
-                    ..Default::default()
                 },
             );
             links.push(CommunicationLinkDefinition {
@@ -353,7 +536,6 @@ fn global_communications(
         SimulatorOptions {
             seed: 0xC3_2026,
             channels: channel_options,
-            ..Default::default()
         },
     )
 }
@@ -1015,6 +1197,7 @@ pub fn jammed_flight_scenario() -> Scenario {
     };
 
     Scenario {
+        campaign: None,
         id: "jammed-flight.v1".into(),
         title: "Jammed Flight Test".into(),
         description:
@@ -1036,7 +1219,6 @@ pub fn jammed_flight_scenario() -> Scenario {
                             discipline: QueueDiscipline::Fifo,
                         },
                         shared_medium: Some("jammed-flight-link16".into()),
-                        ..Default::default()
                     },
                 ),
                 (
@@ -1049,7 +1231,6 @@ pub fn jammed_flight_scenario() -> Scenario {
                             discipline: QueueDiscipline::Fifo,
                         },
                         shared_medium: Some("jammed-flight-link16".into()),
-                        ..Default::default()
                     },
                 ),
             ]),
@@ -1101,6 +1282,8 @@ fn unit(
         sensor: Some(Sensor {
             range_m: if airborne { 180_000.0 } else { 80_000.0 },
             identification_range_m: 35_000.0,
+            scan_interval_ticks: 5,
+            field_of_regard_deg: 360.0,
         }),
         network_device_ids: vec![DeviceId::new(format!("entity-{entity_id}-network"))],
         flight_path: None,
@@ -1217,7 +1400,8 @@ mod tests {
                 .receiver_jammed
         );
         assert!(
-            projection
+            simulation
+                .projection_for(aircraft_2, Side::Blue)
                 .communication_links
                 .iter()
                 .find(|link| link.from_entity_id == aircraft_1)

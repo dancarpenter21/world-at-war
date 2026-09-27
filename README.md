@@ -2,7 +2,7 @@
 
 World At War is a server-authoritative, low-fidelity war-simulation prototype. It combines a Rust entity-component simulation, a Cesium/React operational map, a public Space-Track orbital catalog, and an authority workflow for command decisions.
 
-The current implementation ships **Global Crisis**, with 64 authored entities and a pinned public orbital snapshot, plus a compact **Jammed Flight Test** with two pilot-controlled Blue aircraft and directional receiver jamming. Authored entities and uncertain tracks use MIL-STD-2525D symbols.
+The current implementation ships **Global Crisis**, with 64 authored entities and a pinned public orbital snapshot, a compact **Jammed Flight Test** with two pilot-controlled Blue aircraft and directional receiver jamming, and an offline **Regional Joint Campaign** with 12 entities, two courses of action, and separate command and sector-controller roles. Authored entities and uncertain tracks use MIL-STD-2525D symbols.
 
 The broader target architecture, planned simulation fidelity, and acceptance criteria are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Features described there are not necessarily implemented yet.
 
@@ -18,8 +18,12 @@ The broader target architecture, planned simulation fidelity, and acceptance cri
 - A global airport/runway cache using public-domain OurAirports data with an authoritative FAA NASR overlay for U.S. facilities, declared distances, pavement ratings, and reported gross-weight limits.
 - A Docker Compose edge proxy that serves the web client and routes `/health`, `/v1/`, and WebSocket traffic to the Rust server.
 - A versioned public-safe communications catalog, per-game seed/policy/checksum pinning, append-only message events, and role-filtered map and full-screen network views.
+- Tick-driven application transport with 512-byte fragments, reassembly, three attempts spaced five ticks apart, independent return-path acknowledgements, expiry, and duplicate suppression. Orders execute after delivery; recipients cannot inspect undelivered command messages.
+- A joint planning workspace for editing campaign intent, objectives, phases, component support, missions and airspaces; comparing courses; proposing amendments; and publishing versioned tasking over communications.
+- Delivered clearances, controller handoffs, lost-communications procedures, mission reports, and map overlays. Training combat models abstract fuel/ammunition, seeded weapon outcomes and binary damage; effect assessments use the receiving role's observed tracks.
+- Earth-horizon sensing, scan intervals and field of regard, aging tracks, and delayed friendly-position/contact reports instead of global friendly truth.
 
-Current limitations: command messages traverse the active packet topology, but fragmentation/reassembly, bounded application retries, acknowledgements, controller ground-truth privileges, and durable packet-level history remain planned. Sensor and track behavior is intentionally simplified, and the broader platform, terrain, logistics, cyber, and multi-source catalog systems remain planned work.
+Current limitations: controller ground-truth privileges, durable packet-level history, crash recovery, and full replay remain planned. The message log records server C2 lifecycle events; internal knowledge reports and individual fragments are not a complete durable packet audit. Sensor, airspace and combat behavior uses simplified training estimates: airspaces are regional polygons without antimeridian crossings, overlap checks are conservative, and unapproved entry is reported as a violation. The broader terrain, logistics, cyber, multi-domain platform and multi-source catalog systems remain planned work. Global Crisis performance has not been certified against the roadmap budgets.
 
 ## Prerequisites
 
@@ -123,11 +127,19 @@ The REST API exposes catalog status at `/v1/airport-catalog/status`, paginated s
 
 ## Gameplay and authority workflow
 
-1. Select a scenario. **Global Crisis** requires a usable Space-Track catalog; **Jammed Flight Test** does not.
+1. Select a scenario. **Global Crisis** requires a usable Space-Track catalog; **Jammed Flight Test** and **Regional Joint Campaign** do not.
 2. Create the game, claim an available command or pilot role, and start it as host.
 3. Use **Configure authorities** to inspect or edit the host-managed authority graph and policies. The saved definition uses optimistic versioning to prevent accidental overwrite.
 4. Submit an order. A policy can execute it directly or create an authority request for the configured approvers. Vacant approver roles resolve deterministically after their configured delay.
 5. Participants see their command-chain view and relevant authority-request inbox; the Cesium map receives periodic state updates and a game-pinned orbital catalog.
+
+### Regional campaign planning
+
+Create **Regional Joint Campaign**, claim **Joint Force Commander**, start the scenario, and open **Joint planning**. Compare the two authored courses, edit the draft, save changes, then approve and publish the selected course. Publication queues a separate message for each allied role; receiving a plan starts only that unit's assigned tasking. Component commanders can save proposals and send them back for commander adoption. Save an amendment before publishing a new revision.
+
+In another browser session, claim a pilot or sector-controller role to receive the plan, request/grant clearances, offer/accept handoffs, and inspect delayed mission reports. An accepted handoff takes effect when its message reaches the aircraft. Map airspaces and routes come from the received plan, never the unpublished draft. Remote friendly positions and tracks may be stale during interference.
+
+The planning API is `GET /v1/games/{id}/planning?player_id=...&role_id=...` and `POST /v1/games/{id}/roles/{role_id}/planning`. Mutations require `player_id`, `lease_generation`, and a tagged `action`: `save`, `propose`, `adopt_proposal`, `publish`, `request_clearance`, `grant_clearance`, `offer_handoff`, `accept_handoff`, or `cancel`. Saves and publication use `expected_revision`; published revisions are immutable. Fixture plans, defensive tasking and explicitly estimated combat parameters live in `data/scenarios/`.
 
 ## Communications catalog and network APIs
 
@@ -163,7 +175,10 @@ cargo test --workspace
 cd web
 npm test
 npm run build
+npm run test:e2e
 ```
+
+Browser tests require Playwright Chromium. The planning browser test uses API fixtures and writes `web/test-results/joint-planning.png`; Rust tests separately exercise publication, delivery, authority, handoffs and mission execution. The Space-Track browser test uses a local mock unless both live-provider test variables are explicitly set.
 
 For Compose-only validation:
 

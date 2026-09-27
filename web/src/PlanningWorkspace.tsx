@@ -1,0 +1,84 @@
+import { useEffect, useState } from "react";
+import type { Role } from "./AuthorityWorkspace";
+import type { Position } from "./globeEntities";
+
+export type Volume = { id: string; name: string; kind: string; polygon: Position[]; floor_m: number; ceiling_m: number; start_tick: number; end_tick: number; controller_role_id: string; control_method: string };
+export type Mission = { id: string; name: string; kind: string; unit_id: string; issuer_role_id: string; objective_id: string; start_tick: number; end_tick: number; route: Position[]; home: Position; speed_mps: number; depends_on: string[]; clearance_airspace_ids: string[]; lost_comms: string; engagement: { weapons_release: boolean; minimum_identification: number; max_track_age_ticks: number; authorized_objective: string | null } };
+type Course = { id: string; name: string; risk_assessment: string; component_tasks: { role_id: string; description: string; supports_objective: string; resource_units: string[] }[]; missions: Mission[] };
+export type CampaignPlan = { id: string; revision: number; name: string; intent: string; commander_role_id: string; airspace_authority_role_id: string; objectives: { id: string; description: string; position: Position }[]; phases: { name: string; start_tick: number; end_tick: number }[]; courses: Course[]; selected_course_id: string | null; airspaces: Volume[]; published_tick: number | null };
+type Clearance = { id: string; airspace_id: string; unit_id: string; controller_role_id: string; start_tick: number; end_tick: number };
+type Handoff = { id: string; unit_id: string; from_role_id: string; to_role_id: string; airspace_id: string; accepted: boolean; delivered: boolean };
+export type PlanningView = { draft: CampaignPlan | null; received: CampaignPlan | null; comparisons: { id: string; name: string; aircraft_required: number; mission_ticks: number; risk_assessment: string }[]; reports: { mission_id: string; unit_id: string; state: string; observed_tick: number; detail: string; fuel_seconds: number; ammunition: number }[]; clearances: Clearance[]; handoffs: Handoff[]; tick: number; proposals?: { origin_role: string; plan: CampaignPlan }[]; assessments?: { objective_id: string; description: string; observed_effect: boolean; report_tick: number | null }[] };
+
+export function PlanningWorkspace({ apiBase, gameId, playerId, role, roles, onClose }: { apiBase: string; gameId: string; playerId: string; role: Role; roles: Role[]; onClose: () => void }) {
+  const [view, setView] = useState<PlanningView | null>(null);
+  const [draft, setDraft] = useState<CampaignPlan | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState("");
+  const [unit, setUnit] = useState("");
+  const [sector, setSector] = useState("");
+  const base = `${apiBase}/v1/games/${gameId}`;
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const response = await fetch(`${base}/planning?player_id=${playerId}&role_id=${role.id}`, { credentials: "include" });
+        if (!response.ok) throw new Error((await response.json()).error ?? "Could not load planning");
+        const next = await response.json() as PlanningView;
+        if (!cancelled) { setView(next); if (!dirty) setDraft(next.draft ?? next.received); }
+      } catch (e) { if (!cancelled) setError((e as Error).message); }
+    };
+    void refresh(); const timer = window.setInterval(refresh, 2000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [base, playerId, role.id, dirty]);
+  const plan = draft ?? view?.received;
+  const course = plan?.courses.find(c => c.id === selectedCourse) ?? plan?.courses[0];
+  const receivedCourse = view?.received?.courses.find(c => c.id === view.received?.selected_course_id);
+  const missions = receivedCourse?.missions ?? course?.missions ?? [];
+  const currentUnit = unit || missions[0]?.unit_id || "";
+  const currentSector = sector || view?.received?.airspaces[0]?.id || "";
+  const volume = view?.received?.airspaces.find(a => a.id === currentSector);
+  const roleName = (id: string) => roles.find(r => r.id === id)?.name ?? "Assigned role";
+  const editable = ["joint_force_commander", "combatant_commander", "component_commander"].includes(role.kind);
+  function edit(change: (next: CampaignPlan) => void) { if (!plan) return; const next = structuredClone(plan); change(next); setDraft(next); setDirty(true); }
+  async function act(action: Record<string, unknown>) {
+    setBusy(true); setError(""); setFeedback("");
+    try {
+      const response = await fetch(`${base}/roles/${role.id}/planning`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ player_id: playerId, lease_generation: role.lease_generation, ...action }) });
+      const body = await response.json(); if (!response.ok) throw new Error(body.error ?? "Planning action rejected");
+      setView(body); setDraft(body.draft ?? body.received); setDirty(false);
+      setFeedback(action.action === "save" ? "Draft saved." : "Message queued. Recipients act after delivery.");
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+  const clearance = (): Clearance => ({ id: crypto.randomUUID(), airspace_id: currentSector, unit_id: currentUnit, controller_role_id: volume?.controller_role_id ?? "", start_tick: Math.max(view?.tick ?? 0, volume?.start_tick ?? 0), end_tick: volume?.end_tick ?? 0 });
+  return <section className="planning-workspace" aria-label="Joint campaign planning">
+    <header><div><strong>Joint campaign planning</strong><p>{role.name} · Tick {view?.tick ?? 0} · {view?.received ? `Received revision ${view.received.revision}` : "Awaiting published orders"}</p></div><button onClick={onClose}>Close planning</button></header>
+    {error && <p role="alert" className="planning-error">{error}</p>}{feedback && <p role="status">{feedback}</p>}
+    {(view?.proposals ?? []).map(p => <article className="planning-card" key={p.origin_role}><strong>Proposal from {roleName(p.origin_role)} · revision {p.plan.revision}</strong><p>{p.plan.intent}</p><button disabled={busy || dirty} onClick={() => void act({ action: "adopt_proposal", origin_role: p.origin_role, revision: p.plan.revision })}>Adopt as new draft</button></article>)}
+    {!plan ? <p>No planning product has reached this role. The joint force commander can publish the initial campaign.</p> : <>
+      <h2>{plan.name}</h2><label>Commander intent<textarea aria-label="Commander intent" disabled={!editable} value={plan.intent} onChange={e => edit(p => { p.intent = e.target.value; })} /></label>
+      <div className="planning-columns"><section><h3>Objectives</h3>{plan.objectives.map((o, i) => <label key={o.id}>Objective {i+1}<input disabled={!editable} value={o.description} onChange={e => edit(p => { p.objectives[i].description = e.target.value; })} /></label>)}</section>
+      <section><h3>Campaign phases</h3>{plan.phases.map((phase,i) => <div className="planning-row" key={i}><input aria-label={`Phase ${i+1} name`} disabled={!editable} value={phase.name} onChange={e => edit(p => { p.phases[i].name = e.target.value; })} /><label>Start tick<input type="number" disabled={!editable} value={phase.start_tick} onChange={e => edit(p => { p.phases[i].start_tick = Number(e.target.value); })} /></label><label>End tick<input type="number" disabled={!editable} value={phase.end_tick} onChange={e => edit(p => { p.phases[i].end_tick = Number(e.target.value); })} /></label></div>)}</section></div>
+      <h3>Compare courses of action</h3><table><thead><tr><th>Course</th><th>Aircraft</th><th>Task duration</th><th>Risk assessment</th></tr></thead><tbody>{plan.courses.map(c => <tr key={c.id}><td><label><input type="radio" name="course" checked={course?.id === c.id} onChange={() => setSelectedCourse(c.id)} />{c.name}</label></td><td>{new Set(c.missions.map(m => m.unit_id)).size}</td><td>{c.missions.reduce((sum,m) => sum + m.end_tick-m.start_tick,0)} ticks</td><td>{c.risk_assessment}</td></tr>)}</tbody></table>
+      {course && <><label>Course name<input disabled={!editable} value={course.name} onChange={e => edit(p => { p.courses.find(c => c.id === course.id)!.name = e.target.value; })} /></label><label>Risk assessment<textarea disabled={!editable} value={course.risk_assessment} onChange={e => edit(p => { p.courses.find(c => c.id === course.id)!.risk_assessment = e.target.value; })} /></label>
+        <h3>Component support</h3>{course.component_tasks.map((task,i) => <label key={i}>{roleName(task.role_id)} · {task.resource_units.length} allocated units<input disabled={!editable} value={task.description} onChange={e => edit(p => { p.courses.find(c => c.id === course.id)!.component_tasks[i].description = e.target.value; })} /></label>)}
+        <h3>Air tasking timeline</h3>{course.missions.map((mission, mi) => <article className="planning-card" key={mission.id}><strong>{mission.name}</strong><div className="planning-row"><label>Mission<select disabled={!editable} value={mission.kind} onChange={e => edit(p => { p.courses.find(c => c.id === course.id)!.missions[mi].kind = e.target.value; })}>{["transit","patrol","intercept","strike","return"].map(k => <option key={k}>{k}</option>)}</select></label>{(["start_tick","end_tick","speed_mps"] as const).map(key => <label key={key}>{key === "speed_mps" ? "Speed m/s" : key === "start_tick" ? "Start tick" : "End tick"}<input type="number" disabled={!editable} value={mission[key]} onChange={e => edit(p => { p.courses.find(c => c.id === course.id)!.missions[mi][key] = Number(e.target.value); })} /></label>)}<label>Lost communications<select disabled={!editable} value={mission.lost_comms} onChange={e => edit(p => { p.courses.find(c => c.id === course.id)!.missions[mi].lost_comms = e.target.value; })}>{["continue","hold","return"].map(k => <option key={k}>{k}</option>)}</select></label></div>
+          <label><input type="checkbox" disabled={!editable} checked={mission.engagement.weapons_release} onChange={e => edit(p => { const m = p.courses.find(c => c.id === course.id)!.missions[mi]; m.engagement.weapons_release = e.target.checked; m.engagement.authorized_objective = e.target.checked ? m.objective_id : null; })} />Authorize weapons release against the assigned objective</label>
+          <details><summary>Route and altitude</summary>{mission.route.map((point,pi) => <div className="planning-row" key={pi}>{(["latitude_deg","longitude_deg","altitude_m"] as const).map(key => <label key={key}>{key === "altitude_m" ? "Altitude m" : key === "latitude_deg" ? "Latitude" : "Longitude"}<input type="number" step="any" disabled={!editable} value={point[key]} onChange={e => edit(p => { p.courses.find(c => c.id === course.id)!.missions[mi].route[pi][key] = Number(e.target.value); })} /></label>)}</div>)}</details>
+          <div className="planning-timeline" aria-label={`${mission.name}: ticks ${mission.start_tick} to ${mission.end_tick}`}><span style={{ marginLeft: `${100*mission.start_tick/Math.max(1,plan.phases.at(-1)!.end_tick)}%`, width: `${100*(mission.end_tick-mission.start_tick)/Math.max(1,plan.phases.at(-1)!.end_tick)}%` }}>{mission.kind}</span></div>
+        </article>)}
+      </>}
+      {editable && <div className="planning-row"><button disabled={busy || !dirty} onClick={() => void act({ action: "save", expected_revision: plan.revision, plan })}>Save draft</button><button disabled={busy || dirty} onClick={() => void act({ action: "propose" })}>Send proposal to commander</button>{role.id === plan.commander_role_id && <button disabled={busy || dirty || !course} onClick={() => void act({ action: "publish", expected_revision: plan.revision, course_id: course?.id })}>Approve and publish selected course</button>}</div>}
+      <h3>Airspace control</h3><table><thead><tr><th>Airspace</th><th>Controller</th><th>Altitude</th><th>Window</th><th>Method</th></tr></thead><tbody>{plan.airspaces.map(a => <tr key={a.id}><td>{a.name}</td><td>{roleName(a.controller_role_id)}</td><td>{a.floor_m}–{a.ceiling_m} m</td><td>{a.start_tick}–{a.end_tick}</td><td>{a.control_method}</td></tr>)}</tbody></table>
+      {editable && <details><summary>Edit airspace plan</summary>{plan.airspaces.map((a,ai) => <article className="planning-card" key={a.id}><label>Airspace name<input value={a.name} onChange={e => edit(p => { p.airspaces[ai].name = e.target.value; })} /></label><div className="planning-row"><label>Controller<select value={a.controller_role_id} onChange={e => edit(p => { p.airspaces[ai].controller_role_id = e.target.value; })}>{roles.filter(r => r.side === role.side).map(r => <option value={r.id} key={r.id}>{r.name}</option>)}</select></label><label>Control method<select value={a.control_method} onChange={e => edit(p => { p.airspaces[ai].control_method = e.target.value; })}><option value="procedural">Procedural</option><option value="positive">Positive</option></select></label>{(["floor_m","ceiling_m","start_tick","end_tick"] as const).map(key => <label key={key}>{({floor_m:"Floor m",ceiling_m:"Ceiling m",start_tick:"Active from tick",end_tick:"Active until tick"})[key]}<input type="number" value={a[key]} onChange={e => edit(p => { p.airspaces[ai][key] = Number(e.target.value); })} /></label>)}</div><details><summary>Boundary coordinates</summary>{a.polygon.map((point,pi) => <div className="planning-row" key={pi}>{(["latitude_deg","longitude_deg"] as const).map(key => <label key={key}>{key === "latitude_deg" ? "Latitude" : "Longitude"}<input type="number" step="any" value={point[key]} onChange={e => edit(p => { p.airspaces[ai].polygon[pi][key] = Number(e.target.value); })} /></label>)}</div>)}</details></article>)}</details>}
+      {view?.received && <><div className="planning-row"><label>Aircraft<select value={currentUnit} onChange={e => setUnit(e.target.value)}>{Array.from(new Set(missions.map(m => m.unit_id))).map(id => <option value={id} key={id}>{missions.find(m => m.unit_id === id)?.name}</option>)}</select></label><label>Destination airspace<select value={currentSector} onChange={e => setSector(e.target.value)}>{view.received.airspaces.map(a => <option value={a.id} key={a.id}>{a.name}</option>)}</select></label><button disabled={busy || !volume} onClick={() => void act({ action: "request_clearance", clearance: clearance() })}>Request clearance</button>{volume?.controller_role_id === role.id && <button disabled={busy} onClick={() => void act({ action: "grant_clearance", clearance: clearance() })}>Grant clearance</button>}<button disabled={busy || !volume || volume.controller_role_id === role.id || !view.received.airspaces.some(a => a.controller_role_id === role.id)} onClick={() => void act({ action: "offer_handoff", handoff: { id: crypto.randomUUID(), unit_id: currentUnit, from_role_id: role.id, to_role_id: volume!.controller_role_id, airspace_id: currentSector, accepted: false, delivered: false } })}>Offer handoff</button></div>
+        {view.clearances.map(c => <article className="planning-card" key={c.id}>Clearance · {view.received?.airspaces.find(a => a.id === c.airspace_id)?.name} · ticks {c.start_tick}–{c.end_tick}{c.controller_role_id === role.id && <button disabled={busy} onClick={() => void act({ action: "grant_clearance", clearance: c })}>Approve request</button>}</article>)}
+        {view.handoffs.map(h => <article className="planning-card" key={h.id}>Handoff: {roleName(h.from_role_id)} → {roleName(h.to_role_id)} · {h.delivered ? "Received by aircraft" : h.accepted ? "Accepted; awaiting aircraft receipt" : "Awaiting acceptance"}{h.to_role_id === role.id && !h.accepted && <button disabled={busy} onClick={() => void act({ action: "accept_handoff", handoff_id: h.id })}>Accept handoff</button>}</article>)}
+        <h3>Execution and assessment</h3>{(view.assessments ?? []).map(a => <p key={a.objective_id}>{a.description}: {a.observed_effect ? `Destroyed target observed near objective at tick ${a.report_tick}` : "No confirmed effect in this role’s picture"}</p>)}{view.reports.length === 0 && <p>No mission reports received.</p>}{view.reports.map(r => <article className="planning-card" key={r.mission_id}><strong>{missions.find(m => m.id === r.mission_id)?.name ?? "Mission"} · {r.state}</strong><p>{r.detail}</p><small>Report age {view.tick-r.observed_tick} ticks · fuel {Math.round(r.fuel_seconds)} seconds · {r.ammunition} weapons remaining</small><button disabled={busy} onClick={() => void act({ action: "cancel", mission_ids: [r.mission_id] })}>Send cancellation</button></article>)}
+      </>}
+    </>}
+  </section>;
+}

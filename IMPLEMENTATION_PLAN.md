@@ -1,5 +1,22 @@
 # World At War Implementation Plan
 
+## Implementation checkpoint — 2026-09-27
+
+The sections below remain the target architecture, not a declaration of completed release phases. The communications checkpoint is recorded in `plans/fdffd4709ad9bdb1717bb4035a45af51ed346695.md` (implementation commit `fdffd47`). The current increment adds an offline Regional Joint Campaign: versioned collaborative plans, two courses of action, delivered air tasking/airspace orders, clearances and handoffs, basic mission execution/combat, role-owned reports, and a Cesium planning workspace/overlays.
+
+Communications now include tick-driven fragmentation/reassembly, bounded retries, expiry, independent acknowledgements and duplicate suppression. Remote friendly positions and contacts arrive through reports; application orders wait for delivery. This advances Phases 1–2 and a limited air/combat portion of Phase 3; it does not complete any phase's full exit criteria.
+
+Next work remains:
+
+- Certify multiplayer/reconnect and hidden-information behavior with multiple real browser sessions; the planning browser test currently uses API fixtures, with delivery behavior covered separately in Rust.
+- Complete controller/monitor visibility, durable packet audit and information-management policy fidelity. Measure Global Crisis tick performance before accepting the performance budgets; full-mesh report dissemination is a likely optimization target.
+- Add terrain-aware sensing, richer fusion/SIGINT, remaining multi-domain simulation/logistics and goal-directed Red AI.
+- Add database-backed persistence, deterministic recovery/replay, and the hardening/soak milestones.
+
+See README for the implemented workflow, API entry points and explicit fidelity limits. Campaign state remains memory-resident, and the combat fixtures are labeled gameplay estimates rather than sourced platform performance.
+
+Checkpoint validation: the Rust workspace suite and added message-visibility regression pass (56 tests total), as do formatting, Clippy with warnings denied, 17 frontend tests, the production build, and both Playwright tests using mock APIs/providers. The planning screenshot is generated at `web/test-results/joint-planning.png`. Docker Compose validation could not run because Docker is unavailable in the WSL environment. The build retains its large-bundle warning. The 65-tick Global Crisis authority regression takes roughly 110 seconds in a debug test run; this is evidence that performance needs investigation, not a release-mode benchmark.
+
 ## 1. Product Contract
 
 World At War is a persistent, server-authoritative, multiplayer command simulation. The first complete release models a feature-rich Blue force across air, space, cyber, sea, undersea, and land. Red is controlled by a basic deterministic AI that uses the same imperfect information and legal command interface as a human player.

@@ -1776,6 +1776,7 @@ dependencies = [
  "bevy_ecs",
  "c3mesh",
  "serde",
+ "serde_json",
  "thiserror",
  "uuid",
 ]
@@ -1786,6 +1787,7 @@ version = "0.1.0"
 dependencies = [
  "c3mesh",
  "serde",
+ "serde_json",
  "sim-comms",
  "sim-core",
  "thiserror",
