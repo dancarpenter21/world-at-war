@@ -2,7 +2,7 @@
 
 World At War is a server-authoritative, low-fidelity war-simulation prototype. It combines a Rust entity-component simulation, a Cesium/React operational map, a public Space-Track orbital catalog, and an authority workflow for command decisions.
 
-The current implementation ships **Global Crisis**, with 64 authored entities and a pinned public orbital snapshot, plus a compact **Jammed Flight Test** with two pilot-controlled Blue aircraft and directional receiver jamming. Authored entities and uncertain tracks use MIL-STD-2525D symbols.
+The current implementation ships **Command Link Exercise**, a catalog-free command post and two aircraft on a slow shared training net; **Global Crisis**, with 64 authored entities and a pinned public orbital snapshot; and **Jammed Flight Test**, with two pilot-controlled Blue aircraft and directional receiver jamming. Authored entities and uncertain tracks use MIL-STD-2525D symbols.
 
 The broader target architecture, planned simulation fidelity, and acceptance criteria are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Features described there are not necessarily implemented yet.
 
@@ -59,7 +59,9 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173`. The Vite development server proxies API calls to `http://localhost:8000` by default. Set `VITE_API_BASE` in the frontend environment (for example, `VITE_API_BASE=https://api.example.test npm run dev`) only when the browser must use a different API origin.
+Open `http://localhost:5173`. For a first game, select **Command Link Exercise**, create the game, claim **Exercise Commander**, and start the scenario. Submit movement orders for both aircraft, then open **Network** to inspect their queue and delivery states. The shared 2.4 kbit/s net permits four waiting packets per directional link in addition to a packet already transmitting; excess packets fail with a recorded queue drop. Pause/resume retains pending radio traffic. The exercise uses fictional positions and deliberately slow radio settings, runs without an orbital catalog, and keeps the base stationary.
+
+The Vite development server proxies API calls to `http://localhost:8000` by default. Set `VITE_API_BASE` in the frontend environment (for example, `VITE_API_BASE=https://api.example.test npm run dev`) only when the browser must use a different API origin.
 
 ## Run with Docker
 
@@ -136,6 +138,8 @@ cargo run -p sim-catalog --bin airport-cache-sync
 The REST API exposes catalog status at `/v1/airport-catalog/status`, paginated search at `/v1/airports`, airport/runway details at `/v1/airports/{airport_id}`, and conservative runway compatibility evaluation at `/v1/airports/{airport_id}/compatibility`. Airport search accepts `west`, `south`, `east`, and `north` degree bounds for viewport loading, including bounds that cross the antimeridian. Optional `horizon_latitude`, `horizon_longitude`, and `horizon_radius_deg` parameters further restrict results to a spherical camera-horizon cap. The Cesium operational map uses both filters to display a compact, globe-occluded crossed-runway airport symbol and prioritizes major airports when a viewport contains more than 500 facilities. Compatibility requests supply aircraft mass, landing-gear category, operation, and already-adjusted required distance. Missing pavement-strength information returns `unknown` rather than assuming compatibility.
 
 ## Gameplay and authority workflow
+
+The exercise definition in [data/scenarios/command-link-exercise.v1.json](data/scenarios/command-link-exercise.v1.json) keeps units, authority relationships, provenance, and bounded radio settings separate from simulation code. Its checked parser builds the packet topology and validates the authority chain. The data is embedded at compile time; Docker builds include it and the development watcher recompiles when it changes.
 
 Use **Movement orders** to choose a commanded unit, a clockwise course from north (0–360°), and speed (0–1,000 m/s). **Turn north** sends a 130 m/s northbound order; **Stop unit** cancels movement after its command arrives. The panel prefers an aircraft over a command base and reports packet delivery, authority approval, and the actual execution tick. On a narrow screen, open **Commands** to access the same controls while retaining the map. A lost or timed-out response exposes **Retry order**, which sends the original ID and payload and can recover an accepted order while the scenario is paused.
 

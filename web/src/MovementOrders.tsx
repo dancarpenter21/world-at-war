@@ -20,9 +20,9 @@ const statusText: Record<IntentState, string> = {
   approved_no_executor: "Approved; no executor available"
 };
 
-export function MovementOrders({ apiBase, gameId, playerId, role, projection, canIssueOrders, canRecoverOrder }: {
+export function MovementOrders({ apiBase, gameId, playerId, role, projection, canIssueOrders, canRecoverOrder, onExecuted }: {
   apiBase: string; gameId: string; playerId: string; role: Role; projection: Projection;
-  canIssueOrders: boolean; canRecoverOrder: boolean;
+  canIssueOrders: boolean; canRecoverOrder: boolean; onExecuted?: () => void;
 }) {
   const units = useMemo(() => {
     const controlled = new Set(role.command_units);
@@ -94,6 +94,13 @@ export function MovementOrders({ apiBase, gameId, playerId, role, projection, ca
   };
   const disabled = !canIssueOrders || !target || pending || uncertainOrder !== null;
   const receipt = receiptResource.data;
+  const observedExecution = useRef<string | null>(null);
+  useEffect(() => {
+    if (receipt?.state === "executed" && observedExecution.current !== receipt.intent.intent_id) {
+      observedExecution.current = receipt.intent.intent_id;
+      onExecuted?.();
+    }
+  }, [receipt, onExecuted]);
   const receiptUnit = receipt ? projection.own_units.find((unit) => unit.id === receipt.intent.target) : null;
 
   return <section className="movement-orders" aria-label="Movement orders">

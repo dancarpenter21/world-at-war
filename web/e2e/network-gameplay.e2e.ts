@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -11,6 +12,88 @@ let backend: Awaited<ReturnType<typeof startGameBackend>>;
 test.beforeAll(async () => { backend = await startGameBackend(); });
 test.afterAll(async () => { if (backend) await backend.close(); });
 
+test("plays the command exercise without a catalog and retains a congested radio queue through pause", async ({ page, request }, testInfo) => {
+  const exerciseRole = "00000000-0000-0000-0000-000000004e86";
+  const secondTarget = "00000000-0000-0000-0000-00000000000c";
+  const initialCatalog = await (await request.get(backend.url + "/v1/settings/space-catalog/status")).json();
+  expect(initialCatalog.usable).toBe(false);
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.addInitScript((id) => localStorage.setItem("world-at-war-player", id), playerId);
+  await page.route(/https:\/\/[^/]*tile\.openstreetmap\.org\//, (route) => route.abort());
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: /^Command Link Exercise/ })).toBeVisible();
+  await expect(page.getByText("LOCAL SCENARIO READY", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Game title")).toHaveValue("Command Link Exercise");
+  const creation = page.waitForResponse((response) => response.url().endsWith("/v1/games") && response.request().method() === "POST");
+  await page.getByRole("button", { name: "Create game", exact: true }).click();
+  const created = await (await creation).json();
+  const gameId = created.game.id as string;
+  expect(created.game.space_catalog_enabled).toBe(false);
+  await expect(page.getByRole("button", { name: /^Exercise National Authority/ })).toBeDisabled();
+  const claim = page.waitForResponse((response) => response.url().endsWith(`/roles/${exerciseRole}/claim`));
+  await page.getByRole("button", { name: /^Exercise Commander/ }).click();
+  const heldRole = await (await claim).json();
+  await page.getByRole("button", { name: "Start scenario", exact: true }).click();
+  const movement = page.getByRole("region", { name: "Movement orders" });
+  await expect(movement.getByRole("button", { name: "Send movement order", exact: true })).toBeEnabled();
+  await expect(movement.getByLabel("Command unit").locator("option")).toHaveCount(2);
+  const submit = async (target: string, course: string) => {
+    await movement.getByLabel("Command unit").selectOption(target);
+    await movement.getByLabel("Course (°)").fill(course);
+    await movement.getByLabel("Speed (m/s)").fill("80");
+    const response = page.waitForResponse((item) => item.url().endsWith(`/roles/${exerciseRole}/intent`) && item.request().method() === "POST");
+    await movement.getByRole("button", { name: "Send movement order", exact: true }).click();
+    const completed = await response;
+    expect(completed.ok()).toBe(true);
+    return { outcome: await completed.json(), body: completed.request().postDataJSON() };
+  };
+  const first = await submit(targetId, "90");
+  const second = await submit(secondTarget, "270");
+  const authorization = new URLSearchParams({ player_id: playerId, role_id: exerciseRole });
+  const networkUrl = `${backend.url}/v1/games/${gameId}/network?${authorization}`;
+  // Wait for packet admission at a simulation boundary, then pause through the
+  // API. Queued submission records can precede live channel occupancy.
+  const burst = await Promise.all(Array.from({ length: 6 }, async () => {
+    const response = await request.post(`${backend.url}/v1/games/${gameId}/roles/${exerciseRole}/intent`, {
+      data: { ...first.body, intent: { ...first.body.intent, intent_id: randomUUID() } }
+    });
+    expect(response.ok()).toBe(true);
+    return await response.json() as { message_id: string };
+  }));
+  await expect.poll(async () => {
+    const network = await (await request.get(networkUrl)).json();
+    return network.links.reduce((count: number, link: { queued_packets: number }) => count + link.queued_packets, 0);
+  }, { timeout: 10_000 }).toBeGreaterThan(0);
+  const pause = await request.post(`${backend.url}/v1/games/${gameId}/pause`, { data: { player_id: playerId } });
+  expect(pause.ok()).toBe(true);
+  await expect(page.getByText("Scenario paused", { exact: true })).toBeVisible();
+  const paused = await (await request.get(networkUrl)).json();
+  expect(paused.links.some((link: { queued_packets: number }) => link.queued_packets > 0)).toBe(true);
+  expect(paused.links.every((link: { queued_packets: number }) => link.queued_packets <= 4)).toBe(true);
+  expect(paused.messages.filter((record: { message: { id: string }; state: string }) =>
+    [first.outcome.message_id, second.outcome.message_id, ...burst.map((order) => order.message_id)].includes(record.message.id)).some((record: { state: string }) => record.state !== "delivered")).toBe(true);
+  await page.waitForTimeout(1_100);
+  const stillPaused = await (await request.get(networkUrl)).json();
+  expect(stillPaused).toEqual(paused);
+  await page.getByRole("button", { name: "Resume scenario", exact: true }).click();
+  const receiptAuthorization = new URLSearchParams({ player_id: playerId, lease_generation: String(heldRole.lease_generation) });
+  for (const order of [first, second]) {
+    const url = `${backend.url}/v1/games/${gameId}/roles/${exerciseRole}/intents/${order.body.intent.intent_id}?${receiptAuthorization}`;
+    await expect.poll(async () => (await (await request.get(url)).json()).state, { timeout: 15_000 }).toBe("executed");
+  }
+  await expect(movement.getByRole("status")).toContainText("Order executed", { timeout: 10_000 });
+  await expect(movement.locator(".movement-current")).toHaveText("Current order: 270° at 80 m/s", { timeout: 10_000 });
+  const state = await (await request.get(`${backend.url}/v1/games/${gameId}/state?${authorization}`)).json();
+  expect(state.own_units.find((unit: { id: string }) => unit.id === targetId).velocity).toMatchObject({ north_mps: 0, east_mps: 80 });
+  expect(state.own_units.find((unit: { id: string }) => unit.id === secondTarget).velocity).toMatchObject({ north_mps: 0, east_mps: -80 });
+  expect(state.own_units.find((unit: { id: string }) => unit.id.endsWith("000000000005")).velocity).toMatchObject({ north_mps: 0, east_mps: 0 });
+  await page.screenshot({ path: testInfo.outputPath("command-link-exercise-executed.png") });
+  await page.getByRole("button", { name: "Pause scenario", exact: true }).click();
+  await page.getByRole("button", { name: "Leave scenario", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Create game", exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
+});
 test("runs a real game, persists networked command delivery, and retains the map through host pause", async ({ page, request }, testInfo) => {
   const started = Date.now();
   const timings: { stage: string; elapsed_ms: number; dom_nodes: number; communications_rows: number }[] = [];

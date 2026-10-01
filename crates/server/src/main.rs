@@ -41,7 +41,9 @@ use sim_core::{
     AuthorityDefinition, AuthorityPolicy, AuthorityRoleKind, AuthorizationRecord, AuthorizedIntent,
     PlayerIntent, RoleProjection, Side, Simulation,
 };
-use sim_scenario::{global_crisis_scenario, jammed_flight_scenario, Scenario};
+use sim_scenario::{
+    command_link_exercise_scenario, global_crisis_scenario, jammed_flight_scenario, Scenario,
+};
 use space_assets::{SpaceAssetDetail, SpaceAssetService, SpaceAssetsResponse};
 use space_catalog::{SpaceCatalogService, SpaceCatalogSnapshot, SpaceCatalogStatus};
 use tokio::sync::RwLock;
@@ -258,6 +260,7 @@ struct RoleSummary {
     location_unit_id: Uuid,
     command_units: Vec<Uuid>,
     held: bool,
+    claimable: bool,
     ai_controlled: bool,
     lease_generation: u64,
 }
@@ -460,7 +463,11 @@ type CookieApiResult<T> = Result<(HeaderMap, Json<T>), (StatusCode, Json<ErrorRe
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let scenarios = [global_crisis_scenario(), jammed_flight_scenario()];
+    let scenarios = [
+        global_crisis_scenario(),
+        jammed_flight_scenario(),
+        command_link_exercise_scenario(),
+    ];
     for scenario in &scenarios {
         scenario.validate()?;
     }
@@ -2675,6 +2682,7 @@ fn role_summary(role: &Role) -> RoleSummary {
         location_unit_id: role.location_unit_id,
         command_units: role.command_units.clone(),
         held: role.owner.is_some(),
+        claimable: role.claimable,
         ai_controlled: role.ai_controlled,
         lease_generation: role.lease_generation,
     }

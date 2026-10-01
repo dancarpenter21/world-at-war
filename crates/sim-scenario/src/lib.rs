@@ -1,5 +1,9 @@
 //! Versioned scenario definitions and spawning.
 
+mod radio_exercise;
+
+pub use radio_exercise::command_link_exercise_scenario;
+
 use std::collections::BTreeMap;
 
 use c3mesh::{
@@ -49,6 +53,8 @@ pub struct ScenarioUnit {
 
 #[derive(Debug, Error)]
 pub enum ScenarioError {
+    #[error("invalid authored scenario data: {0}")]
+    InvalidAuthoredData(String),
     #[error("scenario must include at least one unit")]
     MissingUnits,
     #[error("scenario includes duplicate unit id {0}")]
@@ -1162,7 +1168,11 @@ mod tests {
         let catalog_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../data/communications/catalog.yaml");
         let catalog = CommunicationsCatalog::load(catalog_path).unwrap();
-        let scenarios = [global_crisis_scenario(), jammed_flight_scenario()];
+        let scenarios = [
+            global_crisis_scenario(),
+            jammed_flight_scenario(),
+            command_link_exercise_scenario(),
+        ];
         let missing: Vec<_> = scenarios
             .iter()
             .flat_map(|scenario| &scenario.units)

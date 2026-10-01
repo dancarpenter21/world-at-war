@@ -274,7 +274,7 @@ function App() {
   activeGameId.current = game?.id ?? null;
   const [mode, setMode] = useState<"new" | "join" | "space">("new");
   const [message, setMessage] = useState("Loading scenarios");
-  const [gameTitle, setGameTitle] = useState("Global Crisis");
+  const [gameTitle, setGameTitle] = useState("");
   const [displayName, setDisplayName] = useState("Commander");
   const [adminToken, setAdminToken] = useState("");
   const [spaceUsername, setSpaceUsername] = useState("");
@@ -300,6 +300,9 @@ function App() {
   const refreshWaitSeconds = Math.max(0, (spaceStatus?.next_sync_unix ?? 0) - nowUnix);
   const catalogRefreshBlocked = refreshWaitSeconds > 0;
   const selectedScenario = scenarios.find((scenario) => scenario.id === selectedScenarioId) ?? scenarios[0];
+  const localScenarioReady = game ? !game.space_catalog_enabled : mode === "new" && selectedScenario && !selectedScenario.requires_space_catalog;
+  const catalogLabel = localScenarioReady ? "LOCAL SCENARIO READY" : spaceStatus?.usable
+    ? `${spaceStatus.object_count.toLocaleString()} ORBITAL OBJECTS${spaceStatus.stale ? " · CACHED" : ""}` : "SPACE DATA REQUIRED";
   const usingSavedCredentials = Boolean(spaceStatus?.remembered_credentials && spacePassword === SAVED_PASSWORD_MASK);
   const gameResource = usePollingResource<Game>(game ? game.id + ":" + playerId : null, async (signal) => {
     const loaded = await request<Game[]>("/v1/games", { signal });
@@ -346,6 +349,7 @@ function App() {
       effectiveStatus = await request<SpaceStatus>("/v1/settings/space-track/credentials", { method: "POST" });
     }
     setScenarios(loadedScenarios); setGames(loadedGames); setSpaceStatus(effectiveStatus);
+    setGameTitle((current) => current.trim() ? current : loadedScenarios[0]?.title ?? "");
     setSelectedScenarioId((current) => current && loadedScenarios.some((scenario) => scenario.id === current) ? current : loadedScenarios[0]?.id ?? "");
     setGame((current) => current
       ? loadedGames.find((candidate) => candidate.id === current.id) ?? current
@@ -550,7 +554,7 @@ function App() {
       {game && <button className="secondary session-leave" onClick={leave}>Leave scenario</button>}
     </header>
     {!playable && <div className="lobby-stage"><section className="scenario-modal" aria-modal="true" role="dialog">
-      <div className="modal-header"><div><h1>Scenario Command</h1><p>{message}</p></div><span className={spaceStatus?.usable ? "catalog-ready" : "catalog-missing"}>{spaceStatus?.usable ? `${spaceStatus.object_count.toLocaleString()} ORBITAL OBJECTS${spaceStatus.stale ? " · CACHED" : ""}` : "SPACE DATA REQUIRED"}</span></div>
+      <div className="modal-header"><div><h1>Scenario Command</h1><p>{message}</p></div><span className={localScenarioReady || spaceStatus?.usable ? "catalog-ready" : "catalog-missing"}>{catalogLabel}</span></div>
       {!game && <>
         <div className="tabs">
           <button className={mode === "new" ? "active" : ""} onClick={() => setMode("new")}>New scenario</button>
@@ -581,13 +585,13 @@ function App() {
           {spaceStatus?.remembered_credentials && <button className="text-command" onClick={() => void forgetSpaceTrack()}>Forget saved credentials</button>}
         </div>}
       </>}
-      {game && <div className="modal-body"><h2>{game.title}</h2><p className="muted">Claim a command role. The operational map remains offline until the scenario starts.</p><div className="role-grid">{roles.map((item) => <button key={item.id} className={`role ${role?.id === item.id ? "selected" : ""}`} disabled={item.ai_controlled || (item.held && role?.id !== item.id)} onClick={() => void claim(item)}><span>{item.name}</span><small>{item.ai_controlled ? "AI" : item.held ? "held" : item.kind.replaceAll("_", " ")}</small></button>)}</div><div className="modal-actions"><button className="secondary" onClick={leave}>Back</button>{game.host_player_id === playerId && <button className="secondary" onClick={() => setShowAuthority(true)}>Configure authorities</button>}{game.host_player_id === playerId && <button className="command" disabled={!role || pendingControl !== null} aria-busy={pendingControl !== null} onClick={() => void start()}>{pendingControl ? "Starting…" : game.status === "paused" ? "Resume scenario" : "Start scenario"}</button>}{game.host_player_id !== playerId && <span className="muted">Waiting for host to start</span>}</div></div>}
+      {game && <div className="modal-body"><h2>{game.title}</h2><p className="muted">Claim a command role. The operational map remains offline until the scenario starts.</p><div className="role-grid">{roles.map((item) => <button key={item.id} className={`role ${role?.id === item.id ? "selected" : ""}`} disabled={item.ai_controlled || item.claimable === false || (item.held && role?.id !== item.id)} onClick={() => void claim(item)}><span>{item.name}</span><small>{item.ai_controlled ? "AI" : item.claimable === false ? "unavailable" : item.held ? "held" : item.kind.replaceAll("_", " ")}</small></button>)}</div><div className="modal-actions"><button className="secondary" onClick={leave}>Back</button>{game.host_player_id === playerId && <button className="secondary" onClick={() => setShowAuthority(true)}>Configure authorities</button>}{game.host_player_id === playerId && <button className="command" disabled={!role || pendingControl !== null} aria-busy={pendingControl !== null} onClick={() => void start()}>{pendingControl ? "Starting…" : game.status === "paused" ? "Resume scenario" : "Start scenario"}</button>}{game.host_player_id !== playerId && <span className="muted">Waiting for host to start</span>}</div></div>}
     </section></div>}
     {playable && !projection && game && <section className="workspace-loading">
       <GameSessionNotice game={game} status={connectionStatus} error={connectionError} controlError={controlError} hasProjection={false} onRetry={retryConnection} />
     </section>}
     {playable && projection && <section className={`workspace ${showCommands ? "commands-open" : ""}`}>
-      <aside id="command-panel" className={`sidebar ${showCommands ? "commands-open" : ""}`}><h1>{role.name}</h1><p className="message">{game.title}</p><MovementOrders key={`${game.id}:${role.id}:${role.lease_generation}`} apiBase={API_BASE} gameId={game.id} playerId={playerId} role={role} projection={projection} canIssueOrders={canIssueOrders} canRecoverOrder={connectionStatus === "live"} /><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command network-launch" onClick={() => setShowNetwork(true)}>Network</button><button className="command map-filter-launch" onClick={() => setShowMapFilters((value) => !value)}>Map filters</button><h2>Catalog</h2><p className="muted">{game.space_catalog_enabled ? spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status" : "No orbital catalog in this scenario"}</p><p className="session-command-feedback" role="status">{message}</p></aside>
+      <aside id="command-panel" className={`sidebar ${showCommands ? "commands-open" : ""}`}><h1>{role.name}</h1><p className="message">{game.title}</p><MovementOrders key={`${game.id}:${role.id}:${role.lease_generation}`} apiBase={API_BASE} gameId={game.id} playerId={playerId} role={role} projection={projection} canIssueOrders={canIssueOrders} canRecoverOrder={connectionStatus === "live"} onExecuted={projectionResource.refresh} /><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command network-launch" onClick={() => setShowNetwork(true)}>Network</button><button className="command map-filter-launch" onClick={() => setShowMapFilters((value) => !value)}>Map filters</button><h2>Catalog</h2><p className="muted">{game.space_catalog_enabled ? spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status" : "No orbital catalog in this scenario"}</p><p className="session-command-feedback" role="status">{message}</p></aside>
       <section className="map-region">
         <GameSessionNotice game={game} status={connectionStatus} error={connectionError} controlError={controlError} hasProjection={true} onRetry={retryConnection} />
         <Globe key={`${game.id}:${role.id}:${role.lease_generation}`} projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} keyboardEnabled={!showAuthority && !showNetwork && !showMapFilters} renderingEnabled={!showAuthority && !showNetwork} />
