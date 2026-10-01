@@ -51,13 +51,16 @@ fn simulation(platforms: Vec<PlatformSpawn>) -> Simulation {
 }
 
 fn set_position(sim: &mut Simulation, id: u128, longitude_deg: f64, altitude_m: f64) {
-    let mut query = sim.world.query::<(&SimEntityId, &mut GeoPose)>();
-    let (_, mut pose) = query
+    let mut query = sim
+        .world
+        .query::<(&SimEntityId, &mut GeoPose, &mut GeodesicMotionState)>();
+    let (_, mut pose, mut motion) = query
         .iter_mut(&mut sim.world)
-        .find(|(unit_id, _)| unit_id.0 == Uuid::from_u128(id))
+        .find(|(unit_id, _, _)| unit_id.0 == Uuid::from_u128(id))
         .unwrap();
     pose.longitude_deg = longitude_deg;
     pose.altitude_m = altitude_m;
+    motion.origin = *pose;
 }
 
 #[test]

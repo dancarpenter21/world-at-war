@@ -5,9 +5,13 @@ pub mod geodesy;
 #[cfg(test)]
 mod sensor_tests;
 
+#[cfg(test)]
+mod motion_tests;
+
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use bevy_ecs::prelude::*;
+use bevy_ecs::query::QueryData;
 use c3mesh::{
     ChannelId, DeviceId, DeviceKind, DropReason, FrequencyBand, NetworkConfig,
     ReceiverInterference, Simulator as NetworkSimulator, SimulatorOptions,
@@ -108,6 +112,23 @@ pub struct FlightWaypoint {
 pub struct CyclicFlightPath {
     pub period_ticks: u64,
     pub waypoints: Vec<FlightWaypoint>,
+}
+
+#[derive(Component, Debug, Clone, Copy)]
+struct GeodesicMotionState {
+    origin: GeoPose,
+    started_at_tick: u64,
+}
+
+#[derive(QueryData)]
+#[query_data(mutable)]
+struct CommandableUnit {
+    id: &'static SimEntityId,
+    authority: &'static AuthorityNode,
+    pose: &'static GeoPose,
+    velocity: &'static mut Velocity,
+    motion: &'static mut GeodesicMotionState,
+    flight_path: Option<&'static mut CyclicFlightPathState>,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -800,6 +821,10 @@ impl Simulation {
             DomainKind(platform.domain),
             platform.pose,
             platform.velocity,
+            GeodesicMotionState {
+                origin: platform.pose,
+                started_at_tick: 0,
+            },
             AuthorityNode {
                 echelon: 1,
                 can_order: true,
@@ -1189,12 +1214,7 @@ fn apply_orders(
     clock: Res<SimClock>,
     mut pending: ResMut<PendingIntents>,
     mut results: ResMut<OrderResults>,
-    mut units: Query<(
-        &SimEntityId,
-        &AuthorityNode,
-        &mut Velocity,
-        Option<&mut CyclicFlightPathState>,
-    )>,
+    mut units: Query<CommandableUnit>,
 ) {
     let mut deferred = VecDeque::new();
     while let Some(authorized) = pending.0.pop_front() {
@@ -1206,16 +1226,14 @@ fn apply_orders(
             });
             continue;
         }
-        let Some((_, authority, mut velocity, mut flight_path)) =
-            units.iter_mut().find(|(id, _, _, _)| id.0 == intent.target)
-        else {
+        let Some(mut unit) = units.iter_mut().find(|unit| unit.id.0 == intent.target) else {
             results.0.push(OrderResult {
                 intent_id: intent.intent_id,
                 status: OrderStatus::Rejected("target does not exist".into()),
             });
             continue;
         };
-        if !authority.can_order {
+        if !unit.authority.can_order {
             results.0.push(OrderResult {
                 intent_id: intent.intent_id,
                 status: OrderStatus::Rejected("target cannot accept orders".into()),
@@ -1227,9 +1245,23 @@ fn apply_orders(
                 north_mps,
                 east_mps,
             } => {
-                velocity.north_mps = north_mps;
-                velocity.east_mps = east_mps;
-                if let Some(path) = flight_path.as_deref_mut() {
+                if !north_mps.is_finite()
+                    || !east_mps.is_finite()
+                    || !north_mps.hypot(east_mps).is_finite()
+                {
+                    results.0.push(OrderResult {
+                        intent_id: intent.intent_id,
+                        status: OrderStatus::Rejected(
+                            "movement vector must have finite speed".into(),
+                        ),
+                    });
+                    continue;
+                }
+                unit.velocity.north_mps = north_mps;
+                unit.velocity.east_mps = east_mps;
+                unit.motion.origin = *unit.pose;
+                unit.motion.started_at_tick = clock.tick.saturating_sub(1);
+                if let Some(path) = unit.flight_path.as_deref_mut() {
                     path.active = false;
                 }
                 results.0.push(OrderResult {
@@ -1250,17 +1282,29 @@ fn apply_orders(
 
 fn move_platforms(
     clock: Res<SimClock>,
-    mut units: Query<(&mut GeoPose, &Velocity, Option<&CyclicFlightPathState>)>,
+    mut units: Query<(
+        &mut GeoPose,
+        &Velocity,
+        &GeodesicMotionState,
+        Option<&CyclicFlightPathState>,
+    )>,
 ) {
-    for (mut pose, velocity, flight_path) in &mut units {
+    for (mut pose, velocity, motion, flight_path) in &mut units {
         if let Some(path) = flight_path.filter(|path| path.active) {
             *pose = position_on_flight_path(&path.path, clock.tick);
             continue;
         }
-        pose.latitude_deg += velocity.north_mps * TICK_SECONDS as f64 / 111_320.0;
-        let longitude_scale = 111_320.0 * pose.latitude_deg.to_radians().cos().abs().max(0.01);
-        pose.longitude_deg += velocity.east_mps * TICK_SECONDS as f64 / longitude_scale;
-        pose.altitude_m = (pose.altitude_m + velocity.climb_mps * TICK_SECONDS as f64).max(0.0);
+        let elapsed_seconds =
+            clock.tick.saturating_sub(motion.started_at_tick) as f64 * TICK_SECONDS as f64;
+        if let Some(mut moved) = geodesy::advance_position(
+            motion.origin,
+            velocity.north_mps * elapsed_seconds,
+            velocity.east_mps * elapsed_seconds,
+            velocity.climb_mps * elapsed_seconds,
+        ) {
+            moved.altitude_m = moved.altitude_m.max(0.0);
+            *pose = moved;
+        }
     }
 }
 
@@ -1316,14 +1360,8 @@ fn position_on_flight_path(path: &CyclicFlightPath, tick: u64) -> GeoPose {
         )
     };
     let fraction = (cycle_tick - lower.at_tick) as f64 / (upper_tick - lower.at_tick) as f64;
-    GeoPose {
-        latitude_deg: lower.position.latitude_deg
-            + (upper.position.latitude_deg - lower.position.latitude_deg) * fraction,
-        longitude_deg: lower.position.longitude_deg
-            + (upper.position.longitude_deg - lower.position.longitude_deg) * fraction,
-        altitude_m: lower.position.altitude_m
-            + (upper.position.altitude_m - lower.position.altitude_m) * fraction,
-    }
+    geodesy::interpolate_position(lower.position, upper.position, fraction)
+        .expect("validated flight path has finite positions and interpolation fraction")
 }
 
 fn geo_pose_is_finite(position: GeoPose) -> bool {
@@ -1757,6 +1795,6 @@ mod tests {
         assert_eq!(projection.own_units[0].velocity.north_mps, 111.32);
         let position = projection.own_units[0].position;
         assert!((position.latitude_deg - 0.001).abs() < 0.00001);
-        assert_eq!(position.longitude_deg, 1.0);
+        assert!((position.longitude_deg - 1.0).abs() < 1.0e-9);
     }
 }
