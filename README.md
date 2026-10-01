@@ -8,7 +8,7 @@ The broader target architecture, planned simulation fidelity, and acceptance cri
 
 ## What is implemented
 
-- A deterministic Rust ECS simulation with one-second ticks, platform movement, server-side projections, and simple Red patrol AI.
+- A deterministic Rust ECS simulation with one-second ticks, platform movement, server-side projections, and Red patrol AI that plans each aircraft once, waits for delivery, and limits retries over failed links.
 - Mandatory per-entity c3mesh network endpoints, bounded packet queues, deterministic loss and weighted scheduling, cyclic flight paths, geographic receiver-jamming regions, and directional link status.
 - A lobby that creates and joins games, role claiming, host start/pause/resume controls, and REST/WebSocket state delivery. Paused games keep their operational map and inspectors available.
 - A Cesium operational map that keeps authored owned units and uncertain tracks visually separate from the public orbital catalog, reconciling entities in place so movement ticks do not recreate or flicker MIL-STD-2525D icons.
@@ -137,6 +137,8 @@ The REST API exposes catalog status at `/v1/airport-catalog/status`, paginated s
 
 ## Gameplay and authority workflow
 
+Owned-unit projections include the last commanded velocity and whether an authored flight path still controls motion. The Red planner uses reports at its issuing role terminal, assigns overlapping command scopes to the most specific AI role, and leaves non-aircraft units stationary. It submits a new patrol only when the desired movement changes, waits for pending delivery or approval, and retries unchanged failures no more often than every ten simulation ticks.
+
 1. Select a scenario. **Global Crisis** requires a usable Space-Track catalog; **Jammed Flight Test** does not.
 2. Create the game, claim an available command or pilot role, and start it as host.
 3. Use **Configure authorities** to inspect or edit the host-managed authority graph and policies. The saved definition uses optimistic versioning to prevent accidental overwrite.
@@ -162,7 +164,7 @@ The structural schema is checked in at `data/communications/schema/catalog.schem
 
 Role-held network access is available at `/v1/games/{id}/network`, the sequenced WebSocket `/v1/games/{id}/network/stream`, cursor-paginated `/v1/games/{id}/network/events`, and authorized `/v1/games/{id}/network/messages/{message_id}`. Message content is limited to originating roles and destination roles. The event endpoint paginates immutable queued, in-transit, and terminal transitions; projections contain one current record per message. Stream sequence numbers track network revisions independently of the simulation tick.
 
-The operational map previews up to eight links involving your terminal or commanded units, placing failures and queued traffic first. Its summary covers all monitored links; **Inspect full network** opens the full topology. Cesium redraws when units, map layers, or the camera change, suspends rendering beneath a full-screen workspace, and preserves the map and camera when you return.
+The operational map previews up to eight links involving your terminal or commanded units, placing failures and queued traffic first. Its summary covers all monitored links; **Inspect full network** opens the full topology. Cesium redraws when units, map layers, or the camera change, caps interactive rendering at 30 frames per second, suspends rendering beneath a full-screen workspace, and preserves the map and camera when you return.
 
 The **Network** workspace searches role-visible terminals by name or domain and filters directional links by availability, jamming, or queued traffic. Select a terminal to inspect its connections, focus its neighborhood, or browse messages to and from it. Selecting a link scopes message history to that exact direction. The message inspector shows authorized content, structured fields, delivery timing, queue wait, network transit time, classification, and drop reasons; history can be searched and filtered by lifecycle state.
 

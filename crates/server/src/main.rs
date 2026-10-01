@@ -1,3 +1,4 @@
+mod ai_orders;
 mod airport_catalog;
 mod credential_cookie;
 mod space_assets;
@@ -27,7 +28,6 @@ use axum::{
 };
 use credential_cookie::{CredentialCookie, RememberedCredentials};
 use serde::{Deserialize, Serialize};
-use sim_ai::choose_patrol_intent;
 use sim_catalog::{
     airport::{
         evaluate_airport, Airport, AirportKind, MilitaryUse, RunwayCompatibilityAssessment,
@@ -88,6 +88,7 @@ struct Game {
     message_profiles: BTreeMap<String, MessageProfile>,
     packet_messages: BTreeMap<u64, Uuid>,
     pending_deliveries: BTreeMap<Uuid, DeliveryAction>,
+    ai_planner: ai_orders::AiPlannerState,
     network_projection_sequence: u64,
     network_event_path: Option<PathBuf>,
     network_event_sequence: u64,
@@ -760,6 +761,7 @@ async fn create_game(
             .collect(),
         packet_messages: BTreeMap::new(),
         pending_deliveries: BTreeMap::new(),
+        ai_planner: ai_orders::AiPlannerState::default(),
         network_projection_sequence: 0,
         network_event_path: Some(network_event_path),
         network_event_sequence: 0,
@@ -2648,28 +2650,7 @@ async fn run_simulation_loop(state: AppState) {
             .values_mut()
             .filter(|game| game.status == GameStatus::Running)
         {
-            let ai_roles: Vec<Role> = game
-                .roles
-                .values()
-                .filter(|role| role.ai_controlled)
-                .cloned()
-                .collect();
-            for role in ai_roles {
-                let Some(controlled) = role.command_units.first().copied() else {
-                    continue;
-                };
-                let projection = game.simulation.projection_for(controlled, role.side);
-                if let Some(intent) = choose_patrol_intent(role.id, controlled, &projection) {
-                    let _ = submit_authority_action(
-                        game,
-                        role.id,
-                        intent.kind.action_key().into(),
-                        intent.target,
-                        "AI patrol".into(),
-                        Some(intent),
-                    );
-                }
-            }
+            ai_orders::process_ai_orders(game);
             advance_game_tick(game);
         }
     }
@@ -2794,6 +2775,7 @@ mod authority_tests {
             .collect(),
             packet_messages: BTreeMap::new(),
             pending_deliveries: BTreeMap::new(),
+            ai_planner: ai_orders::AiPlannerState::default(),
             network_projection_sequence: 0,
             network_event_path: None,
             network_event_sequence: 0,

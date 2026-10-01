@@ -49,7 +49,7 @@ pub struct GeoPose {
     pub altitude_m: f64,
 }
 
-#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Component, Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Velocity {
     pub north_mps: f64,
     pub east_mps: f64,
@@ -424,7 +424,7 @@ pub struct Track {
 #[derive(Resource, Debug, Default)]
 pub struct KnowledgeBases(pub BTreeMap<Uuid, Vec<Track>>);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum OrderKind {
     Move { north_mps: f64, east_mps: f64 },
     Engage { track_id: Uuid },
@@ -926,14 +926,20 @@ impl Simulation {
             &DomainKind,
             &GeoPose,
             &PlatformSidc,
+            &Velocity,
+            Option<&CyclicFlightPathState>,
         )>();
-        for (id, name, ownership, domain, pose, sidc) in query.iter(&self.world) {
+        for (id, name, ownership, domain, pose, sidc, velocity, flight_path) in
+            query.iter(&self.world)
+        {
             if ownership.0 == side {
                 own_units.push(VisibleUnit {
                     id: id.0,
                     name: name.0.clone(),
                     domain: domain.0,
                     position: *pose,
+                    velocity: *velocity,
+                    following_flight_path: flight_path.is_some_and(|path| path.active),
                     sidc: sidc.0.clone(),
                     receiver_jammed: receiver_jammed.get(&id.0).copied().unwrap_or(false),
                 });
@@ -1057,6 +1063,11 @@ pub struct VisibleUnit {
     pub name: String,
     pub domain: Domain,
     pub position: GeoPose,
+    /// Last commanded velocity; an active authored path controls motion instead.
+    #[serde(default)]
+    pub velocity: Velocity,
+    #[serde(default)]
+    pub following_flight_path: bool,
     pub sidc: String,
     pub receiver_jammed: bool,
 }
@@ -1626,6 +1637,7 @@ mod tests {
                 .longitude_deg,
             1.0
         );
+        assert!(sim.projection_for(unit, Side::Blue).own_units[0].following_flight_path);
         sim.queue_authorized_intent(AuthorizedIntent {
             intent: PlayerIntent {
                 intent_id: Uuid::from_u128(41),
@@ -1646,7 +1658,10 @@ mod tests {
             },
         });
         sim.step();
-        let position = sim.projection_for(unit, Side::Blue).own_units[0].position;
+        let projection = sim.projection_for(unit, Side::Blue);
+        assert!(!projection.own_units[0].following_flight_path);
+        assert_eq!(projection.own_units[0].velocity.north_mps, 111.32);
+        let position = projection.own_units[0].position;
         assert!((position.latitude_deg - 0.001).abs() < 0.00001);
         assert_eq!(position.longitude_deg, 1.0);
     }
