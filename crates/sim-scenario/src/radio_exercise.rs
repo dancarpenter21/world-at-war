@@ -16,6 +16,8 @@ struct RadioScenarioDefinition {
     authority: AuthorityDefinition,
     #[serde(default)]
     sensor_report_routes: Vec<SensorReportRoute>,
+    #[serde(default)]
+    combat: Option<sim_core::combat::CombatConfig>,
 }
 
 #[derive(Deserialize)]
@@ -83,6 +85,7 @@ fn parse_radio_scenario(data: &str) -> Result<Scenario, ScenarioError> {
         jamming_regions: Vec::new(),
         authority: definition.authority,
         sensor_report_routes: definition.sensor_report_routes,
+        combat: definition.combat,
     };
     scenario.validate()?;
     Ok(scenario)
@@ -99,6 +102,14 @@ pub fn sensor_relay_exercise_scenario() -> Scenario {
         "../../../data/scenarios/sensor-relay-exercise.v1.json"
     ))
     .expect("committed sensor relay exercise data must be valid")
+}
+
+/// A fictional weapon and public exercise adjudicator close the detect/order/impact loop.
+pub fn combat_training_scenario() -> Scenario {
+    parse_radio_scenario(include_str!(
+        "../../../data/scenarios/combat-training.v1.json"
+    ))
+    .expect("committed combat training data must be valid")
 }
 
 #[cfg(test)]

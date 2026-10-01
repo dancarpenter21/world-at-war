@@ -267,3 +267,15 @@ select, textarea { width: 100%; padding: 9px; color: #eef7fa; background: #0e171
 .track.last-known > span { color: #d4b8b8; }
 .map-loading { position: absolute; inset: 0; display: grid; place-items: center; color: #9eb3bc; text-align: center; padding: 24px; }
 .map-load-error p { margin: 0 0 16px; }
+
+.training-mission { margin: 16px 0; padding: 12px; border: 1px solid #5a7182; border-radius: 6px; background: #14232f; }
+.training-mission h2 { margin-top: 0; }
+.training-mission p { margin: 8px 0; }
+.training-mission.succeeded { border-color: #65ba88; background: #163126; }
+.training-mission.failed { border-color: #dd947f; background: #37221d; }
+.combat-orders fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.combat-orders label { display: block; margin: 8px 0; }
+.combat-orders select { display: block; width: 100%; margin-top: 4px; }
+.combat-ammunition, .combat-impact { color: #b4d8ce; font-size: 13px; }
+.combat-feedback { margin: 10px 0; font-size: 13px; line-height: 1.5; }
+.combat-feedback small { display: block; color: #c0c7ca; }

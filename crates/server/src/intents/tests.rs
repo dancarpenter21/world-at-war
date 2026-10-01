@@ -251,3 +251,353 @@ fn nonfinite_and_excessive_movement_is_rejected_before_transmission() {
         assert!(game.intent_submissions.is_empty());
     }
 }
+
+const COMBAT_COMMANDER: Uuid = Uuid::from_u128(20102);
+const COMBAT_PILOT: Uuid = Uuid::from_u128(20103);
+
+fn combat_game() -> Game {
+    let mut game = game_from_scenario(sim_scenario::combat_training_scenario());
+    for role_id in [COMBAT_COMMANDER, COMBAT_PILOT] {
+        let role = game.roles.get_mut(&role_id).unwrap();
+        role.owner = Some(PLAYER);
+        role.lease_generation = 4;
+    }
+    game
+}
+
+fn combat_ammunition(game: &mut Game) -> u32 {
+    game.simulation
+        .projection_for(Uuid::from_u128(5), Side::Blue)
+        .own_units
+        .iter()
+        .find(|unit| unit.id == TARGET)
+        .unwrap()
+        .weapon
+        .as_ref()
+        .unwrap()
+        .ammunition
+}
+
+fn engagement(game: &mut Game, role_id: Uuid, id: u128) -> PlayerIntent {
+    let terminal = game.roles[&role_id].location_unit_id;
+    let track = game.simulation.projection_for(terminal, Side::Blue).tracks[0].track_id;
+    PlayerIntent {
+        intent_id: Uuid::from_u128(id),
+        issuer_role: role_id,
+        target: TARGET,
+        kind: OrderKind::Engage { track_id: track },
+        requested_tick: game.simulation.tick() + 1,
+    }
+}
+
+fn submit_engagement(game: &mut Game, intent: PlayerIntent) -> SubmissionResult {
+    submit_player_intent(
+        game,
+        intent.issuer_role,
+        SubmitIntentRequest {
+            player_id: PLAYER,
+            lease_generation: 4,
+            intent,
+        },
+    )
+}
+
+fn wait_for_commanders_report(game: &mut Game) {
+    for _ in 0..10 {
+        tick(game);
+        if !game
+            .simulation
+            .projection_for(Uuid::from_u128(5), Side::Blue)
+            .tracks
+            .is_empty()
+        {
+            return;
+        }
+    }
+    panic!("expected a radio-delivered commander report");
+}
+
+#[test]
+fn engagement_waits_for_radio_delivery_consumes_one_round_and_ends_the_exercise_once() {
+    let mut game = combat_game();
+    wait_for_commanders_report(&mut game);
+    let intent = engagement(&mut game, COMBAT_COMMANDER, 91001);
+    let original = submit_engagement(&mut game, intent.clone()).unwrap();
+    assert_eq!(
+        submit_engagement(&mut game, intent.clone()).unwrap(),
+        original
+    );
+    let SubmissionOutcome::Queued { message_id, .. } = original else {
+        panic!("expected a remote engagement");
+    };
+    let record = game
+        .network_messages
+        .iter()
+        .find(|record| record.message.id == message_id)
+        .unwrap();
+    assert!(record.message.fields.contains_key("aim_point"));
+    assert!(record.message.fields.contains_key("observed_tick"));
+    assert_eq!(combat_ammunition(&mut game), 2);
+    let mut delivered = false;
+    for _ in 0..12 {
+        tick(&mut game);
+        let record = game
+            .network_messages
+            .iter()
+            .find(|record| record.message.id == message_id)
+            .unwrap();
+        if record.state == MessageState::Delivered {
+            delivered = true;
+            break;
+        }
+        assert_eq!(combat_ammunition(&mut game), 2);
+    }
+    assert!(delivered);
+    assert_eq!(combat_ammunition(&mut game), 2);
+    tick(&mut game);
+    assert_eq!(combat_ammunition(&mut game), 1);
+    let receipt = receipt_for(
+        &game,
+        COMBAT_COMMANDER,
+        intent.intent_id,
+        &ReceiptQuery {
+            player_id: PLAYER,
+            lease_generation: 4,
+        },
+    )
+    .unwrap();
+    assert_eq!(receipt.state, IntentState::Executed);
+    for _ in 0..12 {
+        tick(&mut game);
+        if game.simulation.mission_complete() {
+            break;
+        }
+    }
+    assert!(game.simulation.mission_complete());
+    assert_eq!(game.status, GameStatus::Paused);
+    let finished_tick = game.simulation.tick();
+    for _ in 0..4 {
+        tick(&mut game);
+    }
+    assert_eq!(game.simulation.tick(), finished_tick);
+    assert_eq!(submit_engagement(&mut game, intent).unwrap(), original);
+    assert_eq!(combat_ammunition(&mut game), 1);
+    assert_eq!(
+        game.network_messages
+            .iter()
+            .filter(|record| record.message.profile_id == "public-safe.jseries.engage-order.v1")
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn unreceived_and_raw_enemy_identifiers_cannot_bypass_the_commanders_knowledge() {
+    let mut game = combat_game();
+    tick(&mut game);
+    let local_track = game.simulation.current_sensor_tracks(TARGET)[0].track_id;
+    for track_id in [local_track, Uuid::from_u128(51)] {
+        let error = submit_engagement(
+            &mut game,
+            PlayerIntent {
+                intent_id: Uuid::new_v4(),
+                issuer_role: COMBAT_COMMANDER,
+                target: TARGET,
+                kind: OrderKind::Engage { track_id },
+                requested_tick: 2,
+            },
+        )
+        .unwrap_err();
+        assert_eq!(error.0, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(error.1 .0.code, "invalid_engagement");
+    }
+    assert_eq!(combat_ammunition(&mut game), 2);
+    assert!(!game
+        .network_messages
+        .iter()
+        .any(|record| record.message.profile_id == "public-safe.jseries.engage-order.v1"));
+}
+
+#[test]
+fn an_expired_engagement_never_launches_or_consumes_a_round() {
+    let mut game = combat_game();
+    wait_for_commanders_report(&mut game);
+    game.message_profiles
+        .get_mut("public-safe.jseries.engage-order.v1")
+        .unwrap()
+        .expiry_ticks = 1;
+    let intent = engagement(&mut game, COMBAT_COMMANDER, 91002);
+    submit_engagement(&mut game, intent.clone()).unwrap();
+    for _ in 0..12 {
+        tick(&mut game);
+    }
+    assert_eq!(combat_ammunition(&mut game), 2);
+    assert_eq!(
+        receipt_for(
+            &game,
+            COMBAT_COMMANDER,
+            intent.intent_id,
+            &ReceiptQuery {
+                player_id: PLAYER,
+                lease_generation: 4
+            }
+        )
+        .unwrap()
+        .state,
+        IntentState::Expired
+    );
+    assert!(!game.simulation.mission_complete());
+}
+
+#[test]
+fn a_pilots_shot_waits_for_human_authority_and_the_approved_delivery_or_denial() {
+    for approved in [false, true] {
+        let mut game = combat_game();
+        tick(&mut game);
+        let intent = engagement(&mut game, COMBAT_PILOT, 91003);
+        let SubmissionOutcome::PendingAuthority { request_id, .. } =
+            submit_engagement(&mut game, intent).unwrap()
+        else {
+            panic!("expected approval workflow");
+        };
+        for _ in 0..12 {
+            tick(&mut game);
+            if matches!(
+                game.authority_requests[&request_id].status,
+                AuthorityRequestStatus::PendingHuman { .. }
+            ) {
+                break;
+            }
+        }
+        assert!(matches!(
+            game.authority_requests[&request_id].status,
+            AuthorityRequestStatus::PendingHuman { .. }
+        ));
+        assert_eq!(combat_ammunition(&mut game), 2);
+        let mut request = game.authority_requests.remove(&request_id).unwrap();
+        advance_authority_request(&mut game, &mut request, approved, false);
+        game.authority_requests.insert(request_id, request);
+        assert_eq!(combat_ammunition(&mut game), 2);
+        for _ in 0..12 {
+            tick(&mut game);
+        }
+        assert_eq!(combat_ammunition(&mut game), if approved { 1 } else { 2 });
+        assert_eq!(game.simulation.mission_complete(), approved);
+    }
+}
+
+#[test]
+fn combat_time_limit_pauses_the_server_clock_and_preserves_the_failure_outcome() {
+    let mut game = combat_game();
+    for _ in 0..100 {
+        tick(&mut game);
+    }
+    assert_eq!(game.simulation.tick(), 90);
+    assert_eq!(game.status, GameStatus::Paused);
+    let mission = game
+        .simulation
+        .projection_for(Uuid::from_u128(5), Side::Blue)
+        .combat
+        .unwrap()
+        .mission
+        .unwrap();
+    assert_eq!(mission.status, sim_core::combat::MissionStatus::Failed);
+    assert_eq!(mission.finished_tick, Some(90));
+    assert_eq!(combat_ammunition(&mut game), 2);
+}
+
+#[test]
+fn a_delivered_order_scheduled_after_the_mission_deadline_gets_a_terminal_receipt() {
+    let mut game = combat_game();
+    let intent = PlayerIntent {
+        intent_id: Uuid::from_u128(91004),
+        issuer_role: COMBAT_COMMANDER,
+        target: TARGET,
+        kind: OrderKind::Move {
+            north_mps: 10.0,
+            east_mps: 0.0,
+        },
+        requested_tick: 100,
+    };
+    submit_engagement(&mut game, intent.clone()).unwrap();
+    for _ in 0..90 {
+        tick(&mut game);
+    }
+    let receipt = receipt_for(
+        &game,
+        COMBAT_COMMANDER,
+        intent.intent_id,
+        &ReceiptQuery {
+            player_id: PLAYER,
+            lease_generation: 4,
+        },
+    )
+    .unwrap();
+    assert_eq!(receipt.state, IntentState::Rejected);
+    assert!(receipt.error.unwrap().contains("mission ended"));
+    assert!(receipt.executed_tick.is_none());
+}
+
+#[test]
+fn firing_aim_points_and_authority_summaries_are_hidden_from_recipients_until_delivery() {
+    let mut game = combat_game();
+    tick(&mut game);
+    let intent = engagement(&mut game, COMBAT_PILOT, 91005);
+    let SubmissionOutcome::PendingAuthority {
+        request_id,
+        message_id,
+    } = submit_engagement(&mut game, intent).unwrap()
+    else {
+        panic!("expected authority request");
+    };
+    assert!(game.authority_requests[&request_id]
+        .summary
+        .contains("observed at tick"));
+    assert!(authority_request_known(
+        &game.authority_requests[&request_id],
+        COMBAT_PILOT
+    ));
+    assert!(!authority_request_known(
+        &game.authority_requests[&request_id],
+        COMBAT_COMMANDER
+    ));
+    let record = game
+        .network_messages
+        .iter()
+        .find(|record| record.message.id == message_id)
+        .unwrap();
+    assert!(network_message_visible(record, &game.roles[&COMBAT_PILOT]));
+    assert!(!network_message_visible(
+        record,
+        &game.roles[&COMBAT_COMMANDER]
+    ));
+    let mut failed = record.clone();
+    failed.state = MessageState::Dropped;
+    assert!(!network_message_visible(
+        &failed,
+        &game.roles[&COMBAT_COMMANDER]
+    ));
+    let mut failed_request = game.authority_requests[&request_id].clone();
+    failed_request.status = AuthorityRequestStatus::BlockedComms;
+    assert!(!authority_request_known(&failed_request, COMBAT_COMMANDER));
+    for _ in 0..12 {
+        tick(&mut game);
+        if matches!(
+            game.authority_requests[&request_id].status,
+            AuthorityRequestStatus::PendingHuman { .. }
+        ) {
+            break;
+        }
+    }
+    assert!(authority_request_known(
+        &game.authority_requests[&request_id],
+        COMBAT_COMMANDER
+    ));
+    assert!(network_message_visible(
+        game.network_messages
+            .iter()
+            .find(|record| record.message.id == message_id)
+            .unwrap(),
+        &game.roles[&COMBAT_COMMANDER]
+    ));
+}

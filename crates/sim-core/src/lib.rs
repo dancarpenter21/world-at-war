@@ -1,5 +1,6 @@
 //! Deterministic, server-authoritative primitives for World At War.
 
+pub mod combat;
 pub mod geodesy;
 
 #[cfg(test)]
@@ -20,6 +21,7 @@ pub use c3mesh::{
     ChannelState as CommunicationChannelState, DropReason as CommunicationDropReason, NetworkEvent,
     PacketId, PacketMetadata, SimTime as NetworkTime,
 };
+use combat::CombatState;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
@@ -125,6 +127,7 @@ struct GeodesicMotionState {
 struct CommandableUnit {
     id: &'static SimEntityId,
     authority: &'static AuthorityNode,
+    side: &'static Ownership,
     pose: &'static GeoPose,
     velocity: &'static mut Velocity,
     motion: &'static mut GeodesicMotionState,
@@ -785,13 +788,15 @@ impl Simulation {
         world.insert_resource(KnowledgeNamespace(knowledge_namespace));
         world.insert_resource(PendingIntents::default());
         world.insert_resource(OrderResults::default());
+        world.insert_resource(CombatState::default());
 
         let mut schedule = Schedule::default();
         schedule.add_systems((
             advance_clock,
             apply_orders.after(advance_clock),
             move_platforms.after(apply_orders),
-            detect_contacts.after(move_platforms),
+            combat::resolve_impacts.after(move_platforms),
+            detect_contacts.after(combat::resolve_impacts),
             deliver_reports.after(detect_contacts),
         ));
         let mut simulation = Self {
@@ -838,6 +843,61 @@ impl Simulation {
         }
     }
 
+    pub fn configure_combat(&mut self, config: combat::CombatConfig) -> Result<(), String> {
+        if self.tick() != 0 {
+            return Err("combat configuration must be installed before simulation starts".into());
+        }
+        let mut query = self.world.query::<(&SimEntityId, &Ownership)>();
+        let sides = query
+            .iter(&self.world)
+            .map(|(id, side)| (id.0, side.0))
+            .collect();
+        config.validate(&sides)?;
+        self.world
+            .insert_resource(CombatState::from_config(config, sides));
+        Ok(())
+    }
+
+    /// Freeze only the issuing terminal's reported position, never an enemy truth identity.
+    pub fn designate_engagement(
+        &mut self,
+        intent_id: Uuid,
+        attacker: Uuid,
+        terminal: Uuid,
+        track_id: Uuid,
+    ) -> Result<(), String> {
+        let mut query = self.world.query::<(&SimEntityId, &Ownership)>();
+        let sides: BTreeMap<_, _> = query
+            .iter(&self.world)
+            .map(|(id, side)| (id.0, side.0))
+            .collect();
+        let side = *sides
+            .get(&attacker)
+            .ok_or("firing platform does not exist")?;
+        if sides.get(&terminal) != Some(&side) {
+            return Err("target report must come from a friendly command terminal".into());
+        }
+        let track = self
+            .world
+            .resource::<KnowledgeBases>()
+            .0
+            .get(&terminal)
+            .and_then(|tracks| tracks.iter().find(|track| track.track_id == track_id))
+            .cloned()
+            .ok_or("this contact is not known to your command terminal")?;
+        let tick = self.tick();
+        self.world
+            .resource_mut::<CombatState>()
+            .designate(intent_id, attacker, side, track, tick)
+    }
+
+    pub fn engagement_designation(&self, intent_id: Uuid) -> Option<&Track> {
+        self.world.resource::<CombatState>().designation(intent_id)
+    }
+
+    pub fn mission_complete(&self) -> bool {
+        self.world.resource::<CombatState>().complete()
+    }
     pub fn queue_authorized_intent(&mut self, intent: AuthorizedIntent) {
         self.world
             .resource_mut::<PendingIntents>()
@@ -1067,6 +1127,8 @@ impl Simulation {
                     following_flight_path: flight_path.is_some_and(|path| path.active),
                     sidc: sidc.0.clone(),
                     receiver_jammed: receiver_jammed.get(&id.0).copied().unwrap_or(false),
+                    weapon: self.world.resource::<CombatState>().weapon_status(id.0),
+                    hit_points: self.world.resource::<CombatState>().hit_points(id.0),
                 });
             }
         }
@@ -1084,6 +1146,10 @@ impl Simulation {
             tracks,
             jamming_regions: self.communications.jamming_regions.clone(),
             communication_links: link_statuses,
+            combat: self
+                .world
+                .resource::<CombatState>()
+                .projection(knowledge_owner, side),
         }
     }
 
@@ -1195,6 +1261,10 @@ pub struct VisibleUnit {
     pub following_flight_path: bool,
     pub sidc: String,
     pub receiver_jammed: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weapon: Option<combat::WeaponStatus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hit_points: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1204,6 +1274,8 @@ pub struct RoleProjection {
     pub tracks: Vec<Track>,
     pub jamming_regions: Vec<JammingRegion>,
     pub communication_links: Vec<CommunicationLinkStatus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub combat: Option<combat::CombatProjection>,
 }
 
 fn advance_clock(mut clock: ResMut<SimClock>) {
@@ -1215,6 +1287,7 @@ fn apply_orders(
     mut pending: ResMut<PendingIntents>,
     mut results: ResMut<OrderResults>,
     mut units: Query<CommandableUnit>,
+    mut combat: ResMut<CombatState>,
 ) {
     let mut deferred = VecDeque::new();
     while let Some(authorized) = pending.0.pop_front() {
@@ -1271,9 +1344,10 @@ fn apply_orders(
             }
             OrderKind::Engage { .. } => results.0.push(OrderResult {
                 intent_id: intent.intent_id,
-                status: OrderStatus::Rejected(
-                    "engagement modelling is not available in the training slice".into(),
-                ),
+                status: match combat.launch(&intent, unit.side.0, *unit.pose, clock.tick) {
+                    Ok(()) => OrderStatus::Accepted,
+                    Err(error) => OrderStatus::Rejected(error),
+                },
             }),
         }
     }

@@ -1782,6 +1782,7 @@ dependencies = [
  "bevy_ecs",
  "c3mesh",
  "serde",
+ "serde_json",
  "thiserror",
  "uuid",
 ]

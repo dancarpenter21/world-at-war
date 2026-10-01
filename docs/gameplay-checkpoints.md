@@ -2,6 +2,18 @@
 
 These screenshots come from the deterministic Playwright regressions. Training radio settings and target motion are authored scenario data; catalog-dependent tests use an isolated local provider fixture.
 
+## Delivered firing request
+
+In [Combat Training Exercise](../data/scenarios/combat-training.v1.json), the pilot requests a shot using a local contact report. The commander's **Authorities → Requests** view shows the reported aim point, identity confidence, and observation tick only after the request arrives over the shared radio. Denial consumes no ammunition; approval sends a final firing order that must arrive before launch.
+
+![Delivered firing request with reported position and commander approval controls](screenshots/combat-firing-authority.png)
+
+## Completed combat objective
+
+The commander can also order a shot directly from a received contact report. This regression loses the first submission response and retries the same intent, proving that one accepted order launches one weapon. A delayed impact destroys the stationary training target, completes the objective, and pauses the clock. **Weapon launched** is the execution receipt; the public exercise adjudicator supplies the mission result. Local impact telemetry remains at the firing terminal.
+
+![Completed training objective with remaining ammunition and a launch receipt](screenshots/combat-training-complete.png)
+
 ## Delivered sensor knowledge
 
 In [Sensor Relay Exercise](../data/scenarios/sensor-relay-exercise.v1.json), CAP Alpha 1 detects a nearby target locally. The command post learns a snapshot only after its track-report packet arrives. The inspector shows the observation age, receipt age, and delivery delay separately. The snapshot keeps its measured position while the target continues moving.

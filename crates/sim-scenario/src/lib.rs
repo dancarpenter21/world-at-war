@@ -2,7 +2,9 @@
 
 mod radio_exercise;
 
-pub use radio_exercise::{command_link_exercise_scenario, sensor_relay_exercise_scenario};
+pub use radio_exercise::{
+    combat_training_scenario, command_link_exercise_scenario, sensor_relay_exercise_scenario,
+};
 
 use std::collections::BTreeMap;
 
@@ -37,6 +39,8 @@ pub struct Scenario {
     pub authority: AuthorityDefinition,
     #[serde(default)]
     pub sensor_report_routes: Vec<SensorReportRoute>,
+    #[serde(default)]
+    pub combat: Option<sim_core::combat::CombatConfig>,
 }
 
 /// An explicit subscription to a sensing role's local observations, not side-wide awareness.
@@ -127,6 +131,12 @@ impl Scenario {
                 return Err(ScenarioError::InvalidSimulation("sensor report routes require a unique sensing role, a same-side reachable recipient, and a positive interval".into()));
             }
         }
+        if let Some(combat) = &self.combat {
+            let sides = self.units.iter().map(|unit| (unit.id, unit.side)).collect();
+            combat
+                .validate(&sides)
+                .map_err(ScenarioError::InvalidSimulation)?;
+        }
         let platforms = self.platforms();
         Simulation::validate_configuration(&platforms, &self.communications())
             .map_err(|error| ScenarioError::InvalidSimulation(error.to_string()))?;
@@ -163,8 +173,15 @@ impl Scenario {
                 channel.queue.discipline = discipline;
             }
         }
-        Simulation::new_with_knowledge_namespace(self.platforms(), communications, namespace)
-            .map_err(|error| ScenarioError::InvalidSimulation(error.to_string()))
+        let mut simulation =
+            Simulation::new_with_knowledge_namespace(self.platforms(), communications, namespace)
+                .map_err(|error| ScenarioError::InvalidSimulation(error.to_string()))?;
+        if let Some(combat) = &self.combat {
+            simulation
+                .configure_combat(combat.clone())
+                .map_err(ScenarioError::InvalidSimulation)?;
+        }
+        Ok(simulation)
     }
 
     fn platforms(&self) -> Vec<PlatformSpawn> {
@@ -316,6 +333,7 @@ pub fn global_crisis_scenario() -> Scenario {
         jamming_regions: vec![],
         authority,
         sensor_report_routes: vec![],
+        combat: None,
     }
 }
 
@@ -1138,6 +1156,7 @@ pub fn jammed_flight_scenario() -> Scenario {
         }],
         authority,
         sensor_report_routes: vec![],
+        combat: None,
     }
 }
 

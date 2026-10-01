@@ -94,14 +94,36 @@ pub(super) fn submit_player_intent(
             ));
         }
     }
+    if let OrderKind::Engage { track_id } = request.intent.kind {
+        let terminal = game.roles[&role_id].location_unit_id;
+        game.simulation
+            .designate_engagement(
+                request.intent.intent_id,
+                request.intent.target,
+                terminal,
+                track_id,
+            )
+            .map_err(|error| {
+                api_error(
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    "invalid_engagement",
+                    error,
+                )
+            })?;
+    }
     let intent = request.intent;
     let submitted_tick = game.simulation.tick();
+    let summary = game.simulation.engagement_designation(intent.intent_id).map(|report| format!(
+        "Engage reported {:?} contact: {:.0}% identity, {:.5}°, {:.5}°, {:.0} m altitude; observed at tick {}.",
+        report.target_side, report.identity_confidence * 100.0, report.position.latitude_deg,
+        report.position.longitude_deg, report.position.altitude_m, report.observed_tick
+    )).unwrap_or_default();
     let result = submit_authority_action(
         game,
         role_id,
         intent.kind.action_key().into(),
         intent.target,
-        String::new(),
+        summary,
         Some(intent.clone()),
     );
     game.intent_submissions.insert(
@@ -237,6 +259,18 @@ pub(super) fn receipt_for(
             }
         };
     }
+    if game.simulation.mission_complete()
+        && matches!(
+            receipt.state,
+            IntentState::Queued
+                | IntentState::InTransit
+                | IntentState::AwaitingAuthority
+                | IntentState::AwaitingExecution
+        )
+    {
+        receipt.state = IntentState::Rejected;
+        receipt.error = Some("the training mission ended before this order executed".into());
+    }
     Ok(receipt)
 }
 
@@ -252,7 +286,10 @@ pub(super) async fn get_intent_receipt(
     Ok(Json(receipt_for(game, role_id, intent_id, &query)?))
 }
 
-pub(super) fn intent_fields(intent: &PlayerIntent) -> BTreeMap<String, serde_json::Value> {
+pub(super) fn intent_fields(
+    intent: &PlayerIntent,
+    simulation: &Simulation,
+) -> BTreeMap<String, serde_json::Value> {
     let mut fields = BTreeMap::from([
         ("intent_id".into(), serde_json::json!(intent.intent_id)),
         (
@@ -270,6 +307,13 @@ pub(super) fn intent_fields(intent: &PlayerIntent) -> BTreeMap<String, serde_jso
         }
         OrderKind::Engage { track_id } => {
             fields.insert("track_id".into(), serde_json::json!(track_id));
+            if let Some(report) = simulation.engagement_designation(intent.intent_id) {
+                fields.insert("aim_point".into(), serde_json::json!(report.position));
+                fields.insert(
+                    "observed_tick".into(),
+                    serde_json::json!(report.observed_tick),
+                );
+            }
         }
     }
     fields

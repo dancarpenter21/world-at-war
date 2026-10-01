@@ -63,10 +63,13 @@ mod tests {
                 following_flight_path: false,
                 sidc: String::new(),
                 receiver_jammed: false,
+                weapon: None,
+                hit_points: None,
             }],
             tracks: vec![],
             jamming_regions: vec![],
             communication_links: vec![],
+            combat: None,
         }
     }
 

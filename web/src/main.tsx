@@ -6,6 +6,7 @@ import type { Projection } from "./globeEntities";
 import { MapFilterDialog, type MapFilters } from "./MapFilterDialog";
 import { OperationalInspector } from "./OperationalInspector";
 import { MovementOrders } from "./MovementOrders";
+import { CombatOrders } from "./CombatOrders";
 import { ApiError, apiRequest } from "./apiClient";
 import { parseSavedSession } from "./savedSession";
 import { usePollingResource, type PollingStatus } from "./usePollingResource";
@@ -152,7 +153,7 @@ function App() {
     : [projectionResource.status, gameResource.status].includes("reconnecting") ? "reconnecting"
     : projectionResource.status === "live" && gameResource.status === "live" ? "live" : "connecting";
   const connectionError = projectionResource.error ?? gameResource.error;
-  const canIssueOrders = game?.status === "running" && connectionStatus === "live" && !game.operational_error;
+  const canIssueOrders = game?.status === "running" && connectionStatus === "live" && !game.operational_error && !game.mission_complete && (!projection?.combat?.mission || projection.combat.mission.status === "active");
   const retryConnection = () => { projectionResource.refresh(); gameResource.refresh(); roleResource.refresh(); authorityResource.refresh(); };
   const authorityUnits = useMemo(() => {
     if (projection?.own_units.length) return projection.own_units;
@@ -376,8 +377,16 @@ function App() {
 
   async function decideAuthorityRequest(requestId: string, decision: "approve" | "deny") {
     if (!game || !role) return;
-    try { await request(`/v1/games/${game.id}/roles/${role.id}/authority-requests/${requestId}/decision`, { method: "POST", body: JSON.stringify({ player_id: playerId, lease_generation: role.lease_generation, decision }) }); setMessage(`Request ${decision === "approve" ? "approved" : "denied"}.`); }
-    catch (error) { setMessage((error as Error).message); }
+    try {
+      const decided = await request<AuthorityRequest>(`/v1/games/${game.id}/roles/${role.id}/authority-requests/${requestId}/decision`, { method: "POST", body: JSON.stringify({ player_id: playerId, lease_generation: role.lease_generation, decision }) });
+      if (activeGameId.current !== game.id) return;
+      authorityResource.refresh();
+      setAuthorityRequests((items) => items.map((item) => item.id === decided.id ? decided : item));
+      setMessage(`Request ${decision === "approve" ? "approved" : "denied"}.`);
+    } catch (error) {
+      if (activeGameId.current !== game.id) return;
+      authorityResource.refresh(); setMessage((error as Error).message);
+    }
   }
 
   function leave() {
@@ -434,9 +443,9 @@ function App() {
       <GameSessionNotice game={game} status={connectionStatus} error={connectionError} controlError={controlError} hasProjection={false} onRetry={retryConnection} />
     </section>}
     {playable && projection && <section className={`workspace ${showCommands ? "commands-open" : ""}`}>
-      <aside id="command-panel" className={`sidebar ${showCommands ? "commands-open" : ""}`}><h1>{role.name}</h1><p className="message">{game.title}</p><MovementOrders key={`${game.id}:${role.id}:${role.lease_generation}`} apiBase={API_BASE} gameId={game.id} playerId={playerId} role={role} projection={projection} canIssueOrders={canIssueOrders} canRecoverOrder={connectionStatus === "live"} onExecuted={projectionResource.refresh} /><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command network-launch" onClick={() => setShowNetwork(true)}>Network</button><button className="command map-filter-launch" onClick={() => setShowMapFilters((value) => !value)}>Map filters</button><h2>Catalog</h2><p className="muted">{game.space_catalog_enabled ? spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status" : "No orbital catalog in this scenario"}</p><p className="session-command-feedback" role="status">{message}</p></aside>
+      <aside id="command-panel" className={`sidebar ${showCommands ? "commands-open" : ""}`}><h1>{role.name}</h1><p className="message">{game.title}</p><CombatOrders key={`combat:${game.id}:${role.id}:${role.lease_generation}`} apiBase={API_BASE} gameId={game.id} playerId={playerId} role={role} projection={projection} canIssueOrders={canIssueOrders} canRecoverOrder={connectionStatus === "live"} onExecuted={projectionResource.refresh} /><MovementOrders key={`${game.id}:${role.id}:${role.lease_generation}`} apiBase={API_BASE} gameId={game.id} playerId={playerId} role={role} projection={projection} canIssueOrders={canIssueOrders} canRecoverOrder={connectionStatus === "live"} onExecuted={projectionResource.refresh} /><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command network-launch" onClick={() => setShowNetwork(true)}>Network</button><button className="command map-filter-launch" onClick={() => setShowMapFilters((value) => !value)}>Map filters</button><h2>Catalog</h2><p className="muted">{game.space_catalog_enabled ? spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status" : "No orbital catalog in this scenario"}</p><p className="session-command-feedback" role="status">{message}</p></aside>
       <section className="map-region">
-        <GameSessionNotice game={game} status={connectionStatus} error={connectionError} controlError={controlError} hasProjection={true} onRetry={retryConnection} />
+        <GameSessionNotice game={game} status={connectionStatus} error={connectionError} controlError={controlError} hasProjection={true} onRetry={retryConnection} mission={projection?.combat?.mission} />
         <Suspense fallback={<div className="map-loading" role="status">Loading operational map…</div>}>
         <Globe key={`${game.id}:${role.id}:${role.lease_generation}`} projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} keyboardEnabled={!showAuthority && !showNetwork && !showMapFilters} renderingEnabled={!showAuthority && !showNetwork} />
         </Suspense>

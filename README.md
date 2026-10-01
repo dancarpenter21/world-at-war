@@ -2,12 +2,13 @@
 
 World At War is a server-authoritative, low-fidelity war-simulation prototype. It combines a Rust entity-component simulation, a Cesium/React operational map, a public Space-Track orbital catalog, and an authority workflow for command decisions.
 
-The current implementation ships **Command Link Exercise**, a catalog-free command post and two aircraft on a slow shared training net; **Sensor Relay Exercise**, where local detections reach a commander only after radio delivery; **Global Crisis**, with 64 authored entities and a pinned public orbital snapshot; and **Jammed Flight Test**, with two pilot-controlled Blue aircraft and directional receiver jamming. Authored entities and uncertain tracks use MIL-STD-2525D symbols.
+The current implementation ships **Combat Training Exercise**, with a radio-delivered firing order, two fictional training shots, and an adjudicated objective; **Command Link Exercise**, a catalog-free command post and two aircraft on a slow shared training net; **Sensor Relay Exercise**, where local detections reach a commander only after radio delivery; **Global Crisis**, with 64 authored entities and a pinned public orbital snapshot; and **Jammed Flight Test**, with two pilot-controlled Blue aircraft and directional receiver jamming. Authored entities and uncertain tracks use MIL-STD-2525D symbols.
 
 The broader target architecture, planned simulation fidelity, and acceptance criteria are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Features described there are not necessarily implemented yet.
 
 ## What is implemented
 
+- Configured training weapons with finite ammunition, frozen reported aim points, deterministic flight delays, accumulated damage, and terminal mission success or failure.
 - A deterministic Rust ECS simulation with one-second ticks, platform movement, server-side projections, and Red patrol AI that plans each aircraft once, waits for delivery, and limits retries over failed links.
 - Local geometric sensor detections with spherical Earth occlusion and slant range, game/terminal-scoped track identities, and delivery-gated sensor reports. Lost contacts retain their last observed position and timestamps; the map and inspector display their age and report delay.
 - Mandatory per-entity c3mesh network endpoints, bounded packet queues, deterministic loss and weighted scheduling, cyclic flight paths, geographic receiver-jamming regions, and directional link status.
@@ -20,7 +21,7 @@ The broader target architecture, planned simulation fidelity, and acceptance cri
 - A Docker Compose edge proxy that serves the web client and routes `/health`, `/v1/`, and WebSocket traffic to the Rust server.
 - A versioned public-safe communications catalog, per-game seed/policy/checksum pinning, delivery-gated orders and authority handoffs, append-only message lifecycle events, and role-filtered map and full-screen network views.
 
-[Verified gameplay screenshots](docs/gameplay-checkpoints.md) show delivered sensor knowledge, executed movement, network inspection, and map loading.
+[Verified gameplay screenshots](docs/gameplay-checkpoints.md) show firing authorization, mission completion, delivered sensor knowledge, executed movement, network inspection, and map loading.
 
 Current limitations: command messages traverse the active packet topology, but fragmentation/reassembly, bounded application retries, acknowledgements, controller ground-truth privileges, and durable packet-level history remain planned. Sensor and track behavior is intentionally simplified, and the broader platform, terrain, logistics, cyber, and multi-source catalog systems remain planned work.
 
@@ -153,6 +154,18 @@ The authored [Sensor Relay Exercise](data/scenarios/sensor-relay-exercise.v1.jso
 Report routes are explicit same-side subscriptions with validated sensing roles, recipients, links, and positive intervals. Reports use the frozen public-safe track-report message profile and compete with orders on the shared training radio. At most one report from a source track to a recipient is pending; failed attempts are paced, and the next attempt samples a fresh local observation. An expired report terminates at its deadline even on a very slow link, while already reserved physical serialization remains non-preemptive.
 
 The recipient's state, network view, message detail endpoint, REST event history, and network stream withhold incoming report contents until delivery is persisted. Dropped, expired, or failed-persistence reports do not update the recipient's knowledge. Received tracks retain their original observation tick, use the actual receive tick, and never read the target's current truth. Older or duplicate reports cannot overwrite a newer report from the same source. Report routes are disabled in the other existing scenarios; automatic forwarding and multisensor fusion remain planned.
+
+## Combat training
+
+Select **Combat Training Exercise**, create a game, claim **Exercise Commander**, and start. CAP Alpha 1 detects the nearby hostile drone; its report must arrive at the command post before the commander can select the contact under **Engagement orders**. Send the order and watch its delivery and launch receipt. A successful impact completes the objective and pauses the scenario permanently. Leave and create a new game to retry.
+
+A second player can claim **Pilot, CAP Alpha 1** and request a shot using local sensor knowledge. The commander opens **Authorities → Requests** to approve or deny it. The request appears only after its radio packet arrives and shows the frozen aim point, confidence, and observation tick. Incoming message details also withhold those coordinates until recorded delivery. Approval still requires the final firing order to arrive at the aircraft. Denied, dropped, expired, out-of-range, or stale orders consume no ammunition. Retrying a lost submission response reuses the original order ID and cannot fire a second shot.
+
+The [authored exercise](data/scenarios/combat-training.v1.json) provides two fictional shots, a 12 km launch range, a 15-tick maximum report age, and a 90-tick deadline. Reports require at least 80% identity confidence. The original reported position and observation tick are frozen into the command; report age and range are checked again at launch. A weapon has no seeker or guidance: it resolves a deterministic delayed impact at that aim point, so a moving contact can escape. Its configured radius damages only configured enemy platforms. Damage accumulates, and zero hit points remove the platform from movement and sensing.
+
+**Weapon launched** confirms execution, not a hit. Impact telemetry is local to the firing terminal; other terminals do not automatically receive it. The exercise's public adjudicator announces success or failure to the objective's side, without exposing enemy entity IDs, names, or remaining health. Destroying the target succeeds; exhausted shots or the time limit fail. Terminal outcomes stop the server clock, reject resume, and remain available after reload or rejoin.
+
+Weapon and durability definitions are optional scenario data; the existing exercises remain unarmed. These are deliberately simple training mechanics. Guided interception, seekers, real weapon envelopes, countermeasures, friendly fire, fuel, and a general campaign objective system remain planned. Active games and combat state still live in memory and are lost on server restart.
 
 ## Gameplay and authority workflow
 
