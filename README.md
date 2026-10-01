@@ -204,10 +204,14 @@ npm run test:e2e:gameplay
 
 **Continuous integration** checks the pinned c3mesh checkout, formatting, strict lints, and workspace tests on Linux and Windows using Rust 1.89.0 and current stable. The Linux web job uses the npm lockfile, builds the production client, and runs all browser tests with local catalog providers. Browser reports, screenshots, and failure traces are retained for seven days. See [.github/workflows/checks.yml](.github/workflows/checks.yml).
 
+The [production container workflow](.github/workflows/containers.yml) runs when container definitions, dependency pins, authored scenario data, or smoke inputs change, and can also be dispatched manually. It builds the server and client with their lockfiles, starts the production Compose edge stack, and verifies static assets, a catalog-free game, an identical order retry, recorded packet delivery, actual movement execution, and pause through the proxy. The stack is always stopped afterward. Docker contexts exclude local builds, test reports, tool state, and environment files.
+
+After starting a local stack, run `node scripts/smoke-command-exercise.mjs --base-url http://127.0.0.1:8080` for the same smoke check. It creates a game named **Production smoke exercise** and leaves it paused. Pass `--skip-web` when checking a direct server without an edge proxy.
+
 ## Repository layout
 
 - `crates/sim-core/` — deterministic ECS simulation, projections, orders, and authority model.
-- `crates/sim-scenario/` — validated, versioned Global Crisis and Jammed Flight Test definitions.
+- `crates/sim-scenario/` — validated, versioned scenarios and the authored command exercise loader.
 - `crates/sim-ai/` — constrained Red patrol planner that operates on a role projection.
 - `crates/sim-catalog/` — provenance-aware platform, space, airport/runway, importer, and compatibility data types.
 - `crates/sim-comms/` — communications catalogs, validation, checksums, and public-safe C2 message types.
