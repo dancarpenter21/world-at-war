@@ -265,3 +265,5 @@ select, textarea { width: 100%; padding: 9px; color: #eef7fa; background: #0e171
 .track small { margin-top: 4px; line-height: 1.4; }
 .track .track-timing { color: #98abb5; }
 .track.last-known > span { color: #d4b8b8; }
+.map-loading { position: absolute; inset: 0; display: grid; place-items: center; color: #9eb3bc; text-align: center; padding: 24px; }
+.map-load-error p { margin: 0 0 16px; }

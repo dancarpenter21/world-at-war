@@ -7,7 +7,10 @@ type OrderBody = { player_id: string; lease_generation: number; intent: {
   intent_id: string; issuer_role: string; target: string; kind: { Move: { north_mps: number; east_mps: number } }; requested_tick: number
 } };
 
-async function openSession(page: Page, guest = false, projection = sessionProjection(), role = sessionRole()) {
+async function openSession(page: Page, guest = false, projection = sessionProjection(), role = sessionRole(), options: {
+  onLobby?: () => Promise<void>;
+  waitForMap?: boolean;
+} = {}) {
   const state = {
     game: sessionGame(), role, tick: 12, created: guest, projection,
     projectionFailure: false, projectionDenied: false, controlFailure: false, holdProjection: false, holdControl: false, holdSummary: false,
@@ -99,6 +102,7 @@ async function openSession(page: Page, guest = false, projection = sessionProjec
     await json({ error: "Unexpected test endpoint: " + pathname }, 404);
   });
   await page.goto("/");
+  await options.onLobby?.();
   if (guest) {
     await page.getByRole("button", { name: "Join game", exact: true }).click();
     await page.getByRole("button", { name: /Jammed Flight Test.*running/ }).click();
@@ -108,7 +112,7 @@ async function openSession(page: Page, guest = false, projection = sessionProjec
   await page.getByRole("button", { name: /Blue One Pilot/ }).click();
   if (!guest) await page.getByRole("button", { name: "Start scenario", exact: true }).click();
   await expect(page.locator("header .tick")).toHaveText("TICK 12");
-  await expect(page.locator(".globe canvas")).toBeVisible();
+  if (options.waitForMap !== false) await expect(page.locator(".globe canvas")).toBeVisible();
   return state;
 }
 
@@ -438,5 +442,96 @@ test("retains the latest order receipt during an outage and recovers its executi
   await expect(orders.getByRole("status")).toContainText("Order executed at tick 14", { timeout: 10_000 });
   await expect(orders.getByRole("status")).not.toContainText("temporarily unavailable");
   expect(state.orderBodies.length).toBe(1);
+  expect(state.errors).toEqual([]);
+});
+test("opens the lobby before downloading the map and keeps host controls usable during loading", async ({ page }, testInfo) => {
+  const pendingMaps: Route[] = [];
+  await page.route("**/src/Globe.tsx", (route) => { pendingMaps.push(route); });
+  const state = await openSession(page, false, sessionProjection(), sessionRole(), {
+    waitForMap: false,
+    onLobby: async () => {
+      await expect(page.getByRole("button", { name: "Create game", exact: true })).toBeVisible();
+      expect(pendingMaps).toHaveLength(0);
+    }
+  });
+  await expect.poll(() => pendingMaps.length).toBe(1);
+  await expect(page.getByText("Loading operational map…", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Pause scenario", exact: true }).click();
+  await expect(page.getByText("Scenario paused", { exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("deferred-map-loading.png") });
+  await pendingMaps[0].continue();
+  await expect(page.locator(".globe canvas")).toBeVisible();
+  await expect(page.getByText("Loading operational map…", { exact: true })).toHaveCount(0);
+  await expect(page.locator("header .tick")).toHaveText("TICK 12");
+  expect(state.errors).toEqual([]);
+});
+
+test("recovers a failed map download by reloading the held game and role", async ({ page }) => {
+  await page.route("**/src/Globe.tsx", (route) => route.abort("failed"));
+  const state = await openSession(page, false, sessionProjection(), sessionRole(), { waitForMap: false });
+  await expect(page.getByText("The operational map could not load.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pause scenario", exact: true })).toBeEnabled();
+  await page.unroute("**/src/Globe.tsx");
+  await page.getByRole("button", { name: "Reload page", exact: true }).click();
+  await expect(page.locator(".globe canvas")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Blue One Pilot", exact: true })).toBeVisible();
+  await expect(page.locator("header .tick")).toHaveText("TICK 12");
+  expect(state.controls).toHaveLength(1);
+  expect(state.role.lease_generation).toBe(1);
+  expect(state.errors).toEqual([]);
+});
+
+test("restores a paused held role after reload without starting the game again", async ({ page }) => {
+  const state = await openSession(page);
+  await page.getByRole("button", { name: "Pause scenario", exact: true }).click();
+  await expect(page.getByText("Scenario paused", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.locator(".globe canvas")).toBeVisible();
+  await expect(page.getByText("Scenario paused", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Turn north", exact: true })).toBeDisabled();
+  expect(state.controls.map((path) => path.split("/").pop())).toEqual(["start", "pause"]);
+  expect(state.role.lease_generation).toBe(1);
+  expect(state.errors).toEqual([]);
+});
+
+test("does not restore a role after its saved lease has changed", async ({ page }) => {
+  const state = await openSession(page);
+  state.role.lease_generation += 1;
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Create game", exact: true })).toBeVisible();
+  await expect(page.locator(".globe")).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem("world-at-war-session"))).toBeNull();
+  expect(state.errors).toEqual([]);
+});
+
+test("does not reopen the game after leaving and reloading", async ({ page }) => {
+  const state = await openSession(page);
+  await page.getByRole("button", { name: "Leave scenario", exact: true }).click();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Create game", exact: true })).toBeVisible();
+  await expect(page.locator(".globe")).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem("world-at-war-session"))).toBeNull();
+  expect(state.errors).toEqual([]);
+});
+
+test("server rejection clears a restored selection before displaying role data", async ({ page }) => {
+  const state = await openSession(page);
+  state.projectionDenied = true;
+  await page.reload();
+  await expect(page.getByText("Your role is no longer available. Choose an available role to continue.", { exact: true })).toBeVisible();
+  await expect(page.locator(".globe")).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem("world-at-war-session"))).toBeNull();
+  expect(state.errors).toEqual([]);
+});
+
+test("corrupt saved selections do not block the lobby", async ({ page }) => {
+  const state = await openSession(page);
+  for (const value of ["{", "null", "[]"]) {
+    await page.evaluate((raw) => localStorage.setItem("world-at-war-session", raw), value);
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Create game", exact: true })).toBeVisible();
+    await expect(page.locator(".globe")).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem("world-at-war-session"))).toBeNull();
+  }
   expect(state.errors).toEqual([]);
 });

@@ -179,6 +179,10 @@ Read `GET /v1/games/{game_id}/roles/{role_id}/intents/{intent_id}?player_id=...&
 
 Authority requests and approvals use the same transport. A remote approver receives the request before a human decision becomes available or a vacant-role timer starts. Final approved orders also wait for delivery. Pausing freezes both packet progress and execution. A lifecycle-event write failure pauses the game and cancels pending delivery actions so an unrecorded command cannot execute.
 
+The lobby loads its own small client bundle. Cesium, map symbols, and orbital rendering load when a playable map opens; authority and network workspaces also load on demand. A slow map download shows a loading state while host controls remain available. A failed download offers a page reload. The browser remembers the selected game, player, role, and lease generation, checks that lease against the current server roles, and lets the state endpoint authorize access before displaying an operational picture. Reloading a paused game does not resume it; leaving, changed leases, and rejected access clear the saved selection. Invalid saved data cannot block the lobby.
+
+Production builds emit a Vite manifest and enforce a 350 KiB limit on all startup JavaScript, including static imported chunks. Dynamic map and graph bundles are excluded from that startup limit. The split reduced the initial minified script from 5.26 MB to about 239 KB in the current build; Cesium's separate map bundle remains substantial.
+
 Each session resource waits for its previous refresh to finish, cancels obsolete reads when a game or role changes, and times out after ten seconds. Temporary failures retain the last map with a visible connection notice, disable movement orders, and retry with bounded backoff. **Retry connection** requests a fresh update immediately. A rejected or changed role lease removes the operational picture and returns the player to role selection. Leaving a game cancels pending reads and host controls so delayed responses cannot reopen it.
 
 ## Communications catalog and network APIs

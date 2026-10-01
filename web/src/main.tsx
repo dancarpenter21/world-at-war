@@ -1,24 +1,25 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import {
-  Cartesian3, Color, EllipsoidTerrainProvider,
-  ImageryLayer, Math as CesiumMath, OpenStreetMapImageryProvider, Viewer
-} from "cesium";
-import ms from "milsymbol";
-import "cesium/Build/Cesium/Widgets/widgets.css";
 import "./styles.css";
 import type { AuthorityDefinition, AuthorityRequest, Role } from "./AuthorityWorkspace";
-import { AirportLayer, type AirportDetail, type AirportListResponse } from "./airportLayer";
-import { GlobeEntityReconciler, type Projection } from "./globeEntities";
-import { attachMapKeyboardControls, type AttachedMapKeyboardControls } from "./mapKeyboardControls";
+import type { Projection } from "./globeEntities";
 import { MapFilterDialog, type MapFilters } from "./MapFilterDialog";
 import { OperationalInspector } from "./OperationalInspector";
 import { MovementOrders } from "./MovementOrders";
-import { SpaceAssetLayer } from "./spaceAssetLayer";
 import { ApiError, apiRequest } from "./apiClient";
+import { parseSavedSession } from "./savedSession";
 import { usePollingResource, type PollingStatus } from "./usePollingResource";
 import { GameSessionControls, GameSessionNotice, type Game } from "./GameSessionControls";
 
+function UnavailableMap() {
+  return <div className="map-loading map-load-error" role="alert">
+    <div><p>The operational map could not load.</p>
+      <button className="secondary" onClick={() => window.location.reload()}>Reload page</button>
+    </div>
+  </div>;
+}
+
+const Globe = lazy(() => import("./Globe").catch(() => ({ default: UnavailableMap })));
 const AuthorityWorkspace = lazy(() => import("./AuthorityWorkspace").then((module) => ({ default: module.AuthorityWorkspace })));
 const NetworkWorkspace = lazy(() => import("./NetworkWorkspace").then((module) => ({ default: module.NetworkWorkspace })));
 
@@ -78,186 +79,6 @@ function CatalogTabStatus({ status }: { status: SpaceStatus | null }) {
   return <span className={`catalog-tab-status ${presentation.state}`} data-tooltip={presentation.tooltip} aria-hidden="true">{presentation.icon}</span>;
 }
 
-const symbolCache = new Map<string, HTMLCanvasElement>();
-function symbolCanvas(sidc: string, size = 32) {
-  const key = `${sidc}:${size}`;
-  let canvas = symbolCache.get(key);
-  if (!canvas) {
-    canvas = new ms.Symbol(sidc, { size, frame: true, fill: true }).asCanvas();
-    symbolCache.set(key, canvas);
-  }
-  return canvas;
-}
-
-function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnabled, keyboardEnabled, renderingEnabled }: {
-  projection: Projection;
-  filters: MapFilters;
-  gameId: string;
-  playerId: string;
-  roleId: string;
-  spaceCatalogEnabled: boolean;
-  keyboardEnabled: boolean;
-  renderingEnabled: boolean;
-}) {
-  const host = useRef<HTMLDivElement>(null);
-  const viewerRef = useRef<Viewer | null>(null);
-  const reconcilerRef = useRef<GlobeEntityReconciler | null>(null);
-  const airportLayerRef = useRef<AirportLayer | null>(null);
-  const spaceAssetLayerRef = useRef<SpaceAssetLayer | null>(null);
-  const keyboardControlsRef = useRef<AttachedMapKeyboardControls | null>(null);
-  const showSpaceAssetsRef = useRef<() => void>(() => undefined);
-  const airportRequestRef = useRef<AbortController | undefined>(undefined);
-  const refreshAirportsRef = useRef<() => void>(() => undefined);
-  const filtersRef = useRef(filters);
-  const focusedRef = useRef(false);
-  filtersRef.current = filters;
-  const [airportStatus, setAirportStatus] = useState("Loading airports");
-  const [spaceAssetStatus, setSpaceAssetStatus] = useState("Space assets hidden");
-
-  useEffect(() => {
-    if (!host.current || viewerRef.current) return;
-    const viewer = new Viewer(host.current, {
-      animation: false,
-      baseLayer: new ImageryLayer(new OpenStreetMapImageryProvider({ url: "https://tile.openstreetmap.org/", credit: "OpenStreetMap contributors" })),
-      baseLayerPicker: false, fullscreenButton: false, geocoder: false, homeButton: false,
-      infoBox: true, navigationHelpButton: false, sceneModePicker: false, selectionIndicator: true,
-      terrainProvider: new EllipsoidTerrainProvider(), timeline: false,
-      requestRenderMode: true, maximumRenderTimeChange: Infinity, targetFrameRate: 30
-    });
-    viewer.scene.globe.baseColor = Color.fromCssColorString("#1f3340");
-    viewer.camera.setView({ destination: Cartesian3.fromDegrees(-40, 30, 20_000_000) });
-    viewerRef.current = viewer;
-    const keyboardControls = attachMapKeyboardControls(viewer.camera, viewer.scene.globe.ellipsoid);
-    keyboardControls.setEnabled(keyboardEnabled);
-    keyboardControlsRef.current = keyboardControls;
-    reconcilerRef.current = new GlobeEntityReconciler(viewer.entities, symbolCanvas);
-    const airportLayer = new AirportLayer(viewer, (airportId) =>
-      request<AirportDetail>(`/v1/airports/${encodeURIComponent(airportId)}`)
-    );
-    airportLayerRef.current = airportLayer;
-    const showSpaceAssets = () => {
-      if (!spaceAssetLayerRef.current) {
-        spaceAssetLayerRef.current = new SpaceAssetLayer(viewer, gameId, playerId, roleId, setSpaceAssetStatus);
-      }
-      spaceAssetLayerRef.current.setFilters(filtersRef.current.spaceAssets);
-    };
-    showSpaceAssetsRef.current = showSpaceAssets;
-    if (spaceCatalogEnabled && (filtersRef.current.spaceAssets.showAll || filtersRef.current.spaceAssets.showStarlink)) showSpaceAssets();
-    let refreshTimer: number | undefined;
-    let stopped = false;
-
-    const refreshAirports = async () => {
-      const runwayFilters = filtersRef.current.runways;
-      if (!runwayFilters.visible) return;
-      const rectangle = viewer.camera.computeViewRectangle(viewer.scene.globe.ellipsoid);
-      if (!rectangle) return;
-      airportRequestRef.current?.abort();
-      airportRequestRef.current = new AbortController();
-      const cameraPosition = viewer.camera.positionCartographic;
-      const ellipsoidRadius = viewer.scene.globe.ellipsoid.maximumRadius;
-      const horizonRadius = Math.acos(Math.min(1, ellipsoidRadius / Math.max(ellipsoidRadius, ellipsoidRadius + cameraPosition.height)));
-      const query = new URLSearchParams({
-        west: CesiumMath.toDegrees(rectangle.west).toFixed(5),
-        south: CesiumMath.toDegrees(rectangle.south).toFixed(5),
-        east: CesiumMath.toDegrees(rectangle.east).toFixed(5),
-        north: CesiumMath.toDegrees(rectangle.north).toFixed(5),
-        horizon_latitude: CesiumMath.toDegrees(cameraPosition.latitude).toFixed(5),
-        horizon_longitude: CesiumMath.toDegrees(cameraPosition.longitude).toFixed(5),
-        horizon_radius_deg: CesiumMath.toDegrees(horizonRadius).toFixed(5),
-        minimum_runway_length_m: String(runwayFilters.minimumLengthM),
-        limit: "500"
-      });
-      try {
-        const response = await request<AirportListResponse>(`/v1/airports?${query}`, { signal: airportRequestRef.current.signal });
-        if (stopped || !filtersRef.current.runways.visible) return;
-        airportLayer.update(response.airports);
-        const threshold = runwayFilters.minimumLengthM > 0 ? ` · runways ≥ ${runwayFilters.minimumLengthM.toLocaleString()} m` : "";
-        setAirportStatus(response.total > response.airports.length
-          ? `${response.airports.length.toLocaleString()} of ${response.total.toLocaleString()} airports${threshold}`
-          : `${response.total.toLocaleString()} airports${threshold}`);
-      } catch (error) {
-        if (!stopped && !(error instanceof DOMException && error.name === "AbortError")) {
-          setAirportStatus("Airport layer unavailable");
-        }
-      }
-    };
-    refreshAirportsRef.current = () => void refreshAirports();
-    const scheduleAirportRefresh = () => {
-      if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
-      refreshTimer = window.setTimeout(() => void refreshAirports(), 150);
-    };
-    viewer.camera.moveEnd.addEventListener(scheduleAirportRefresh);
-    void refreshAirports();
-    return () => {
-      stopped = true;
-      airportRequestRef.current?.abort();
-      if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
-      viewer.camera.moveEnd.removeEventListener(scheduleAirportRefresh);
-      keyboardControls.destroy();
-      spaceAssetLayerRef.current?.destroy();
-      airportLayer.destroy();
-      airportLayerRef.current = null;
-      spaceAssetLayerRef.current = null;
-      showSpaceAssetsRef.current = () => undefined;
-      refreshAirportsRef.current = () => undefined;
-      keyboardControlsRef.current = null;
-      reconcilerRef.current = null;
-      viewer.destroy();
-      viewerRef.current = null;
-    };
-  }, [spaceCatalogEnabled]);
-
-  useEffect(() => {
-    keyboardControlsRef.current?.setEnabled(keyboardEnabled);
-  }, [keyboardEnabled]);
-
-  useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!viewer) return;
-    viewer.useDefaultRenderLoop = renderingEnabled;
-    if (renderingEnabled) viewer.scene.requestRender();
-  }, [renderingEnabled]);
-
-  useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!renderingEnabled || !viewer) return;
-    reconcilerRef.current?.reconcile({
-      ...projection,
-      communication_links: filters.network.visible ? projection.communication_links : []
-    });
-    if (!focusedRef.current && viewerRef.current && reconcilerRef.current) {
-      const entities = reconcilerRef.current.focusEntities();
-      if (entities.length) {
-        focusedRef.current = true;
-        void viewerRef.current.flyTo(entities, { duration: 0 });
-      }
-    }
-    viewer.scene.requestRender();
-  }, [projection, filters.network.visible, renderingEnabled]);
-
-  useEffect(() => {
-    if (spaceCatalogEnabled && (filters.spaceAssets.showAll || filters.spaceAssets.showStarlink)) {
-      showSpaceAssetsRef.current();
-    } else {
-      spaceAssetLayerRef.current?.setFilters(filters.spaceAssets);
-      setSpaceAssetStatus("Space assets hidden");
-    }
-  }, [filters.spaceAssets.showAll, filters.spaceAssets.showStarlink, spaceCatalogEnabled]);
-
-  useEffect(() => {
-    airportRequestRef.current?.abort();
-    if (!filters.runways.visible) {
-      airportLayerRef.current?.hide();
-      setAirportStatus("Airport runways hidden");
-      return;
-    }
-    setAirportStatus("Loading airports");
-    refreshAirportsRef.current();
-  }, [filters.runways.visible, filters.runways.minimumLengthM]);
-
-  return <><div className="globe" ref={host} aria-label="Operational map. Use W A S D to move and Q or E to turn." aria-keyshortcuts="W A S D Q E" /><div className="map-layer-status"><span>{airportStatus}</span><span>{spaceCatalogEnabled ? spaceAssetStatus : "No orbital catalog in this scenario"}</span></div><div className="map-controls-hint">WASD MOVE · Q/E TURN</div></>;
-}
-
 function App() {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [selectedScenarioId, setSelectedScenarioId] = useState("");
@@ -295,6 +116,7 @@ function App() {
   const [authority, setAuthority] = useState<AuthorityDefinition | null>(null);
   const [authorityRequests, setAuthorityRequests] = useState<AuthorityRequest[]>([]);
   const restoreAttempted = useRef(false);
+  const sessionRestoreAttempted = useRef(false);
   const playerId = useMemo(() => localStorage.getItem("world-at-war-player") ?? crypto.randomUUID(), []);
   const playable = (game?.status === "running" || game?.status === "paused") && role !== null;
   const refreshWaitSeconds = Math.max(0, (spaceStatus?.next_sync_unix ?? 0) - nowUnix);
@@ -348,6 +170,18 @@ function App() {
       restoreAttempted.current = true;
       effectiveStatus = await request<SpaceStatus>("/v1/settings/space-track/credentials", { method: "POST" });
     }
+    if (!sessionRestoreAttempted.current) {
+      sessionRestoreAttempted.current = true;
+      const session = parseSavedSession(localStorage.getItem("world-at-war-session"));
+      const savedGame = loadedGames.find((candidate) => candidate.id === session?.game_id);
+      if (session?.player_id === playerId && savedGame) {
+        const savedRoles = await request<Role[]>(`/v1/games/${savedGame.id}/roles`);
+        const savedRole = savedRoles.find((candidate) => candidate.id === session.role_id && candidate.held && candidate.lease_generation === session.lease_generation);
+        if (savedRole) {
+          setGame(savedGame); setRoles(savedRoles); setRole(savedRole);
+        } else localStorage.removeItem("world-at-war-session");
+      } else localStorage.removeItem("world-at-war-session");
+    }
     setScenarios(loadedScenarios); setGames(loadedGames); setSpaceStatus(effectiveStatus);
     setGameTitle((current) => current.trim() ? current : loadedScenarios[0]?.title ?? "");
     setSelectedScenarioId((current) => current && loadedScenarios.some((scenario) => scenario.id === current) ? current : loadedScenarios[0]?.id ?? "");
@@ -360,6 +194,15 @@ function App() {
     localStorage.setItem("world-at-war-player", playerId);
     void refreshLobby().then(() => setMessage("Create a scenario or join a running game")).catch((error: Error) => setMessage(error.message));
   }, [playerId]);
+
+  useEffect(() => {
+    if (!sessionRestoreAttempted.current) return;
+    if (game && role) {
+      localStorage.setItem("world-at-war-session", JSON.stringify({
+        player_id: playerId, game_id: game.id, role_id: role.id, lease_generation: role.lease_generation
+      }));
+    } else localStorage.removeItem("world-at-war-session");
+  }, [game?.id, role?.id, role?.lease_generation, playerId]);
 
   useEffect(() => {
     const nextSyncUnix = spaceStatus?.next_sync_unix;
@@ -594,7 +437,9 @@ function App() {
       <aside id="command-panel" className={`sidebar ${showCommands ? "commands-open" : ""}`}><h1>{role.name}</h1><p className="message">{game.title}</p><MovementOrders key={`${game.id}:${role.id}:${role.lease_generation}`} apiBase={API_BASE} gameId={game.id} playerId={playerId} role={role} projection={projection} canIssueOrders={canIssueOrders} canRecoverOrder={connectionStatus === "live"} onExecuted={projectionResource.refresh} /><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command network-launch" onClick={() => setShowNetwork(true)}>Network</button><button className="command map-filter-launch" onClick={() => setShowMapFilters((value) => !value)}>Map filters</button><h2>Catalog</h2><p className="muted">{game.space_catalog_enabled ? spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status" : "No orbital catalog in this scenario"}</p><p className="session-command-feedback" role="status">{message}</p></aside>
       <section className="map-region">
         <GameSessionNotice game={game} status={connectionStatus} error={connectionError} controlError={controlError} hasProjection={true} onRetry={retryConnection} />
+        <Suspense fallback={<div className="map-loading" role="status">Loading operational map…</div>}>
         <Globe key={`${game.id}:${role.id}:${role.lease_generation}`} projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} keyboardEnabled={!showAuthority && !showNetwork && !showMapFilters} renderingEnabled={!showAuthority && !showNetwork} />
+        </Suspense>
         {showMapFilters && <MapFilterDialog filters={mapFilters} spaceAssetsAvailable={game.space_catalog_enabled} onChange={setMapFilters} onClose={() => setShowMapFilters(false)} />}
         <div className="map-caption">{role.name} · {role.side} · operational picture</div>
       </section>
