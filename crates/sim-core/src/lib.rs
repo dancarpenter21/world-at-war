@@ -1027,6 +1027,11 @@ impl Simulation {
                         at,
                     )
                     .expect("validated monitored link must remain queryable");
+                let queue = self
+                    .communications
+                    .simulator
+                    .channel_queue_metrics(link.channel_id.clone())
+                    .expect("validated monitored link queue must remain queryable");
                 CommunicationLinkStatus {
                     id: link.id.clone(),
                     from_entity_id: link.from_entity_id,
@@ -1038,22 +1043,8 @@ impl Simulation {
                         metrics.jammed
                     },
                     effective_bit_rate_bps: metrics.effective_bit_rate_bps,
-                    queued_packets: {
-                        let queue = self
-                            .communications
-                            .simulator
-                            .channel_queue_metrics(link.channel_id.clone())
-                            .expect("validated monitored link queue must remain queryable");
-                        queue.packets_0_to_1 + queue.packets_1_to_0
-                    },
-                    queued_bytes: {
-                        let queue = self
-                            .communications
-                            .simulator
-                            .channel_queue_metrics(link.channel_id.clone())
-                            .expect("validated monitored link queue must remain queryable");
-                        queue.bytes_0_to_1 + queue.bytes_1_to_0
-                    },
+                    queued_packets: queue.packets_0_to_1 + queue.packets_1_to_0,
+                    queued_bytes: queue.bytes_0_to_1 + queue.bytes_1_to_0,
                 }
             })
             .collect()
