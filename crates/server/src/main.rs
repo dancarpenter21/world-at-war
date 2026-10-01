@@ -1,6 +1,7 @@
 mod ai_orders;
 mod airport_catalog;
 mod credential_cookie;
+mod impact_reports;
 mod intents;
 #[cfg(test)]
 mod role_tests;
@@ -45,8 +46,8 @@ use sim_core::{
     PlayerIntent, RoleProjection, Side, Simulation,
 };
 use sim_scenario::{
-    combat_training_scenario, command_link_exercise_scenario, global_crisis_scenario,
-    jammed_flight_scenario, sensor_relay_exercise_scenario, Scenario,
+    combat_training_scenario, command_link_exercise_scenario, contested_combat_scenario,
+    global_crisis_scenario, jammed_flight_scenario, sensor_relay_exercise_scenario, Scenario,
 };
 use space_assets::{SpaceAssetDetail, SpaceAssetService, SpaceAssetsResponse};
 use space_catalog::{SpaceCatalogService, SpaceCatalogSnapshot, SpaceCatalogStatus};
@@ -97,6 +98,7 @@ struct Game {
     pending_deliveries: BTreeMap<Uuid, DeliveryAction>,
     ai_planner: ai_orders::AiPlannerState,
     sensor_reports: sensor_reports::SensorReportState,
+    impact_reports: impact_reports::ImpactReportState,
     intent_submissions: BTreeMap<Uuid, intents::IntentSubmission>,
     network_projection_sequence: u64,
     network_event_path: Option<PathBuf>,
@@ -208,6 +210,7 @@ struct GameSummary {
     network_seed: u64,
     operational_error: Option<String>,
     mission_complete: bool,
+    settling_reports: bool,
 }
 #[derive(Deserialize)]
 struct AirportListQuery {
@@ -480,6 +483,7 @@ async fn main() -> anyhow::Result<()> {
         command_link_exercise_scenario(),
         sensor_relay_exercise_scenario(),
         combat_training_scenario(),
+        contested_combat_scenario(),
     ];
     for scenario in &scenarios {
         scenario.validate()?;
@@ -564,6 +568,10 @@ async fn main() -> anyhow::Result<()> {
             get(intents::get_intent_receipt),
         )
         .route("/v1/games/{game_id}/state", get(get_projection))
+        .route(
+            "/v1/games/{game_id}/roles/{role_id}/debrief",
+            get(intents::get_mission_debrief),
+        )
         .route("/v1/games/{game_id}/network", get(get_network_projection))
         .route(
             "/v1/games/{game_id}/network/events",
@@ -794,6 +802,10 @@ async fn create_game(
         ai_planner: ai_orders::AiPlannerState::default(),
         sensor_reports: sensor_reports::SensorReportState::new(
             scenario.sensor_report_routes.clone(),
+        ),
+        impact_reports: impact_reports::ImpactReportState::new(
+            scenario.impact_report_routes.clone(),
+            scenario.reporting_window_ticks,
         ),
         intent_submissions: BTreeMap::new(),
         network_projection_sequence: 0,
@@ -1141,6 +1153,13 @@ async fn decide_authority_request(
         .get_mut(&game_id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
     validate_role_lease(game, role_id, request.player_id, request.lease_generation)?;
+    if game.simulation.mission_complete() {
+        return Err(api_error(
+            StatusCode::CONFLICT,
+            "mission_complete",
+            "the training mission has ended",
+        ));
+    }
     let mut authority_request = game.authority_requests.remove(&request_id).ok_or_else(|| {
         api_error(
             StatusCode::NOT_FOUND,
@@ -1426,6 +1445,13 @@ fn submit_authority_action(
     summary: String,
     intent: Option<PlayerIntent>,
 ) -> Result<SubmissionOutcome, (StatusCode, Json<ErrorResponse>)> {
+    if game.simulation.mission_complete() {
+        return Err(api_error(
+            StatusCode::CONFLICT,
+            "mission_complete",
+            "the training mission has ended",
+        ));
+    }
     let policy = game
         .authority
         .policy_for(&action, target)
@@ -1944,6 +1970,7 @@ fn network_message_visible(record: &NetworkMessageRecord, role: &Role) -> bool {
     record.message.header.origin_role_id == role.id
         || (record.message.header.recipient_entity_id == role.location_unit_id
             && ((record.message.profile_id != sensor_reports::TRACK_REPORT_PROFILE
+                && record.message.profile_id != impact_reports::IMPACT_REPORT_PROFILE
                 && !record.message.fields.contains_key("aim_point"))
                 || record.state == MessageState::Delivered))
 }
@@ -2680,6 +2707,19 @@ fn advance_game_tick(game: &mut Game) {
     if game.status != GameStatus::Running {
         return;
     }
+    if game.simulation.mission_complete() {
+        game.simulation.advance_reporting_clock();
+        game.network_projection_sequence = game.network_projection_sequence.saturating_add(1);
+        process_network_messages(game);
+        impact_reports::send_reports(game);
+        process_network_messages(game);
+        game.impact_reports.remaining_ticks = game.impact_reports.remaining_ticks.saturating_sub(1);
+        if game.impact_reports.remaining_ticks == 0 || impact_reports::reports_settled(game) {
+            transport::finish_reporting(game);
+            game.status = GameStatus::Paused;
+        }
+        return;
+    }
     process_network_messages(game);
     if game.status != GameStatus::Running {
         return;
@@ -2692,8 +2732,13 @@ fn advance_game_tick(game: &mut Game) {
     game.simulation.step();
     game.network_projection_sequence = game.network_projection_sequence.saturating_add(1);
     process_network_messages(game);
+    impact_reports::send_reports(game);
+    process_network_messages(game);
     if game.simulation.mission_complete() {
-        game.status = GameStatus::Paused;
+        game.impact_reports.remaining_ticks = game.impact_reports.window_ticks;
+        if game.impact_reports.remaining_ticks == 0 || impact_reports::reports_settled(game) {
+            game.status = GameStatus::Paused;
+        }
         return;
     }
     if game.status != GameStatus::Running {
@@ -2743,6 +2788,7 @@ fn game_summary(game: &Game) -> GameSummary {
         network_seed: game.network_seed,
         operational_error: game.operational_error.clone(),
         mission_complete: game.simulation.mission_complete(),
+        settling_reports: game.simulation.mission_complete() && game.status == GameStatus::Running,
     }
 }
 
@@ -2854,6 +2900,10 @@ mod authority_tests {
             ai_planner: ai_orders::AiPlannerState::default(),
             sensor_reports: sensor_reports::SensorReportState::new(
                 scenario.sensor_report_routes.clone(),
+            ),
+            impact_reports: impact_reports::ImpactReportState::new(
+                scenario.impact_report_routes.clone(),
+                scenario.reporting_window_ticks,
             ),
             intent_submissions: BTreeMap::new(),
             network_projection_sequence: 0,

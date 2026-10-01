@@ -17,9 +17,10 @@ export type Unit = { weapon?: { ammunition: number; range_m: number; max_track_a
 export type Track = { track_id: string; target_side: Side; position: Position; identity_confidence: number; observed_tick: number; received_tick: number; observed_sidc: string };
 export type JammingRegion = { id: string; name: string; center: Position; radius_m: number; band: { lower_hz: number; upper_hz: number }; jammed: number };
 export type CommunicationLink = { id: string; from_entity_id: string; to_entity_id: string; available: boolean; jammed: number; effective_bit_rate_bps?: number; queued_packets?: number; queued_bytes?: number };
+export type ImpactReport = { intent_id: string; observed_tick: number; launched_tick: number; resolved_tick: number; hit: boolean };
 export type CombatProjection = {
   mission: { title: string; status: "active" | "succeeded" | "failed"; deadline_tick: number; finished_tick: number | null; reason: string | null } | null;
-  local_shots_in_flight: number; local_impacts: { intent_id: string; resolved_tick: number; hit: boolean }[];
+  local_shots_in_flight: number; local_impacts: ImpactReport[]; received_impacts?: { report: ImpactReport; received_tick: number }[];
 };
 export type Projection = { combat?: CombatProjection; tick: number; own_units: Unit[]; tracks: Track[]; jamming_regions: JammingRegion[]; communication_links: CommunicationLink[] };
 

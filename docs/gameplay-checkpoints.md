@@ -2,6 +2,16 @@
 
 These screenshots come from the deterministic Playwright regressions. Training radio settings and target motion are authored scenario data; catalog-dependent tests use an isolated local provider fixture.
 
+## Contested mission debrief
+
+The real-server regression waits through the initial command-post blackout, compares moving target reports, reacquires the drone during its hold, and sends a firing order. The commander first sees a launch receipt with no impact result. The final hit report reaches the command post over the radio after combat time stops. The debrief shows separate observation, delivery, launch, impact, and receipt ticks; its radio history includes the delivered firing order and impact packet. It also checks stale-lease rejection and a 390-pixel phone layout.
+
+![Role-scoped contested mission debrief with separate combat and radio clocks](screenshots/contested-mission-debrief.png)
+
+On a phone, the dialog fits the viewport and the timeline scrolls horizontally to retain every timing column.
+
+![Contested mission debrief on a phone](screenshots/contested-mission-debrief-phone.png)
+
 ## Delivered firing request
 
 In [Combat Training Exercise](../data/scenarios/combat-training.v1.json), the pilot requests a shot using a local contact report. The commander's **Authorities → Requests** view shows the reported aim point, identity confidence, and observation tick only after the request arrives over the shared radio. Denial consumes no ammunition; approval sends a final firing order that must arrive before launch.

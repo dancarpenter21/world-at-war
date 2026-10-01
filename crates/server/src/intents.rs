@@ -74,7 +74,7 @@ pub(super) fn submit_player_intent(
         }
         return existing.result.clone();
     }
-    if game.status != GameStatus::Running {
+    if game.status != GameStatus::Running || game.simulation.mission_complete() {
         return Err(api_error(
             StatusCode::CONFLICT,
             "game_not_running",
@@ -321,3 +321,260 @@ pub(super) fn intent_fields(
 
 #[cfg(test)]
 mod tests;
+
+#[derive(Serialize)]
+pub(super) struct DebriefRadioLeg {
+    profile_id: String,
+    state: MessageState,
+    sent_tick: u64,
+    delivered_tick: Option<u64>,
+}
+#[derive(Serialize)]
+pub(super) struct DebriefEntry {
+    intent_id: Uuid,
+    platform_id: Uuid,
+    submitted_tick: Option<u64>,
+    observed_tick: Option<u64>,
+    approval_ticks: Vec<u64>,
+    launch_tick: Option<u64>,
+    impact_tick: Option<u64>,
+    report_received_tick: Option<u64>,
+    hit: Option<bool>,
+    state: String,
+    error: Option<String>,
+    radio_legs: Vec<DebriefRadioLeg>,
+}
+#[derive(Serialize)]
+pub(super) struct MissionDebrief {
+    tick: u64,
+    radio_tick: u64,
+    settling_reports: bool,
+    mission: Option<sim_core::combat::MissionOutcome>,
+    entries: Vec<DebriefEntry>,
+}
+
+pub(super) fn mission_debrief(game: &mut Game, role: &Role) -> MissionDebrief {
+    let combat = game
+        .simulation
+        .projection_for(role.location_unit_id, role.side)
+        .combat;
+    let local = game.simulation.local_impact_reports(role.location_unit_id);
+    let mut entries = Vec::new();
+    for submission in game
+        .intent_submissions
+        .values()
+        .filter(|submission| matches!(submission.intent.kind, OrderKind::Engage { .. }))
+    {
+        let intent_id = submission.intent.intent_id;
+        let request = game.authority_requests.values().find(|request| {
+            request
+                .intent
+                .as_ref()
+                .is_some_and(|intent| intent.intent_id == intent_id)
+        });
+        let own = submission.role_id == role.id;
+        if !own && !request.is_some_and(|request| authority_request_known(request, role.id)) {
+            continue;
+        }
+        let received = combat.as_ref().and_then(|combat| {
+            combat
+                .received_impacts
+                .iter()
+                .find(|impact| impact.report.intent_id == intent_id)
+        });
+        let report = local
+            .iter()
+            .find(|report| report.intent_id == intent_id)
+            .or_else(|| received.map(|received| &received.report));
+        let key = intent_id.to_string();
+        let records: Vec<_> = game
+            .network_messages
+            .iter()
+            .filter(|record| {
+                network_message_visible(record, role)
+                    && record
+                        .message
+                        .fields
+                        .get("intent_id")
+                        .is_some_and(|id| id.as_str() == Some(key.as_str()))
+            })
+            .collect();
+        let receipt = own
+            .then(|| {
+                receipt_for(
+                    game,
+                    role.id,
+                    intent_id,
+                    &ReceiptQuery {
+                        player_id: role.owner.expect("authorized held role"),
+                        lease_generation: role.lease_generation,
+                    },
+                )
+                .ok()
+            })
+            .flatten();
+        let state = receipt
+            .as_ref()
+            .map(|receipt| {
+                serde_json::to_value(receipt.state)
+                    .unwrap()
+                    .as_str()
+                    .unwrap()
+                    .to_owned()
+            })
+            .unwrap_or_else(|| {
+                if report.is_some() {
+                    "reported".into()
+                } else {
+                    request
+                        .map(|request| {
+                            serde_json::to_value(&request.status).unwrap()["state"]
+                                .as_str()
+                                .unwrap()
+                                .to_owned()
+                        })
+                        .unwrap_or_else(|| "unknown".into())
+                }
+            });
+        entries.push(DebriefEntry {
+            intent_id,
+            platform_id: submission.intent.target,
+            submitted_tick: Some(submission.submitted_tick),
+            observed_tick: report.map(|report| report.observed_tick).or_else(|| {
+                records.iter().find_map(|record| {
+                    record
+                        .message
+                        .fields
+                        .get("observed_tick")
+                        .and_then(|tick| tick.as_u64())
+                })
+            }),
+            approval_ticks: request
+                .map(|request| {
+                    request
+                        .decisions
+                        .iter()
+                        .filter(|decision| decision.approved)
+                        .map(|decision| decision.tick)
+                        .collect()
+                })
+                .unwrap_or_default(),
+            launch_tick: report.map(|report| report.launched_tick).or_else(|| {
+                receipt
+                    .as_ref()
+                    .filter(|receipt| receipt.state == IntentState::Executed)
+                    .and_then(|receipt| receipt.executed_tick)
+            }),
+            impact_tick: report.map(|report| report.resolved_tick),
+            report_received_tick: received.map(|received| received.received_tick),
+            hit: report.map(|report| report.hit),
+            error: receipt.and_then(|receipt| receipt.error),
+            state,
+            radio_legs: records
+                .into_iter()
+                .map(|record| DebriefRadioLeg {
+                    profile_id: record.message.profile_id.clone(),
+                    state: record.state,
+                    sent_tick: record.message.header.created_tick,
+                    delivered_tick: record
+                        .delivered_at_ns
+                        .map(|time| time.div_ceil(1_000_000_000)),
+                })
+                .collect(),
+        });
+    }
+    // A received report can teach this terminal about a shot it did not issue or approve.
+    // Build those rows solely from the report and visible packets, not the submission ledger.
+    let mut known_impacts: Vec<_> = local
+        .iter()
+        .map(|report| (report.clone(), None, role.location_unit_id))
+        .collect();
+    if let Some(combat) = &combat {
+        for received in &combat.received_impacts {
+            let source = game
+                .network_messages
+                .iter()
+                .find(|record| {
+                    record.state == MessageState::Delivered
+                        && record.message.profile_id == impact_reports::IMPACT_REPORT_PROFILE
+                        && record.message.header.recipient_entity_id == role.location_unit_id
+                        && record.message.fields.get("intent_id").is_some_and(|id| {
+                            id.as_str() == Some(received.report.intent_id.to_string().as_str())
+                        })
+                })
+                .map(|record| record.message.header.origin_entity_id);
+            if let Some(source) = source {
+                known_impacts.push((
+                    received.report.clone(),
+                    Some(received.received_tick),
+                    source,
+                ));
+            }
+        }
+    }
+    for (report, received_tick, platform_id) in known_impacts {
+        if entries
+            .iter()
+            .any(|entry| entry.intent_id == report.intent_id)
+        {
+            continue;
+        }
+        let key = report.intent_id.to_string();
+        let radio_legs = game
+            .network_messages
+            .iter()
+            .filter(|record| {
+                network_message_visible(record, role)
+                    && record
+                        .message
+                        .fields
+                        .get("intent_id")
+                        .is_some_and(|id| id.as_str() == Some(key.as_str()))
+            })
+            .map(|record| DebriefRadioLeg {
+                profile_id: record.message.profile_id.clone(),
+                state: record.state,
+                sent_tick: record.message.header.created_tick,
+                delivered_tick: record
+                    .delivered_at_ns
+                    .map(|time| time.div_ceil(1_000_000_000)),
+            })
+            .collect();
+        entries.push(DebriefEntry {
+            intent_id: report.intent_id,
+            platform_id,
+            submitted_tick: None,
+            observed_tick: Some(report.observed_tick),
+            approval_ticks: vec![],
+            launch_tick: Some(report.launched_tick),
+            impact_tick: Some(report.resolved_tick),
+            report_received_tick: received_tick,
+            hit: Some(report.hit),
+            state: "reported".into(),
+            error: None,
+            radio_legs,
+        });
+    }
+    entries.sort_by_key(|entry| (entry.submitted_tick.or(entry.launch_tick), entry.intent_id));
+    MissionDebrief {
+        tick: game.simulation.tick(),
+        radio_tick: game.simulation.radio_tick(),
+        settling_reports: game.simulation.mission_complete() && game.status == GameStatus::Running,
+        mission: combat.and_then(|combat| combat.mission),
+        entries,
+    }
+}
+
+pub(super) async fn get_mission_debrief(
+    Path((game_id, role_id)): Path<(Uuid, Uuid)>,
+    State(state): State<AppState>,
+    Query(query): Query<ReceiptQuery>,
+) -> ApiResult<MissionDebrief> {
+    let mut games = state.games.write().await;
+    let game = games
+        .get_mut(&game_id)
+        .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
+    validate_role_lease(game, role_id, query.player_id, query.lease_generation)?;
+    let role = game.roles[&role_id].clone();
+    Ok(Json(mission_debrief(game, &role)))
+}

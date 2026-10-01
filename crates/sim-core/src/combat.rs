@@ -66,8 +66,16 @@ pub struct WeaponStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImpactReport {
     pub intent_id: Uuid,
+    pub observed_tick: u64,
+    pub launched_tick: u64,
     pub resolved_tick: u64,
     pub hit: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReceivedImpactReport {
+    pub report: ImpactReport,
+    pub received_tick: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,6 +83,7 @@ pub struct CombatProjection {
     pub mission: Option<MissionOutcome>,
     pub local_shots_in_flight: usize,
     pub local_impacts: Vec<ImpactReport>,
+    pub received_impacts: Vec<ReceivedImpactReport>,
 }
 
 struct Flight {
@@ -83,6 +92,8 @@ struct Flight {
     side: Side,
     position: GeoPose,
     impact_tick: u64,
+    observed_tick: u64,
+    launched_tick: u64,
     blast_radius_m: f64,
     damage: u32,
 }
@@ -95,6 +106,7 @@ pub(super) struct CombatState {
     designations: BTreeMap<Uuid, Track>,
     flights: Vec<Flight>,
     reports: Vec<(Uuid, ImpactReport)>,
+    received: BTreeMap<Uuid, Vec<ReceivedImpactReport>>,
     mission: Option<TrainingMission>,
     outcome: Option<MissionOutcome>,
 }
@@ -204,6 +216,7 @@ impl CombatState {
                 .iter()
                 .filter(|flight| flight.attacker == terminal)
                 .count(),
+            received_impacts: self.received.get(&terminal).cloned().unwrap_or_default(),
             local_impacts: self
                 .reports
                 .iter()
@@ -211,6 +224,27 @@ impl CombatState {
                 .map(|(_, report)| report.clone())
                 .collect(),
         })
+    }
+
+    pub(super) fn local_reports(&self, terminal: Uuid) -> Vec<ImpactReport> {
+        self.reports
+            .iter()
+            .filter(|(source, _)| *source == terminal)
+            .map(|(_, report)| report.clone())
+            .collect()
+    }
+
+    pub(super) fn receive(&mut self, terminal: Uuid, report: ImpactReport, received_tick: u64) {
+        let reports = self.received.entry(terminal).or_default();
+        if !reports
+            .iter()
+            .any(|known| known.report.intent_id == report.intent_id)
+        {
+            reports.push(ReceivedImpactReport {
+                report,
+                received_tick,
+            });
+        }
     }
 
     pub(super) fn complete(&self) -> bool {
@@ -281,6 +315,8 @@ impl CombatState {
             side,
             position: track.position,
             impact_tick,
+            observed_tick: track.observed_tick,
+            launched_tick: tick,
             blast_radius_m: weapon.blast_radius_m,
             damage: weapon.damage,
         });
@@ -343,6 +379,8 @@ pub(super) fn resolve_impacts(world: &mut World) {
             flight.attacker,
             ImpactReport {
                 intent_id: flight.intent_id,
+                observed_tick: flight.observed_tick,
+                launched_tick: flight.launched_tick,
                 resolved_tick: tick,
                 hit,
             },

@@ -216,6 +216,8 @@ fn restored_receiver_gets_a_fresh_report_without_retroactive_hidden_observations
             .find_map(|channel| channel.radio.as_ref().map(|radio| radio.band))
             .unwrap(),
         jammed: 1.0,
+        active_from_tick: 0,
+        active_until_tick: None,
     });
     let mut game = game_from_scenario(scenario);
     ticks(&mut game, 5);

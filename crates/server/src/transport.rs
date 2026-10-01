@@ -3,6 +3,10 @@ use sim_core::{NetworkEvent, NetworkTime, PacketMetadata};
 
 pub(super) enum DeliveryAction {
     ExecuteIntent(AuthorizedIntent),
+    ReceiveImpactReport {
+        recipient_unit_id: Uuid,
+        report: sim_core::combat::ImpactReport,
+    },
     ReceiveTrackReport {
         recipient_unit_id: Uuid,
         source_track: sim_core::Track,
@@ -60,7 +64,7 @@ pub(super) fn transmit_c2_message_with_fields(
 ) -> Option<Uuid> {
     let origin_entity_id = game.roles.get(&origin_role_id)?.location_unit_id;
     let profile = game.message_profiles.get(profile_id)?.clone();
-    let tick = game.simulation.tick();
+    let tick = game.simulation.radio_tick();
     let message = C2Message {
         id: Uuid::new_v4(),
         profile_id: profile_id.into(),
@@ -178,7 +182,9 @@ fn apply_to_request(game: &mut Game, request: &mut AuthorityRequest, action: Del
             }
         }
         DeliveryAction::ExecuteRequest { intent, .. } => {
-            game.simulation.queue_authorized_intent(intent);
+            if !game.simulation.mission_complete() {
+                game.simulation.queue_authorized_intent(intent);
+            }
             request.status = AuthorityRequestStatus::Approved;
         }
         _ => {}
@@ -187,7 +193,24 @@ fn apply_to_request(game: &mut Game, request: &mut AuthorityRequest, action: Del
 
 fn apply_delivery(game: &mut Game, message_id: Uuid, action: DeliveryAction) {
     match action {
-        DeliveryAction::ExecuteIntent(intent) => game.simulation.queue_authorized_intent(intent),
+        DeliveryAction::ExecuteIntent(intent) if !game.simulation.mission_complete() => {
+            game.simulation.queue_authorized_intent(intent)
+        }
+        DeliveryAction::ExecuteIntent(_) => {}
+        DeliveryAction::ReceiveImpactReport {
+            recipient_unit_id,
+            report,
+        } => {
+            let received_tick = game
+                .network_messages
+                .iter()
+                .find(|record| record.message.id == message_id)
+                .and_then(|record| record.delivered_at_ns)
+                .unwrap_or(0)
+                .div_ceil(1_000_000_000);
+            game.simulation
+                .receive_impact_report(recipient_unit_id, report, received_tick);
+        }
         DeliveryAction::ReceiveTrackReport {
             recipient_unit_id,
             source_track,
@@ -199,7 +222,9 @@ fn apply_delivery(game: &mut Game, message_id: Uuid, action: DeliveryAction) {
             let request_id = match &action {
                 DeliveryAction::ActivateRequest { request_id, .. }
                 | DeliveryAction::ExecuteRequest { request_id, .. } => *request_id,
-                DeliveryAction::ExecuteIntent(_) | DeliveryAction::ReceiveTrackReport { .. } => {
+                DeliveryAction::ExecuteIntent(_)
+                | DeliveryAction::ReceiveImpactReport { .. }
+                | DeliveryAction::ReceiveTrackReport { .. } => {
                     unreachable!()
                 }
             };
@@ -219,7 +244,9 @@ fn fail_delivery(game: &mut Game, message_id: Uuid, action: DeliveryAction) {
     let request_id = match action {
         DeliveryAction::ActivateRequest { request_id, .. }
         | DeliveryAction::ExecuteRequest { request_id, .. } => Some(request_id),
-        DeliveryAction::ExecuteIntent(_) | DeliveryAction::ReceiveTrackReport { .. } => None,
+        DeliveryAction::ExecuteIntent(_)
+        | DeliveryAction::ReceiveImpactReport { .. }
+        | DeliveryAction::ReceiveTrackReport { .. } => None,
     };
     if let Some(request) = request_id.and_then(|id| game.authority_requests.get_mut(&id)) {
         if matches!(request.status, AuthorityRequestStatus::InTransit { message_id: awaiting } if awaiting == message_id)
@@ -294,6 +321,32 @@ fn abort_pending(game: &mut Game, reason: &str) {
             .find(|item| item.message.id == record.message.id)
         {
             *current = record;
+        }
+    }
+}
+
+/// Close the finite post-mission window with persisted terminal packet states.
+pub(super) fn finish_reporting(game: &mut Game) {
+    let pending: Vec<_> = game
+        .network_messages
+        .iter()
+        .filter(|record| matches!(record.state, MessageState::Queued | MessageState::InTransit))
+        .cloned()
+        .collect();
+    for mut record in pending {
+        let id = record.message.id;
+        if let Some(packet) = record.packet_id {
+            game.packet_messages.remove(&packet);
+        }
+        record.state = MessageState::Dropped;
+        record.terminal_at_ns = Some(tick_time_ns(game.simulation.radio_tick()));
+        record.drop_reason = Some("mission reporting window ended".into());
+        if !record_transition(game, record) {
+            abort_pending(game, "network event store write failed");
+            return;
+        }
+        if let Some(action) = game.pending_deliveries.remove(&id) {
+            fail_delivery(game, id, action);
         }
     }
 }

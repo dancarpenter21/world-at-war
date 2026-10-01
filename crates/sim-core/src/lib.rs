@@ -148,6 +148,16 @@ pub struct JammingRegion {
     pub radius_m: f64,
     pub band: FrequencyBand,
     pub jammed: f64,
+    #[serde(default)]
+    pub active_from_tick: u64,
+    #[serde(default)]
+    pub active_until_tick: Option<u64>,
+}
+
+impl JammingRegion {
+    pub fn active_at(&self, tick: u64) -> bool {
+        tick >= self.active_from_tick && self.active_until_tick.is_none_or(|until| tick < until)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -581,6 +591,7 @@ pub struct Simulation {
     world: World,
     schedule: Schedule,
     communications: CommunicationsRuntime,
+    reporting_ticks: u64,
 }
 
 impl Simulation {
@@ -741,6 +752,9 @@ impl Simulation {
                 || !region.radius_m.is_finite()
                 || region.radius_m <= 0.0
                 || region.band.lower_hz >= region.band.upper_hz
+                || region
+                    .active_until_tick
+                    .is_some_and(|until| until <= region.active_from_tick)
                 || !region.jammed.is_finite()
                 || !(0.0..=1.0).contains(&region.jammed)
             {
@@ -802,6 +816,7 @@ impl Simulation {
         let mut simulation = Self {
             world,
             schedule,
+            reporting_ticks: 0,
             communications: CommunicationsRuntime {
                 simulator,
                 entity_devices,
@@ -909,6 +924,36 @@ impl Simulation {
         self.schedule.run(&mut self.world);
         self.sync_network_interference()
             .expect("validated network must accept tick interference");
+    }
+
+    /// Advance radio traffic after an objective ends without moving or sensing platforms.
+    pub fn advance_reporting_clock(&mut self) {
+        assert!(
+            self.mission_complete(),
+            "reporting clock requires a completed mission"
+        );
+        self.reporting_ticks = self.reporting_ticks.saturating_add(1);
+        self.sync_network_interference()
+            .expect("validated interference");
+    }
+
+    pub fn radio_tick(&self) -> u64 {
+        self.tick().saturating_add(self.reporting_ticks)
+    }
+
+    pub fn local_impact_reports(&self, terminal: Uuid) -> Vec<combat::ImpactReport> {
+        self.world.resource::<CombatState>().local_reports(terminal)
+    }
+
+    pub fn receive_impact_report(
+        &mut self,
+        terminal: Uuid,
+        report: combat::ImpactReport,
+        received_tick: u64,
+    ) {
+        self.world
+            .resource_mut::<CombatState>()
+            .receive(terminal, report, received_tick);
     }
 
     pub fn tick(&self) -> u64 {
@@ -1144,7 +1189,13 @@ impl Simulation {
             tick: self.tick(),
             own_units,
             tracks,
-            jamming_regions: self.communications.jamming_regions.clone(),
+            jamming_regions: self
+                .communications
+                .jamming_regions
+                .iter()
+                .filter(|region| region.active_at(self.radio_tick()))
+                .cloned()
+                .collect(),
             communication_links: link_statuses,
             combat: self
                 .world
@@ -1155,7 +1206,7 @@ impl Simulation {
 
     fn network_time(&self) -> NetworkTime {
         let tick_ns = self
-            .tick()
+            .radio_tick()
             .saturating_mul(TICK_SECONDS)
             .saturating_mul(1_000_000_000);
         NetworkTime::from_nanos(tick_ns.max(self.communications.simulator.now().as_nanos()))
@@ -1180,7 +1231,9 @@ impl Simulation {
                     .cloned()
                     .unwrap_or_default();
                 for region in &self.communications.jamming_regions {
-                    if great_circle_distance_m(*position, region.center) <= region.radius_m {
+                    if region.active_at(self.radio_tick())
+                        && great_circle_distance_m(*position, region.center) <= region.radius_m
+                    {
                         snapshot.push(ReceiverInterference {
                             band: region.band,
                             jammed: region.jammed,

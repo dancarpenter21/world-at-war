@@ -3,6 +3,7 @@ import { ApiError, apiRequest } from "./apiClient";
 import type { Role } from "./AuthorityWorkspace";
 import type { Projection } from "./globeEntities";
 import { usePollingResource } from "./usePollingResource";
+import { MissionDebrief } from "./MissionDebrief";
 
 type EngagementBody = { player_id: string; lease_generation: number; intent: {
   intent_id: string; issuer_role: string; target: string; kind: { Engage: { track_id: string } }; requested_tick: number;
@@ -15,12 +16,13 @@ const receiptText: Record<string, string> = {
   expired: "Engagement expired", denied: "Firing authority denied", approved_no_executor: "Approved; no firing platform available"
 };
 
-export function CombatOrders({ apiBase, gameId, playerId, role, projection, canIssueOrders, canRecoverOrder, onExecuted }: {
+export function CombatOrders({ apiBase, gameId, playerId, role, projection, canIssueOrders, canRecoverOrder, onExecuted, settlingReports = false }: {
   apiBase: string; gameId: string; playerId: string; role: Role; projection: Projection;
-  canIssueOrders: boolean; canRecoverOrder: boolean; onExecuted: () => void;
+  canIssueOrders: boolean; canRecoverOrder: boolean; onExecuted: () => void; settlingReports?: boolean;
 }) {
   const controlled = new Set(role.command_units);
   const armed = projection.own_units.filter((unit) => controlled.has(unit.id) && unit.weapon);
+  const [showDebrief, setShowDebrief] = useState(false);
   const [unitId, setUnitId] = useState("");
   const [trackId, setTrackId] = useState("");
   const [pending, setPending] = useState(false);
@@ -90,12 +92,14 @@ export function CombatOrders({ apiBase, gameId, playerId, role, projection, canI
   if (!projection.combat) return null;
   const impacts = projection.combat.local_impacts;
   const lastImpact = impacts[impacts.length - 1];
+  const received = projection.combat.received_impacts ?? [];
+  const lastReceived = received[received.length - 1];
   return <>
     {mission && <section className={`training-mission ${mission.status}`} aria-label="Training mission" aria-live="polite">
       <h2>{mission.status === "succeeded" ? "Mission complete" : mission.status === "failed" ? "Mission failed" : "Mission active"}</h2>
       <p>{mission.title}</p>
       <small>{mission.status === "active" ? `Complete by tick ${mission.deadline_tick}` : `${mission.reason} · tick ${mission.finished_tick}`}</small>
-      {finished && <p>The exercise has ended. Leave and create a new game to try again.</p>}
+      {finished && <p>{settlingReports ? "Combat has stopped. Final radio reports are still settling." : "The exercise has ended. Leave and create a new game to try again."}</p>}
     </section>}
     <section className="combat-orders" aria-label="Engagement orders">
       <h2>Engagement orders</h2>
@@ -125,6 +129,9 @@ export function CombatOrders({ apiBase, gameId, playerId, role, projection, canI
       </> : <p className="muted">No armed platform under this role's command.</p>}
       {projection.combat.local_shots_in_flight > 0 && <p>Training shots in flight: {projection.combat.local_shots_in_flight}</p>}
       {lastImpact && <p className="combat-impact">Weapon impact: {lastImpact.hit ? "hit" : "miss"} at tick {lastImpact.resolved_tick}</p>}
+      {lastReceived && <p className="combat-impact">Received impact report: {lastReceived.report.hit ? "hit" : "miss"} at tick {lastReceived.report.resolved_tick} · received at radio tick {lastReceived.received_tick}</p>}
+      <button className="secondary" onClick={() => setShowDebrief(true)}>Mission debrief</button>
     </section>
+    {showDebrief && <MissionDebrief apiBase={apiBase} gameId={gameId} playerId={playerId} role={role} units={projection.own_units} onClose={() => setShowDebrief(false)} />}
   </>;
 }

@@ -18,6 +18,12 @@ struct RadioScenarioDefinition {
     sensor_report_routes: Vec<SensorReportRoute>,
     #[serde(default)]
     combat: Option<sim_core::combat::CombatConfig>,
+    #[serde(default)]
+    impact_report_routes: Vec<ImpactReportRoute>,
+    #[serde(default)]
+    reporting_window_ticks: u64,
+    #[serde(default)]
+    jamming_regions: Vec<JammingRegion>,
 }
 
 #[derive(Deserialize)]
@@ -82,10 +88,12 @@ fn parse_radio_scenario(data: &str) -> Result<Scenario, ScenarioError> {
         network,
         simulator_options,
         communication_links,
-        jamming_regions: Vec::new(),
+        jamming_regions: definition.jamming_regions,
         authority: definition.authority,
         sensor_report_routes: definition.sensor_report_routes,
         combat: definition.combat,
+        impact_report_routes: definition.impact_report_routes,
+        reporting_window_ticks: definition.reporting_window_ticks,
     };
     scenario.validate()?;
     Ok(scenario)
@@ -110,6 +118,14 @@ pub fn combat_training_scenario() -> Scenario {
         "../../../data/scenarios/combat-training.v1.json"
     ))
     .expect("committed combat training data must be valid")
+}
+
+/// Patrol motion, timed jamming, and delivered impact reports create a contested exercise.
+pub fn contested_combat_scenario() -> Scenario {
+    parse_radio_scenario(include_str!(
+        "../../../data/scenarios/contested-combat.v1.json"
+    ))
+    .expect("committed contested combat data must be valid")
 }
 
 #[cfg(test)]

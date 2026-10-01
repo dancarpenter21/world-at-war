@@ -2,7 +2,7 @@
 
 World At War is a server-authoritative, low-fidelity war-simulation prototype. It combines a Rust entity-component simulation, a Cesium/React operational map, a public Space-Track orbital catalog, and an authority workflow for command decisions.
 
-The current implementation ships **Combat Training Exercise**, with a radio-delivered firing order, two fictional training shots, and an adjudicated objective; **Command Link Exercise**, a catalog-free command post and two aircraft on a slow shared training net; **Sensor Relay Exercise**, where local detections reach a commander only after radio delivery; **Global Crisis**, with 64 authored entities and a pinned public orbital snapshot; and **Jammed Flight Test**, with two pilot-controlled Blue aircraft and directional receiver jamming. Authored entities and uncertain tracks use MIL-STD-2525D symbols.
+The current implementation ships **Contested Combat Exercise**, with a patrolling target, timed command-post blackout, delivered impact reports, and a role-scoped debrief; **Combat Training Exercise**, with a radio-delivered firing order, two fictional training shots, and an adjudicated objective; **Command Link Exercise**, a catalog-free command post and two aircraft on a slow shared training net; **Sensor Relay Exercise**, where local detections reach a commander only after radio delivery; **Global Crisis**, with 64 authored entities and a pinned public orbital snapshot; and **Jammed Flight Test**, with two pilot-controlled Blue aircraft and directional receiver jamming. Authored entities and uncertain tracks use MIL-STD-2525D symbols.
 
 The broader target architecture, planned simulation fidelity, and acceptance criteria are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Features described there are not necessarily implemented yet.
 
@@ -166,6 +166,18 @@ The [authored exercise](data/scenarios/combat-training.v1.json) provides two fic
 **Weapon launched** confirms execution, not a hit. Impact telemetry is local to the firing terminal; other terminals do not automatically receive it. The exercise's public adjudicator announces success or failure to the objective's side, without exposing enemy entity IDs, names, or remaining health. Destroying the target succeeds; exhausted shots or the time limit fail. Terminal outcomes stop the server clock, reject resume, and remain available after reload or rejoin.
 
 Weapon and durability definitions are optional scenario data; the existing exercises remain unarmed. These are deliberately simple training mechanics. Guided interception, seekers, real weapon envelopes, countermeasures, friendly fire, fuel, and a general campaign objective system remain planned. Active games and combat state still live in memory and are lost on server restart.
+
+## Contested combat and mission debrief
+
+Create **Contested Combat Exercise**, claim **Exercise Commander**, and start. The command post is jammed for ticks 0–7, so initial sensor reports can fail. When the blackout ends, fresh reports arrive on the shared radio. The drone patrols between two positions and holds from ticks 20–54; use the observation age and changing reported positions to reacquire it before firing. An early shot at a moving contact can miss its frozen aim point. CAP Alpha 1 has three fictional shots and the objective has a 150-tick deadline. Movement orders remain available to reposition the aircraft.
+
+The pilot's impact telemetry is explicitly subscribed to the command post. **Received impact report** appears only after its packet delivery is recorded; dropped, expired, or unpersisted packets reveal no result. Reports contain the original observation, launch, and impact ticks plus hit/miss, without enemy identity or remaining health. Each route makes at most four attempts, paced five ticks apart in this scenario. The other pilot receives no report automatically.
+
+Open **Mission debrief** during or after either combat exercise. Its table separates observation, approval, final order delivery, launch, impact, and report receipt. The radio history shows visible packet outcomes. Unknown events remain blank: a commander who approved a pilot's order does not gain local impact telemetry automatically, and a received report does not expose another player's unreported submission history. Access requires the current player and role lease; reloading or rejoining preserves the in-memory timeline.
+
+After the contested objective ends, combat time, movement, sensing, and new orders stop. Only the radio clock advances for at most 20 ticks so final reports can arrive or exhaust their attempts; the game then pauses. Packets still pending at the limit receive recorded drops. The interface marks this phase **Radio reporting**, and the debrief displays combat and radio clocks separately. The original Combat Training Exercise retains its immediate pause and local-only impact telemetry.
+
+Jamming regions can optionally specify an inclusive `active_from_tick` and exclusive `active_until_tick`. Omitted values preserve continuously active regions. Exercise timings, patrols, report subscriptions, and limits live in [contested-combat.v1.json](data/scenarios/contested-combat.v1.json). These rules use the existing pinned c3mesh packet engine and add no external data source. Save/load and durable replay remain future work.
 
 ## Gameplay and authority workflow
 

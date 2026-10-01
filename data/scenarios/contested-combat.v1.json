@@ -1,0 +1,359 @@
+{
+  "id": "training-contested.v1",
+  "title": "Contested Combat Exercise",
+  "description": "Track a moving training drone through a radio blackout. Reacquire a fresh report when it holds, deliver a firing order, and receive an impact report over the radio. The debrief separates observation, approval, delivery, launch, and impact.",
+  "version": 1,
+  "provenance": "Fictional positions, training weapon limits, target durability, and exercise rules. No real weapon performance data.",
+  "units": [
+    {
+      "id": "00000000-0000-0000-0000-000000000005",
+      "name": "Andersen Air Force Base",
+      "side": "Blue",
+      "domain": "Land",
+      "sidc": "100310000012110000000000000000",
+      "position": {
+        "latitude_deg": 13.584,
+        "longitude_deg": 144.93,
+        "altitude_m": 180
+      },
+      "velocity": {
+        "north_mps": 0,
+        "east_mps": 0,
+        "climb_mps": 0
+      },
+      "sensor": null,
+      "network_device_ids": [],
+      "flight_path": null
+    },
+    {
+      "id": "00000000-0000-0000-0000-00000000000b",
+      "name": "F-35A CAP Alpha 1",
+      "side": "Blue",
+      "domain": "Air",
+      "sidc": "100301000011010000000000000000",
+      "position": {
+        "latitude_deg": 13.7,
+        "longitude_deg": 145.05,
+        "altitude_m": 8000
+      },
+      "velocity": {
+        "north_mps": 0,
+        "east_mps": 0,
+        "climb_mps": 0
+      },
+      "sensor": {
+        "range_m": 20000,
+        "identification_range_m": 8000
+      },
+      "network_device_ids": [],
+      "flight_path": null
+    },
+    {
+      "id": "00000000-0000-0000-0000-00000000000c",
+      "name": "F-35A CAP Alpha 2",
+      "side": "Blue",
+      "domain": "Air",
+      "sidc": "100301000011010000000000000000",
+      "position": {
+        "latitude_deg": 13.75,
+        "longitude_deg": 145.1,
+        "altitude_m": 8000
+      },
+      "velocity": {
+        "north_mps": 0,
+        "east_mps": 0,
+        "climb_mps": 0
+      },
+      "sensor": null,
+      "network_device_ids": [],
+      "flight_path": null
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000033",
+      "name": "Hostile training drone",
+      "side": "Red",
+      "domain": "Air",
+      "sidc": "100601000011010000000000000000",
+      "position": {
+        "latitude_deg": 13.719999999999999,
+        "longitude_deg": 145.05,
+        "altitude_m": 8000
+      },
+      "velocity": {
+        "north_mps": 0,
+        "east_mps": 0,
+        "climb_mps": 0
+      },
+      "sensor": null,
+      "network_device_ids": [],
+      "flight_path": {
+        "waypoints": [
+          {
+            "at_tick": 0,
+            "position": {
+              "latitude_deg": 13.72,
+              "longitude_deg": 145.05,
+              "altitude_m": 8000
+            }
+          },
+          {
+            "at_tick": 20,
+            "position": {
+              "latitude_deg": 13.755,
+              "longitude_deg": 145.05,
+              "altitude_m": 8000
+            }
+          },
+          {
+            "at_tick": 55,
+            "position": {
+              "latitude_deg": 13.755,
+              "longitude_deg": 145.05,
+              "altitude_m": 8000
+            }
+          },
+          {
+            "at_tick": 75,
+            "position": {
+              "latitude_deg": 13.72,
+              "longitude_deg": 145.05,
+              "altitude_m": 8000
+            }
+          }
+        ],
+        "period_ticks": 100
+      }
+    }
+  ],
+  "radio": {
+    "bit_rate_bps": 2400,
+    "propagation_delay_ns": 5000000,
+    "mtu_bytes": 1200,
+    "overhead_bytes": 24,
+    "max_queue_packets": 4,
+    "max_queue_bytes": 4096,
+    "shared_medium": "contested-training-net",
+    "seed": 42
+  },
+  "authority": {
+    "version": 1,
+    "roles": [
+      {
+        "id": "00000000-0000-0000-0000-000000004e85",
+        "name": "Exercise National Authority",
+        "side": "Blue",
+        "kind": "national_command",
+        "location_unit_id": "00000000-0000-0000-0000-000000000005",
+        "claimable": false,
+        "ai_controlled": false
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004e86",
+        "name": "Exercise Commander",
+        "side": "Blue",
+        "kind": "component_commander",
+        "location_unit_id": "00000000-0000-0000-0000-000000000005",
+        "claimable": true,
+        "ai_controlled": false
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004e87",
+        "name": "Pilot, CAP Alpha 1",
+        "side": "Blue",
+        "kind": "pilot",
+        "location_unit_id": "00000000-0000-0000-0000-00000000000b",
+        "claimable": true,
+        "ai_controlled": false
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004e88",
+        "name": "Pilot, CAP Alpha 2",
+        "side": "Blue",
+        "kind": "pilot",
+        "location_unit_id": "00000000-0000-0000-0000-00000000000c",
+        "claimable": true,
+        "ai_controlled": false
+      },
+      {
+        "id": "00000000-0000-0000-0000-00000000526d",
+        "name": "Red exercise authority",
+        "side": "Red",
+        "kind": "national_command",
+        "location_unit_id": "00000000-0000-0000-0000-000000000033",
+        "claimable": false,
+        "ai_controlled": false
+      }
+    ],
+    "relationships": [
+      {
+        "id": "00000000-0000-0000-0000-000000004ee9",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e85",
+        "subordinate_role_id": "00000000-0000-0000-0000-000000004e86",
+        "subordinate_unit_id": null,
+        "kind": "national_command"
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004eea",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e86",
+        "subordinate_role_id": "00000000-0000-0000-0000-000000004e87",
+        "subordinate_unit_id": null,
+        "kind": "tacon"
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004eeb",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e86",
+        "subordinate_role_id": "00000000-0000-0000-0000-000000004e88",
+        "subordinate_unit_id": null,
+        "kind": "tacon"
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004eec",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e85",
+        "subordinate_role_id": null,
+        "subordinate_unit_id": "00000000-0000-0000-0000-000000000005",
+        "kind": "national_command"
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004eed",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e87",
+        "subordinate_role_id": null,
+        "subordinate_unit_id": "00000000-0000-0000-0000-00000000000b",
+        "kind": "tacon"
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004eee",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e88",
+        "subordinate_role_id": null,
+        "subordinate_unit_id": "00000000-0000-0000-0000-00000000000c",
+        "kind": "tacon"
+      },
+      {
+        "id": "00000000-0000-0000-0000-0000000052d1",
+        "superior_role_id": "00000000-0000-0000-0000-00000000526d",
+        "subordinate_role_id": null,
+        "subordinate_unit_id": "00000000-0000-0000-0000-000000000033",
+        "kind": "national_command"
+      }
+    ],
+    "policies": [
+      {
+        "id": "00000000-0000-0000-0000-000000004f4d",
+        "name": "CAP Alpha 1 movement authority",
+        "action": "move",
+        "target_unit_ids": [
+          "00000000-0000-0000-0000-00000000000b"
+        ],
+        "direct_role_ids": [
+          "00000000-0000-0000-0000-000000004e86",
+          "00000000-0000-0000-0000-000000004e87"
+        ],
+        "request_role_ids": [],
+        "decision_steps": [],
+        "notify_role_ids": [],
+        "executable": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004f4e",
+        "name": "CAP Alpha 2 movement authority",
+        "action": "move",
+        "target_unit_ids": [
+          "00000000-0000-0000-0000-00000000000c"
+        ],
+        "direct_role_ids": [
+          "00000000-0000-0000-0000-000000004e86",
+          "00000000-0000-0000-0000-000000004e88"
+        ],
+        "request_role_ids": [],
+        "decision_steps": [],
+        "notify_role_ids": [],
+        "executable": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004f60",
+        "name": "Training engagement authority",
+        "action": "engage",
+        "target_unit_ids": [
+          "00000000-0000-0000-0000-00000000000b"
+        ],
+        "direct_role_ids": [
+          "00000000-0000-0000-0000-000000004e86"
+        ],
+        "request_role_ids": [
+          "00000000-0000-0000-0000-000000004e87"
+        ],
+        "decision_steps": [
+          {
+            "role_id": "00000000-0000-0000-0000-000000004e86",
+            "vacant_delay_ticks": 3,
+            "approve_probability_bps": 0
+          }
+        ],
+        "notify_role_ids": [],
+        "executable": true
+      }
+    ]
+  },
+  "sensor_report_routes": [
+    {
+      "origin_role_id": "00000000-0000-0000-0000-000000004e87",
+      "recipient_unit_id": "00000000-0000-0000-0000-000000000005",
+      "interval_ticks": 3
+    }
+  ],
+  "combat": {
+    "units": [
+      {
+        "unit_id": "00000000-0000-0000-0000-00000000000b",
+        "hit_points": 100,
+        "weapon": {
+          "ammunition": 3,
+          "range_m": 12000,
+          "speed_mps": 600,
+          "blast_radius_m": 75,
+          "damage": 100,
+          "max_track_age_ticks": 12
+        }
+      },
+      {
+        "unit_id": "00000000-0000-0000-0000-000000000033",
+        "hit_points": 100,
+        "weapon": null
+      }
+    ],
+    "mission": {
+      "title": "Destroy the patrolling training drone",
+      "side": "Blue",
+      "target_unit_ids": [
+        "00000000-0000-0000-0000-000000000033"
+      ],
+      "deadline_tick": 150
+    }
+  },
+  "jamming_regions": [
+    {
+      "radius_m": 500,
+      "active_until_tick": 8,
+      "jammed": 1.0,
+      "id": "command-post-blackout",
+      "band": {
+        "lower_hz": 960000000,
+        "upper_hz": 1215000000
+      },
+      "center": {
+        "latitude_deg": 13.584,
+        "longitude_deg": 144.93,
+        "altitude_m": 180
+      },
+      "active_from_tick": 0,
+      "name": "Training command-post blackout"
+    }
+  ],
+  "impact_report_routes": [
+    {
+      "origin_role_id": "00000000-0000-0000-0000-000000004e87",
+      "recipient_unit_id": "00000000-0000-0000-0000-000000000005",
+      "retry_interval_ticks": 5
+    }
+  ],
+  "reporting_window_ticks": 20
+}

@@ -19,7 +19,9 @@ fn order_is_pending(game: &Game, unit_id: Uuid) -> bool {
     game.pending_deliveries.values().any(|action| match action {
         DeliveryAction::ExecuteIntent(order)
         | DeliveryAction::ExecuteRequest { intent: order, .. } => order.intent.target == unit_id,
-        DeliveryAction::ActivateRequest { .. } | DeliveryAction::ReceiveTrackReport { .. } => false,
+        DeliveryAction::ActivateRequest { .. }
+        | DeliveryAction::ReceiveTrackReport { .. }
+        | DeliveryAction::ReceiveImpactReport { .. } => false,
     }) || game.authority_requests.values().any(|request| {
         request.target_unit_id == unit_id
             && request.action == sim_core::ACTION_MOVE
@@ -34,7 +36,7 @@ fn order_is_pending(game: &Game, unit_id: Uuid) -> bool {
 }
 
 pub(super) fn process_ai_orders(game: &mut Game) {
-    if game.status != GameStatus::Running {
+    if game.status != GameStatus::Running || game.simulation.mission_complete() {
         return;
     }
     let mut roles: Vec<_> = game
@@ -88,7 +90,7 @@ pub(super) fn process_ai_orders(game: &mut Game) {
                 "AI patrol".into(),
                 Some(intent),
             );
-            if game.status != GameStatus::Running {
+            if game.status != GameStatus::Running || game.simulation.mission_complete() {
                 return;
             }
         }

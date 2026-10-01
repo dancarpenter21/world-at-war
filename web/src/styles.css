@@ -279,3 +279,18 @@ select, textarea { width: 100%; padding: 9px; color: #eef7fa; background: #0e171
 .combat-ammunition, .combat-impact { color: #b4d8ce; font-size: 13px; }
 .combat-feedback { margin: 10px 0; font-size: 13px; line-height: 1.5; }
 .combat-feedback small { display: block; color: #c0c7ca; }
+
+.mission-debrief { width: min(1100px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: auto; color: #dbe9ee; background: #101e25; border: 1px solid #405d68; padding: 24px; }
+.mission-debrief::backdrop { background: #020b10cc; }
+.mission-debrief header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 0 12px; }
+.mission-debrief h1 { font-size: 20px; margin: 0; white-space: nowrap; }
+.mission-debrief header .secondary { width: auto; flex-shrink: 0; margin-top: 0; }
+.mission-debrief p { line-height: 1.5; }
+.debrief-table-wrap { overflow-x: auto; }
+.mission-debrief table { width: 100%; min-width: 750px; border-collapse: collapse; text-align: left; }
+.mission-debrief caption { text-align: left; font-weight: bold; padding: 12px 0; }
+.mission-debrief th, .mission-debrief td { padding: 12px 8px; border-bottom: 1px solid #334b55; vertical-align: top; }
+.mission-debrief small { display: block; max-width: 180px; margin-top: 6px; color: #9ab1bc; font-weight: normal; }
+.debrief-radio h2 { margin: 20px 0 8px; font-size: 14px; }
+.debrief-radio li { margin: 6px 0; color: #9ab1bc; }
+@media (max-width: 700px) { .mission-debrief { padding: 16px; } }

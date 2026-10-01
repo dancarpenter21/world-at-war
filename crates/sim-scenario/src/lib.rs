@@ -3,7 +3,8 @@
 mod radio_exercise;
 
 pub use radio_exercise::{
-    combat_training_scenario, command_link_exercise_scenario, sensor_relay_exercise_scenario,
+    combat_training_scenario, command_link_exercise_scenario, contested_combat_scenario,
+    sensor_relay_exercise_scenario,
 };
 
 use std::collections::BTreeMap;
@@ -41,6 +42,10 @@ pub struct Scenario {
     pub sensor_report_routes: Vec<SensorReportRoute>,
     #[serde(default)]
     pub combat: Option<sim_core::combat::CombatConfig>,
+    #[serde(default)]
+    pub impact_report_routes: Vec<ImpactReportRoute>,
+    #[serde(default)]
+    pub reporting_window_ticks: u64,
 }
 
 /// An explicit subscription to a sensing role's local observations, not side-wide awareness.
@@ -50,6 +55,15 @@ pub struct SensorReportRoute {
     pub origin_role_id: Uuid,
     pub recipient_unit_id: Uuid,
     pub interval_ticks: u64,
+}
+
+/// Explicit subscriptions to a firing terminal, with bounded paced retries.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ImpactReportRoute {
+    pub origin_role_id: Uuid,
+    pub recipient_unit_id: Uuid,
+    pub retry_interval_ticks: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -136,6 +150,40 @@ impl Scenario {
             combat
                 .validate(&sides)
                 .map_err(ScenarioError::InvalidSimulation)?;
+        }
+        if self.reporting_window_ticks > 60
+            || (!self.impact_report_routes.is_empty() && self.reporting_window_ticks == 0)
+        {
+            return Err(ScenarioError::InvalidSimulation(
+                "impact reports require a reporting window of 1 to 60 ticks".into(),
+            ));
+        }
+        let mut impact_routes = std::collections::BTreeSet::new();
+        for route in &self.impact_report_routes {
+            let valid = self
+                .authority
+                .roles
+                .iter()
+                .find(|role| role.id == route.origin_role_id)
+                .is_some_and(|role| {
+                    route.retry_interval_ticks > 0
+                        && route.recipient_unit_id != role.location_unit_id
+                        && self.combat.as_ref().is_some_and(|combat| {
+                            combat.units.iter().any(|unit| {
+                                unit.unit_id == role.location_unit_id && unit.weapon.is_some()
+                            })
+                        })
+                        && self.units.iter().any(|unit| {
+                            unit.id == route.recipient_unit_id && unit.side == role.side
+                        })
+                        && self.communication_links.iter().any(|link| {
+                            link.from_entity_id == role.location_unit_id
+                                && link.to_entity_id == route.recipient_unit_id
+                        })
+                });
+            if !valid || !impact_routes.insert((route.origin_role_id, route.recipient_unit_id)) {
+                return Err(ScenarioError::InvalidSimulation("impact report routes require a unique armed terminal, a friendly reachable recipient, and a positive retry interval".into()));
+            }
         }
         let platforms = self.platforms();
         Simulation::validate_configuration(&platforms, &self.communications())
@@ -334,6 +382,8 @@ pub fn global_crisis_scenario() -> Scenario {
         authority,
         sensor_report_routes: vec![],
         combat: None,
+        impact_report_routes: vec![],
+        reporting_window_ticks: 0,
     }
 }
 
@@ -1153,10 +1203,14 @@ pub fn jammed_flight_scenario() -> Scenario {
             radius_m: 5_000.0,
             band: RADIO_BAND,
             jammed: 1.0,
+            active_from_tick: 0,
+            active_until_tick: None,
         }],
         authority,
         sensor_report_routes: vec![],
         combat: None,
+        impact_report_routes: vec![],
+        reporting_window_ticks: 0,
     }
 }
 
