@@ -23,6 +23,7 @@ Rust builds require Rust 1.89+ and the sibling `../c3mesh` checkout pinned in `c
 - From `web/`, `npm ci` and `npm run dev`: install locked dependencies and run the Cesium client.
 - From `web/`, `npm test` and `npm run build`: run frontend unit tests, typecheck, and build.
 - From `web/`, `npx playwright install chromium`, then `npm run test:e2e:network` or `npm run test:e2e:session`: run standalone browser tests without the Rust server.
+- From `web/`, `npm run test:e2e:gameplay`: build the Rust server and run the real gameplay/transport regression with isolated local providers.
 - From `web/`, `npm run test:e2e`: build the Rust server and run all browser integration tests.
 - `docker compose up --build`: start the full local stack.
 - `docker compose run --rm <service> <command>`: run service-scoped tests or maintenance.

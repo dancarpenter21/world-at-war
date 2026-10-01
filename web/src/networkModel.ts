@@ -8,7 +8,8 @@ export type NetworkLink = {
 export const MESSAGE_STATES = ["queued", "in_transit", "delivered", "acknowledged", "retrying", "dropped", "expired"] as const;
 export type MessageState = typeof MESSAGE_STATES[number];
 export type MessageRecord = {
-  sequence: number; state: MessageState; delivered_at_ns?: number | null; drop_reason?: string | null; encoded_bytes?: number[];
+  sequence: number; state: MessageState; packet_id?: number | null; started_at_ns?: number | null; terminal_at_ns?: number | null;
+  delivered_at_ns?: number | null; drop_reason?: string | null; encoded_bytes?: number[];
   message: {
     id: string; profile_id: string; rendered_text: string; fields?: Record<string, unknown>;
     header: {
@@ -139,6 +140,8 @@ function isMessage(value: unknown): value is MessageRecord {
     && typeof header.origin_role_id === "string" && typeof header.origin_entity_id === "string" && typeof header.recipient_entity_id === "string"
     && typeof header.classification === "string" && isCounter(header.priority) && isCounter(header.created_tick) && isCounter(header.expires_tick)
     && (value.delivered_at_ns == null || (typeof value.delivered_at_ns === "number" && Number.isFinite(value.delivered_at_ns) && value.delivered_at_ns >= 0))
+    && (value.packet_id == null || isCounter(value.packet_id))
+    && [value.started_at_ns, value.terminal_at_ns].every((time) => time == null || (typeof time === "number" && Number.isFinite(time) && time >= 0))
     && (value.drop_reason == null || typeof value.drop_reason === "string")
     && (value.encoded_bytes === undefined || (Array.isArray(value.encoded_bytes) && value.encoded_bytes.every((byte) => isCounter(byte) && byte <= 255)));
 }

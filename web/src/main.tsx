@@ -500,7 +500,7 @@ function App() {
   async function turnNorth() {
     if (!game || !role || !projection || !canIssueOrders) return;
     const target = role.command_units[0]; if (!target) return;
-    await request(`/v1/games/${game.id}/roles/${role.id}/intent`, { method: "POST", body: JSON.stringify({ player_id: playerId, lease_generation: role.lease_generation, intent: { intent_id: crypto.randomUUID(), issuer_role: role.id, target, kind: { Move: { north_mps: 130, east_mps: 0 } }, requested_tick: projection.tick + 1 } }) }).then(() => setMessage("Order submitted through authority validation.")).catch((error: Error) => setMessage(error.message));
+    await request<{ status: "queued" | "pending_authority" }>(`/v1/games/${game.id}/roles/${role.id}/intent`, { method: "POST", body: JSON.stringify({ player_id: playerId, lease_generation: role.lease_generation, intent: { intent_id: crypto.randomUUID(), issuer_role: role.id, target, kind: { Move: { north_mps: 130, east_mps: 0 } }, requested_tick: projection.tick + 1 } }) }).then((outcome) => setMessage(outcome.status === "pending_authority" ? "Order awaiting authority approval." : "Order queued for delivery.")).catch((error: Error) => setMessage(error.message));
   }
 
   async function saveAuthority(draft: AuthorityDefinition) {

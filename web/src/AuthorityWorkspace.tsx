@@ -17,7 +17,7 @@ export type AuthorityDefinition = { version: number; roles: AuthorityRole[]; rel
 export type AuthorityRequest = {
   id: string; action: string; target_unit_id: string; target: { kind: "unit"; unit_id: string } | { kind: "satellite"; norad_catalog_id: number }; requester_role_id: string; policy: Policy;
   policy_version: number; current_step: number; created_tick: number; summary: string;
-  status: { state: string; role_id?: string; resolves_at_tick?: number }; decisions: { role_id: string; approved: boolean; automatic: boolean; tick: number }[];
+  status: { state: string; message_id?: string; role_id?: string; resolves_at_tick?: number }; decisions: { role_id: string; approved: boolean; automatic: boolean; tick: number }[];
 };
 
 const operationalKinds = new Set(["national_command", "cocom", "opcon", "tacon"]);

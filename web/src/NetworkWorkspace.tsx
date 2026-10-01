@@ -22,6 +22,10 @@ const TerminalNode = memo(function TerminalNode({ data, selected }: NodeProps<Ne
 const nodeTypes = { terminal: TerminalNode };
 const emptyProjection = { tick: 0, nodes: [], links: [], messages: [] };
 const labelState = (state: string) => state.replaceAll("_", " ");
+const formatDuration = (nanoseconds: number) => {
+  const ms = Math.max(0, nanoseconds / 1_000_000);
+  return ms < 1_000 ? `${ms.toFixed(1)} ms` : `${(ms / 1_000).toFixed(2)} s`;
+};
 
 function MessageDetails({ record, name }: { record: MessageRecord; name: (id: string) => string }) {
   const { message } = record;
@@ -38,6 +42,10 @@ function MessageDetails({ record, name }: { record: MessageRecord; name: (id: st
       <div><dt>Created</dt><dd>Tick {message.header.created_tick}</dd></div>
       <div><dt>Expires</dt><dd>Tick {message.header.expires_tick}</dd></div>
       <div><dt>Delivery time</dt><dd>{latencyMs === null ? "Not delivered" : latencyMs < 1_000 ? `${latencyMs.toFixed(1)} ms` : `${(latencyMs / 1_000).toFixed(2)} s`}</dd></div>
+      {record.packet_id != null && <div><dt>Queue wait</dt><dd>{record.started_at_ns == null
+        ? ["dropped", "expired"].includes(record.state) ? "Not transmitted" : "Waiting to transmit"
+        : formatDuration(record.started_at_ns - message.header.created_tick * 1_000_000_000)}</dd></div>}
+      {record.started_at_ns != null && <div><dt>Network transit</dt><dd>{record.terminal_at_ns == null ? "In transit" : formatDuration(record.terminal_at_ns - record.started_at_ns)}</dd></div>}
       {record.encoded_bytes && <div><dt>Encoded size</dt><dd>{record.encoded_bytes.length.toLocaleString()} bytes</dd></div>}
     </dl>
     {record.drop_reason && <p className="network-drop-reason">{record.drop_reason}</p>}

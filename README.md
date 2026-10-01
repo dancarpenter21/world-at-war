@@ -17,7 +17,7 @@ The broader target architecture, planned simulation fidelity, and acceptance cri
 - A Space-Track GP catalog integration with encrypted remembered credentials, cached snapshots, clear diagnostics for credential/access/service failures, and per-game catalog pinning.
 - A global airport/runway cache using public-domain OurAirports data with an authoritative FAA NASR overlay for U.S. facilities, declared distances, pavement ratings, and reported gross-weight limits.
 - A Docker Compose edge proxy that serves the web client and routes `/health`, `/v1/`, and WebSocket traffic to the Rust server.
-- A versioned public-safe communications catalog, per-game seed/policy/checksum pinning, append-only message events, and role-filtered map and full-screen network views.
+- A versioned public-safe communications catalog, per-game seed/policy/checksum pinning, delivery-gated orders and authority handoffs, append-only message lifecycle events, and role-filtered map and full-screen network views.
 
 Current limitations: command messages traverse the active packet topology, but fragmentation/reassembly, bounded application retries, acknowledgements, controller ground-truth privileges, and durable packet-level history remain planned. Sensor and track behavior is intentionally simplified, and the broader platform, terrain, logistics, cyber, and multi-source catalog systems remain planned work.
 
@@ -144,6 +144,10 @@ The REST API exposes catalog status at `/v1/airport-catalog/status`, paginated s
 5. Participants see their command-chain view and relevant authority-request inbox; the Cesium map receives periodic state updates and a game-pinned orbital catalog.
 6. The host can **Pause scenario** or **Resume scenario** from the header, including on narrow screens. All players retain their map while paused, and movement orders are disabled until the game is running.
 
+Orders sent to another entity stay pending until their packets arrive; serialization, queue waits, jamming, MTU rejection, loss, and expiry affect whether execution becomes possible. The catalog's message priority, forwarding-hop budget, and expiry are carried into the packet engine. A local order at the same command entity can be delivered immediately. An accepted submission reports that the order was queued, and a delivered order enters the executor on the next simulation tick.
+
+Authority requests and approvals use the same transport. A remote approver receives the request before a human decision becomes available or a vacant-role timer starts. Final approved orders also wait for delivery. Pausing freezes both packet progress and execution. A lifecycle-event write failure pauses the game and cancels pending delivery actions so an unrecorded command cannot execute.
+
 Each session resource waits for its previous refresh to finish, cancels obsolete reads when a game or role changes, and times out after ten seconds. Temporary failures retain the last map with a visible connection notice, disable movement orders, and retry with bounded backoff. **Retry connection** requests a fresh update immediately. A rejected or changed role lease removes the operational picture and returns the player to role selection. Leaving a game cancels pending reads and host controls so delayed responses cannot reopen it.
 
 ## Communications catalog and network APIs
@@ -156,9 +160,9 @@ cargo run -p sim-comms --bin comms-catalog-validate -- data/communications/catal
 
 The structural schema is checked in at `data/communications/schema/catalog.schema.json`; startup also performs semantic validation for duplicate IDs, unresolved references, estimates without rationale, invalid bands/rates, and empty queues. Game creation accepts optional `seed` and `network_policy_id` fields and returns the pinned scenario version, catalog and message-pack checksums, seed, and policy in the game summary.
 
-Role-held network access is available at `/v1/games/{id}/network`, the sequenced WebSocket `/v1/games/{id}/network/stream`, cursor-paginated `/v1/games/{id}/network/events`, and authorized `/v1/games/{id}/network/messages/{message_id}`. Message content is limited to originating roles and destination roles in this delivery.
+Role-held network access is available at `/v1/games/{id}/network`, the sequenced WebSocket `/v1/games/{id}/network/stream`, cursor-paginated `/v1/games/{id}/network/events`, and authorized `/v1/games/{id}/network/messages/{message_id}`. Message content is limited to originating roles and destination roles. The event endpoint paginates immutable queued, in-transit, and terminal transitions; projections contain one current record per message. Stream sequence numbers track network revisions independently of the simulation tick.
 
-The **Network** workspace searches role-visible terminals by name or domain and filters directional links by availability, jamming, or queued traffic. Select a terminal to inspect its connections, focus its neighborhood, or browse messages to and from it. Selecting a link scopes message history to that exact direction. The message inspector shows authorized content, structured fields, delivery timing, classification, and drop reasons; history can be searched and filtered by lifecycle state.
+The **Network** workspace searches role-visible terminals by name or domain and filters directional links by availability, jamming, or queued traffic. Select a terminal to inspect its connections, focus its neighborhood, or browse messages to and from it. Selecting a link scopes message history to that exact direction. The message inspector shows authorized content, structured fields, delivery timing, queue wait, network transit time, classification, and drop reasons; history can be searched and filtered by lifecycle state.
 
 Dragged terminal positions remain in place across live updates and filtering. **Fit view** frames the current filters; **Reset layout** restores the grid. A disconnected stream retains the last topology with a reconnecting notice, and malformed updates trigger a fresh snapshot. On narrow screens, the graph and inspector stack vertically. Press **Escape** or choose **Back to map** to close the workspace.
 
@@ -175,6 +179,13 @@ The standalone session tests exercise the actual Cesium map with mocked REST res
 ```sh
 cd web
 npm run test:e2e:session
+```
+
+The real-server gameplay regression creates Global Crisis through the browser, sends a networked command, checks lifecycle events in both the API and JSONL store, verifies role access, inspects message timing, and exercises host pause/resume. Its Space-Track and airport providers use small local fixtures in an isolated runtime directory:
+
+```sh
+cd web
+npm run test:e2e:gameplay
 ```
 
 ## Repository layout

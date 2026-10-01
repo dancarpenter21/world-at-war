@@ -4,9 +4,12 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use bevy_ecs::prelude::*;
 use c3mesh::{
-    ChannelId, DeviceId, DeviceKind, DropReason, FrequencyBand, NetworkConfig, NetworkEvent,
-    PacketId, ReceiverInterference, SimTime as NetworkTime, Simulator as NetworkSimulator,
-    SimulatorOptions,
+    ChannelId, DeviceId, DeviceKind, DropReason, FrequencyBand, NetworkConfig,
+    ReceiverInterference, Simulator as NetworkSimulator, SimulatorOptions,
+};
+pub use c3mesh::{
+    ChannelState as CommunicationChannelState, DropReason as CommunicationDropReason, NetworkEvent,
+    PacketId, PacketMetadata, SimTime as NetworkTime,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -852,6 +855,37 @@ impl Simulation {
             link.destination_device_id.clone(),
             payload,
         )?)
+    }
+
+    /// Queues endpoint scheduling metadata and a forwarding-hop budget without advancing time.
+    pub fn queue_transmission_with_metadata(
+        &mut self,
+        from_entity_id: Uuid,
+        to_entity_id: Uuid,
+        payload: Vec<u8>,
+        hop_limit: u16,
+        metadata: PacketMetadata,
+    ) -> Result<PacketId, CommunicationError> {
+        let link = self
+            .communications
+            .links
+            .iter()
+            .find(|link| link.from_entity_id == from_entity_id && link.to_entity_id == to_entity_id)
+            .ok_or(CommunicationError::NoLink {
+                from: from_entity_id,
+                to: to_entity_id,
+            })?;
+        Ok(self
+            .communications
+            .simulator
+            .schedule_send_with_hop_limit_and_metadata(
+                self.network_time(),
+                link.source_device_id.clone(),
+                link.destination_device_id.clone(),
+                payload,
+                hop_limit,
+                metadata,
+            )?)
     }
 
     /// Advances pending network traffic to the current ECS tick boundary.
