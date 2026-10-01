@@ -1,6 +1,7 @@
 mod ai_orders;
 mod airport_catalog;
 mod credential_cookie;
+mod intents;
 mod space_assets;
 mod space_catalog;
 mod transport;
@@ -51,7 +52,7 @@ use tower_http::{
 };
 use transport::{
     await_authority_delivery, await_message_delivery, process_network_messages,
-    transmit_c2_message, DeliveryAction,
+    transmit_c2_message, transmit_c2_message_with_fields, DeliveryAction,
 };
 use uuid::Uuid;
 
@@ -89,6 +90,7 @@ struct Game {
     packet_messages: BTreeMap<u64, Uuid>,
     pending_deliveries: BTreeMap<Uuid, DeliveryAction>,
     ai_planner: ai_orders::AiPlannerState,
+    intent_submissions: BTreeMap<Uuid, intents::IntentSubmission>,
     network_projection_sequence: u64,
     network_event_path: Option<PathBuf>,
     network_event_sequence: u64,
@@ -295,7 +297,7 @@ struct SubmitIntentRequest {
     lease_generation: u64,
     intent: PlayerIntent,
 }
-#[derive(Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 enum SubmissionOutcome {
     Queued { intent_id: Uuid, message_id: Uuid },
@@ -448,7 +450,7 @@ struct SpaceTrackConnectRequest {
     #[serde(default)]
     remember: bool,
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 struct ErrorResponse {
     code: &'static str,
     error: String,
@@ -536,6 +538,10 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/v1/games/{game_id}/roles/{role_id}/intent",
             post(submit_intent),
+        )
+        .route(
+            "/v1/games/{game_id}/roles/{role_id}/intents/{intent_id}",
+            get(intents::get_intent_receipt),
         )
         .route("/v1/games/{game_id}/state", get(get_projection))
         .route("/v1/games/{game_id}/network", get(get_network_projection))
@@ -762,6 +768,7 @@ async fn create_game(
         packet_messages: BTreeMap::new(),
         pending_deliveries: BTreeMap::new(),
         ai_planner: ai_orders::AiPlannerState::default(),
+        intent_submissions: BTreeMap::new(),
         network_projection_sequence: 0,
         network_event_path: Some(network_event_path),
         network_event_sequence: 0,
@@ -893,42 +900,7 @@ async fn submit_intent(
     let game = games
         .get_mut(&game_id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
-    if game.status != GameStatus::Running {
-        return Err(api_error(
-            StatusCode::CONFLICT,
-            "game_not_running",
-            "game is not running",
-        ));
-    }
-    let role = game
-        .roles
-        .get(&role_id)
-        .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "role_not_found", "role not found"))?;
-    if role.owner != Some(request.player_id) || role.lease_generation != request.lease_generation {
-        return Err(api_error(
-            StatusCode::FORBIDDEN,
-            "invalid_role_lease",
-            "invalid role lease",
-        ));
-    }
-    if request.intent.issuer_role != role_id {
-        return Err(api_error(
-            StatusCode::FORBIDDEN,
-            "issuer_role",
-            "intent issuer does not match the held role",
-        ));
-    }
-    let action = request.intent.kind.action_key().to_string();
-    let target = request.intent.target;
-    let outcome = submit_authority_action(
-        game,
-        role_id,
-        action,
-        target,
-        String::new(),
-        Some(request.intent),
-    )?;
-    Ok(Json(outcome))
+    Ok(Json(intents::submit_player_intent(game, role_id, request)?))
 }
 
 async fn get_authority(
@@ -1425,7 +1397,7 @@ fn submit_authority_action(
             )
         })?;
         let intent_id = intent.intent_id;
-        let message_id = transmit_c2_message(
+        let message_id = transmit_c2_message_with_fields(
             game,
             role_id,
             target,
@@ -1434,6 +1406,7 @@ fn submit_authority_action(
                 _ => "public-safe.jseries.move-order.v1",
             },
             format!("{action} order for unit {target}"),
+            intents::intent_fields(&intent),
         )
         .ok_or_else(|| {
             api_error(
@@ -1486,12 +1459,16 @@ fn submit_authority_action(
                 "the deciding role has no communication location",
             )
         })?;
-    let message_id = transmit_c2_message(
+    let message_id = transmit_c2_message_with_fields(
         game,
         role_id,
         first_step_entity,
         "public-safe.usmtf.authority-request.v1",
         format!("authority request: {action} for unit {target}; {summary}"),
+        intent
+            .as_ref()
+            .map(intents::intent_fields)
+            .unwrap_or_default(),
     )
     .ok_or_else(|| {
         api_error(
@@ -1664,7 +1641,7 @@ fn advance_authority_request(
         request.status = AuthorityRequestStatus::ApprovedNoExecutor;
         return;
     }
-    let Some(message_id) = transmit_c2_message(
+    let Some(message_id) = transmit_c2_message_with_fields(
         game,
         role_id,
         request.target_unit_id,
@@ -1676,6 +1653,7 @@ fn advance_authority_request(
             "approved {} order for unit {}",
             request.action, request.target_unit_id
         ),
+        intents::intent_fields(request.intent.as_ref().expect("checked above")),
     ) else {
         request.status = AuthorityRequestStatus::BlockedComms;
         return;
@@ -2652,6 +2630,7 @@ async fn run_simulation_loop(state: AppState) {
         {
             ai_orders::process_ai_orders(game);
             advance_game_tick(game);
+            intents::record_execution_results(game);
         }
     }
 }
@@ -2776,6 +2755,7 @@ mod authority_tests {
             packet_messages: BTreeMap::new(),
             pending_deliveries: BTreeMap::new(),
             ai_planner: ai_orders::AiPlannerState::default(),
+            intent_submissions: BTreeMap::new(),
             network_projection_sequence: 0,
             network_event_path: None,
             network_event_sequence: 0,

@@ -439,7 +439,7 @@ impl OrderKind {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlayerIntent {
     pub intent_id: Uuid,
     pub issuer_role: Uuid,

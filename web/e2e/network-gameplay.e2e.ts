@@ -43,18 +43,33 @@ test("runs a real game, persists networked command delivery, and retains the map
   await expect(page.locator(".communication-status")).toHaveCount(8);
   await mark("map-ready");
 
-  const intent = await request.post(`${backend.url}/v1/games/${gameId}/roles/${roleId}/intent`, {
-    data: {
-      player_id: playerId, lease_generation: heldRole.lease_generation,
-      intent: {
-        intent_id: "00000000-0000-4000-8000-000000008002", issuer_role: roleId, target: targetId,
-        kind: { Move: { north_mps: 10, east_mps: 0 } }, requested_tick: 0
-      }
+  const orderBody = {
+    player_id: playerId, lease_generation: heldRole.lease_generation,
+    intent: {
+      intent_id: "00000000-0000-4000-8000-000000008002", issuer_role: roleId, target: targetId,
+      kind: { Move: { north_mps: 10, east_mps: 0 } }, requested_tick: 0
     }
-  });
+  };
+  const orderUrl = `${backend.url}/v1/games/${gameId}/roles/${roleId}/intent`;
+  const intent = await request.post(orderUrl, { data: orderBody });
   expect(intent.ok()).toBe(true);
   const submission = await intent.json() as { status: string; message_id: string };
   expect(submission.status).toBe("queued");
+  const replay = await request.post(orderUrl, { data: orderBody });
+  expect(replay.ok()).toBe(true);
+  expect(await replay.json()).toEqual(submission);
+  const conflict = await request.post(orderUrl, { data: { ...orderBody, intent: {
+    ...orderBody.intent, kind: { Move: { north_mps: 0, east_mps: 10 } }
+  } } });
+  expect(conflict.status()).toBe(409);
+  expect((await conflict.json()).code).toBe("intent_conflict");
+  const receiptAuthorization = new URLSearchParams({ player_id: playerId, lease_generation: String(heldRole.lease_generation) });
+  const receiptUrl = `${backend.url}/v1/games/${gameId}/roles/${roleId}/intents/${orderBody.intent.intent_id}?${receiptAuthorization}`;
+  await expect.poll(async () => (await (await request.get(receiptUrl)).json()).state, { timeout: 10_000 }).toBe("executed");
+  const receipt = await (await request.get(receiptUrl)).json();
+  expect(receipt.message_id).toBe(submission.message_id);
+  expect(receipt.executed_tick).toBeGreaterThanOrEqual(receipt.submitted_tick);
+  expect(receipt.intent).toEqual(orderBody.intent);
   const authorization = new URLSearchParams({ player_id: playerId, role_id: roleId });
   const messageUrl = `${backend.url}/v1/games/${gameId}/network/messages/${submission.message_id}?${authorization}`;
   await expect.poll(async () => (await (await request.get(messageUrl)).json()).state, { timeout: 10_000 }).toBe("delivered");
@@ -74,6 +89,8 @@ test("runs a real game, persists networked command delivery, and retains the map
   await mark("command-delivered");
   const outsider = await request.get(`${backend.url}/v1/games/${gameId}/network?player_id=00000000-0000-4000-8000-000000008099&role_id=${roleId}`);
   expect(outsider.status()).toBe(403);
+  const outsiderReceipt = await request.get(receiptUrl.replace(playerId, "00000000-0000-4000-8000-000000008099"));
+  expect(outsiderReceipt.status()).toBe(403);
   await page.getByRole("button", { name: "Network", exact: true }).click();
   await expect(page.getByRole("region", { name: "C2 network workspace", exact: true })).toBeVisible();
   await mark("network-open");

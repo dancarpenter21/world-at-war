@@ -36,6 +36,24 @@ pub(super) fn transmit_c2_message(
     profile_id: &str,
     rendered_text: String,
 ) -> Option<Uuid> {
+    transmit_c2_message_with_fields(
+        game,
+        origin_role_id,
+        recipient_entity_id,
+        profile_id,
+        rendered_text,
+        BTreeMap::new(),
+    )
+}
+
+pub(super) fn transmit_c2_message_with_fields(
+    game: &mut Game,
+    origin_role_id: Uuid,
+    recipient_entity_id: Uuid,
+    profile_id: &str,
+    rendered_text: String,
+    fields: BTreeMap<String, serde_json::Value>,
+) -> Option<Uuid> {
     let origin_entity_id = game.roles.get(&origin_role_id)?.location_unit_id;
     let profile = game.message_profiles.get(profile_id)?.clone();
     let tick = game.simulation.tick();
@@ -51,7 +69,7 @@ pub(super) fn transmit_c2_message(
             created_tick: tick,
             expires_tick: tick.saturating_add(profile.expiry_ticks),
         },
-        fields: BTreeMap::new(),
+        fields,
         rendered_text,
     };
     let encoded_bytes = message.encoded();
