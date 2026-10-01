@@ -8,7 +8,7 @@ import "@xyflow/react/dist/style.css";
 
 export type Side = "Blue" | "Red";
 export type Unit = { id: string; name: string; domain: string };
-export type Role = { id: string; name: string; side: Side; kind: string; location_unit_id: string; command_units: string[]; held: boolean; claimable?: boolean; ai_controlled: boolean; lease_generation: number };
+export type Role = { id: string; name: string; side: Side; kind: string; location_unit_id: string; command_units: string[]; held: boolean; held_by_you?: boolean; claimable?: boolean; ai_controlled: boolean; lease_generation: number };
 export type AuthorityRole = { id: string; name: string; side: Side; kind: string; location_unit_id: string; claimable: boolean; ai_controlled: boolean };
 export type Relationship = { id: string; superior_role_id: string; subordinate_role_id?: string; subordinate_unit_id?: string; kind: string };
 export type DecisionStep = { role_id: string; vacant_delay_ticks: number; approve_probability_bps: number };

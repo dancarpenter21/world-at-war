@@ -133,7 +133,7 @@ function App() {
     return current;
   }, 2_000);
   const roleResource = usePollingResource<Role[]>(game ? game.id + ":" + (role?.id ?? "") + ":" + (role?.lease_generation ?? "") : null,
-    (signal) => request<Role[]>("/v1/games/" + game!.id + "/roles", { signal }), 2_000);
+    (signal) => request<Role[]>("/v1/games/" + game!.id + "/roles?" + new URLSearchParams({ player_id: playerId }), { signal }), 2_000);
   const authorityResource = usePollingResource<{ definition: AuthorityDefinition; requests: AuthorityRequest[] }>(
     game && (role || game.host_player_id === playerId) ? game.id + ":" + playerId + ":" + (role?.id ?? "") + ":" + (role?.lease_generation ?? "") : null,
     async (signal) => {
@@ -175,7 +175,7 @@ function App() {
       const session = parseSavedSession(localStorage.getItem("world-at-war-session"));
       const savedGame = loadedGames.find((candidate) => candidate.id === session?.game_id);
       if (session?.player_id === playerId && savedGame) {
-        const savedRoles = await request<Role[]>(`/v1/games/${savedGame.id}/roles`);
+        const savedRoles = await request<Role[]>(`/v1/games/${savedGame.id}/roles?${new URLSearchParams({ player_id: playerId })}`);
         const savedRole = savedRoles.find((candidate) => candidate.id === session.role_id && candidate.held && candidate.lease_generation === session.lease_generation);
         if (savedRole) {
           setGame(savedGame); setRoles(savedRoles); setRole(savedRole);
@@ -315,14 +315,14 @@ function App() {
     const scenario = selectedScenario; if (!scenario) return;
     try {
       const created = await request<{ game: Game }>("/v1/games", { method: "POST", body: JSON.stringify({ scenario_id: scenario.id, title: gameTitle, host_player_id: playerId }) });
-      setGame(created.game); setRoles(await request<Role[]>(`/v1/games/${created.game.id}/roles`)); setMessage("Claim a role, then start the scenario.");
+      setGame(created.game); setRoles(await request<Role[]>(`/v1/games/${created.game.id}/roles?${new URLSearchParams({ player_id: playerId })}`)); setMessage("Claim a role, then start the scenario.");
     } catch (error) { setMessage((error as Error).message); }
   }
 
   async function selectGame(selected: Game) {
     try {
       await request(`/v1/games/${selected.id}/join`, { method: "POST", body: JSON.stringify({ display_name: displayName }) });
-      setGame(selected); setRole(null); setRoles(await request<Role[]>(`/v1/games/${selected.id}/roles`)); setMessage("Choose an available role.");
+      setGame(selected); setRole(null); setRoles(await request<Role[]>(`/v1/games/${selected.id}/roles?${new URLSearchParams({ player_id: playerId })}`)); setMessage("Choose an available role.");
     } catch (error) { setMessage((error as Error).message); }
   }
 
@@ -428,7 +428,7 @@ function App() {
           {spaceStatus?.remembered_credentials && <button className="text-command" onClick={() => void forgetSpaceTrack()}>Forget saved credentials</button>}
         </div>}
       </>}
-      {game && <div className="modal-body"><h2>{game.title}</h2><p className="muted">Claim a command role. The operational map remains offline until the scenario starts.</p><div className="role-grid">{roles.map((item) => <button key={item.id} className={`role ${role?.id === item.id ? "selected" : ""}`} disabled={item.ai_controlled || item.claimable === false || (item.held && role?.id !== item.id)} onClick={() => void claim(item)}><span>{item.name}</span><small>{item.ai_controlled ? "AI" : item.claimable === false ? "unavailable" : item.held ? "held" : item.kind.replaceAll("_", " ")}</small></button>)}</div><div className="modal-actions"><button className="secondary" onClick={leave}>Back</button>{game.host_player_id === playerId && <button className="secondary" onClick={() => setShowAuthority(true)}>Configure authorities</button>}{game.host_player_id === playerId && <button className="command" disabled={!role || pendingControl !== null} aria-busy={pendingControl !== null} onClick={() => void start()}>{pendingControl ? "Starting…" : game.status === "paused" ? "Resume scenario" : "Start scenario"}</button>}{game.host_player_id !== playerId && <span className="muted">Waiting for host to start</span>}</div></div>}
+      {game && <div className="modal-body"><h2>{game.title}</h2><p className="muted">{game.status === "lobby" ? "Claim a command role. The operational map remains offline until the scenario starts." : game.status === "paused" ? "Choose your role to return to the operational map. The scenario remains paused." : "Choose your role to open its operational map."}</p><div className="role-grid">{roles.map((item) => <button key={item.id} className={`role ${role?.id === item.id ? "selected" : ""}`} disabled={item.ai_controlled || item.claimable === false || (item.held && !item.held_by_you && role?.id !== item.id)} onClick={() => void claim(item)}><span>{item.name}</span><small>{item.ai_controlled ? "AI" : item.claimable === false ? "unavailable" : item.held_by_you ? "your role" : item.held ? "held" : item.kind.replaceAll("_", " ")}</small></button>)}</div><div className="modal-actions"><button className="secondary" onClick={leave}>Back</button>{game.host_player_id === playerId && <button className="secondary" onClick={() => setShowAuthority(true)}>Configure authorities</button>}{game.host_player_id === playerId && <button className="command" disabled={!role || pendingControl !== null} aria-busy={pendingControl !== null} onClick={() => void start()}>{pendingControl ? "Starting…" : game.status === "paused" ? "Resume scenario" : "Start scenario"}</button>}{game.host_player_id !== playerId && <span className="muted">Waiting for host to start</span>}</div></div>}
     </section></div>}
     {playable && !projection && game && <section className="workspace-loading">
       <GameSessionNotice game={game} status={connectionStatus} error={connectionError} controlError={controlError} hasProjection={false} onRetry={retryConnection} />

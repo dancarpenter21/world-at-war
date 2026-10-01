@@ -51,7 +51,7 @@ async function openSession(page: Page, guest = false, projection = sessionProjec
     }
     if (pathname.endsWith("/join")) { await json({ player_id: PLAYER_ID }); return; }
     if (pathname.endsWith("/claim")) {
-      state.role.held = true; state.role.lease_generation += 1;
+      state.role.held = true; state.role.held_by_you = true; state.role.lease_generation += 1;
       await json(state.role); return;
     }
     if (pathname.endsWith("/roles")) { await json([state.role]); return; }

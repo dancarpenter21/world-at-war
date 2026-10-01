@@ -2,6 +2,8 @@ mod ai_orders;
 mod airport_catalog;
 mod credential_cookie;
 mod intents;
+#[cfg(test)]
+mod role_tests;
 mod sensor_reports;
 mod space_assets;
 mod space_catalog;
@@ -263,6 +265,7 @@ struct RoleSummary {
     location_unit_id: Uuid,
     command_units: Vec<Uuid>,
     held: bool,
+    held_by_you: bool,
     claimable: bool,
     ai_controlled: bool,
     lease_generation: u64,
@@ -288,6 +291,10 @@ struct JoinRequest {
 struct JoinResponse {
     player_id: Uuid,
     display_name: String,
+}
+#[derive(Deserialize)]
+struct RolesQuery {
+    player_id: Option<Uuid>,
 }
 #[derive(Deserialize)]
 struct ClaimRoleRequest {
@@ -834,12 +841,18 @@ async fn join_game(
 async fn list_roles(
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
+    Query(query): Query<RolesQuery>,
 ) -> ApiResult<Vec<RoleSummary>> {
     let games = state.games.read().await;
     let game = games
         .get(&game_id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
-    Ok(Json(game.roles.values().map(role_summary).collect()))
+    Ok(Json(
+        game.roles
+            .values()
+            .map(|role| role_summary(role, query.player_id))
+            .collect(),
+    ))
 }
 
 async fn claim_role(
@@ -871,7 +884,7 @@ async fn claim_role(
     }
     role.owner = Some(request.player_id);
     role.lease_generation += 1;
-    Ok(Json(role_summary(role)))
+    Ok(Json(role_summary(role, Some(request.player_id))))
 }
 
 async fn start_game(
@@ -2691,7 +2704,7 @@ fn require_game_catalog(game: &Game) -> Result<String, (StatusCode, Json<ErrorRe
         )
     })
 }
-fn role_summary(role: &Role) -> RoleSummary {
+fn role_summary(role: &Role, player: Option<Uuid>) -> RoleSummary {
     RoleSummary {
         id: role.id,
         name: role.name.clone(),
@@ -2700,6 +2713,7 @@ fn role_summary(role: &Role) -> RoleSummary {
         location_unit_id: role.location_unit_id,
         command_units: role.command_units.clone(),
         held: role.owner.is_some(),
+        held_by_you: player.is_some_and(|player| role.owner == Some(player)),
         claimable: role.claimable,
         ai_controlled: role.ai_controlled,
         lease_generation: role.lease_generation,

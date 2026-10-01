@@ -315,3 +315,63 @@ test("runs a real game, persists networked command delivery, and retains the map
   await testInfo.attach("gameplay-performance", { body: JSON.stringify(timings, null, 2), contentType: "application/json" });
   console.log("gameplay performance", JSON.stringify(timings));
 });
+
+test("rejoins a paused game through the players held role without resuming or claiming another players slot", async ({ page, request }) => {
+  const commanderRole = "00000000-0000-0000-0000-000000004e86";
+  const pilotRole = "00000000-0000-0000-0000-000000004e87";
+  const otherPlayer = "00000000-0000-4000-8000-000000008099";
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.addInitScript((id) => localStorage.setItem("world-at-war-player", id), playerId);
+  await page.route(/https:\/\/[^/]*tile\.openstreetmap\.org\//, (route) => route.abort());
+  await page.goto("/");
+  await page.getByRole("button", { name: /^Command Link Exercise/ }).click();
+  await page.getByLabel("Game title").fill("Held role rejoin");
+  const creation = page.waitForResponse((response) => response.url().endsWith("/v1/games") && response.request().method() === "POST");
+  await page.getByRole("button", { name: "Create game", exact: true }).click();
+  const gameId = (await (await creation).json()).game.id as string;
+  const claim = page.waitForResponse((response) => response.url().endsWith(`/roles/${commanderRole}/claim`));
+  await page.getByRole("button", { name: /^Exercise Commander/ }).click();
+  const firstLease = (await (await claim).json()).lease_generation as number;
+  const pilotClaim = await request.post(`${backend.url}/v1/games/${gameId}/roles/${pilotRole}/claim`, { data: { player_id: otherPlayer } });
+  expect(pilotClaim.ok()).toBe(true);
+  await page.getByRole("button", { name: "Start scenario", exact: true }).click();
+  await expect(page.locator(".globe canvas")).toBeVisible();
+  await page.getByRole("button", { name: "Pause scenario", exact: true }).click();
+  await expect(page.getByText("Scenario paused", { exact: true })).toBeVisible();
+  const authorization = new URLSearchParams({ player_id: playerId, role_id: commanderRole });
+  const pausedState = await (await request.get(`${backend.url}/v1/games/${gameId}/state?${authorization}`)).json() as { tick: number };
+  const pausedTick = `TICK ${pausedState.tick}`;
+  await expect(page.locator("header .tick")).toHaveText(pausedTick);
+  const anonymous = await (await request.get(`${backend.url}/v1/games/${gameId}/roles`)).json() as { id: string; held_by_you: boolean }[];
+  expect(anonymous.every((role) => !role.held_by_you)).toBe(true);
+  expect(JSON.stringify(anonymous)).not.toContain(otherPlayer);
+  const foreignClaim = await request.post(`${backend.url}/v1/games/${gameId}/roles/${commanderRole}/claim`, { data: { player_id: otherPlayer } });
+  expect(foreignClaim.status()).toBe(409);
+  await page.getByRole("button", { name: "Leave scenario", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Create game", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Join game", exact: true }).click();
+  await page.getByRole("button", { name: /Held role rejoin.*paused/ }).click();
+  const owned = page.getByRole("button", { name: /^Exercise Commander/ });
+  await expect(owned).toBeEnabled();
+  await expect(owned).toContainText("your role");
+  await expect(page.getByRole("button", { name: /^Pilot, CAP Alpha 1/ })).toBeDisabled();
+  const reclaim = page.waitForResponse((response) => response.url().endsWith(`/roles/${commanderRole}/claim`));
+  await owned.click();
+  const secondLease = (await (await reclaim).json()).lease_generation as number;
+  expect(secondLease).toBeGreaterThan(firstLease);
+  const staleOrder = await request.post(`${backend.url}/v1/games/${gameId}/roles/${commanderRole}/intent`, { data: {
+    player_id: playerId, lease_generation: firstLease,
+    intent: { intent_id: randomUUID(), issuer_role: commanderRole, target: targetId,
+      kind: { Move: { north_mps: 0, east_mps: 0 } }, requested_tick: 0 }
+  } });
+  expect(staleOrder.status()).toBe(403);
+  expect((await staleOrder.json()).code).toBe("invalid_role_lease");
+  await expect(page.locator(".globe canvas")).toBeVisible();
+  await expect(page.getByText("Scenario paused", { exact: true })).toBeVisible();
+  await expect(page.locator("header .tick")).toHaveText(pausedTick!);
+  await expect(page.getByRole("button", { name: "Send movement order", exact: true })).toBeDisabled();
+  const summary = await (await request.get(backend.url + "/v1/games")).json() as { id: string; status: string }[];
+  expect(summary.find((game) => game.id === gameId)!.status).toBe("paused");
+  expect(errors).toEqual([]);
+});
