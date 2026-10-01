@@ -10,7 +10,7 @@ The broader target architecture, planned simulation fidelity, and acceptance cri
 
 - A deterministic Rust ECS simulation with one-second ticks, platform movement, server-side projections, and simple Red patrol AI.
 - Mandatory per-entity c3mesh network endpoints, bounded packet queues, deterministic loss and weighted scheduling, cyclic flight paths, geographic receiver-jamming regions, and directional link status.
-- A lobby that creates and joins games, role claiming, game start/pause controls, and REST/WebSocket state delivery.
+- A lobby that creates and joins games, role claiming, host start/pause/resume controls, and REST/WebSocket state delivery. Paused games keep their operational map and inspectors available.
 - A Cesium operational map that keeps authored owned units and uncertain tracks visually separate from the public orbital catalog, reconciling entities in place so movement ticks do not recreate or flicker MIL-STD-2525D icons.
 - A lazy full-screen space-asset workspace with worker-based bulk propagation, point-primitive rendering, UTC playback, search/facets, sourced payload cards, and authority-routed satellite requests.
 - A versioned authority definition: roles, operational/support/advisory/transmit relationships, policies, direct grants, approval sequences, vacant-role resolution, and human approval or denial of requests.
@@ -128,6 +128,9 @@ The REST API exposes catalog status at `/v1/airport-catalog/status`, paginated s
 3. Use **Configure authorities** to inspect or edit the host-managed authority graph and policies. The saved definition uses optimistic versioning to prevent accidental overwrite.
 4. Submit an order. A policy can execute it directly or create an authority request for the configured approvers. Vacant approver roles resolve deterministically after their configured delay.
 5. Participants see their command-chain view and relevant authority-request inbox; the Cesium map receives periodic state updates and a game-pinned orbital catalog.
+6. The host can **Pause scenario** or **Resume scenario** from the header, including on narrow screens. All players retain their map while paused, and movement orders are disabled until the game is running.
+
+Each session resource waits for its previous refresh to finish, cancels obsolete reads when a game or role changes, and times out after ten seconds. Temporary failures retain the last map with a visible connection notice, disable movement orders, and retry with bounded backoff. **Retry connection** requests a fresh update immediately. A rejected or changed role lease removes the operational picture and returns the player to role selection. Leaving a game cancels pending reads and host controls so delayed responses cannot reopen it.
 
 ## Communications catalog and network APIs
 
@@ -151,6 +154,13 @@ The standalone browser regressions use deterministic role-visible network fixtur
 cd web
 npx playwright install chromium
 npm run test:e2e:network
+```
+
+The standalone session tests exercise the actual Cesium map with mocked REST responses, covering host and guest pause/resume, retained maps during outages, request timeouts, revoked roles, delayed responses after leaving, and mobile controls:
+
+```sh
+cd web
+npm run test:e2e:session
 ```
 
 ## Repository layout
