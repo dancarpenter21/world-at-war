@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
+    "test:e2e:network": "tsc --project tsconfig.e2e.json && playwright test network-workspace.e2e.ts",
     "test:e2e": "tsc --project tsconfig.e2e.json && cargo build --manifest-path ../Cargo.toml --package world-at-war-server && playwright test",
     "preview": "vite preview"
   },

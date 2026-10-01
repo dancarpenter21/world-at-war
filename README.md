@@ -24,7 +24,7 @@ Current limitations: command messages traverse the active packet topology, but f
 ## Prerequisites
 
 - Rust toolchain compatible with the Rust 2021 workspace.
-- The pre-publish `c3mesh` checkout in a sibling directory, so this repository and the crate resolve as `world-at-war/` and `c3mesh/` under the same parent.
+- The pre-publish **packet-engine revision** of `c3mesh` in a sibling directory, so this repository and the crate resolve as `world-at-war/` and `c3mesh/` under the same parent. It must include `SimulatorOptions`, `QueueConfig`, `QueueDiscipline`, and tick-boundary advancement; the earlier jamming-only revision is incompatible.
 - Node.js 22+ and npm for frontend development.
 - Docker Compose v2 for the container workflows.
 - A Space-Track account only when creating a scenario that requires the public orbital catalog.
@@ -140,6 +140,18 @@ cargo run -p sim-comms --bin comms-catalog-validate -- data/communications/catal
 The structural schema is checked in at `data/communications/schema/catalog.schema.json`; startup also performs semantic validation for duplicate IDs, unresolved references, estimates without rationale, invalid bands/rates, and empty queues. Game creation accepts optional `seed` and `network_policy_id` fields and returns the pinned scenario version, catalog and message-pack checksums, seed, and policy in the game summary.
 
 Role-held network access is available at `/v1/games/{id}/network`, the sequenced WebSocket `/v1/games/{id}/network/stream`, cursor-paginated `/v1/games/{id}/network/events`, and authorized `/v1/games/{id}/network/messages/{message_id}`. Message content is limited to originating roles and destination roles in this delivery.
+
+The **Network** workspace searches role-visible terminals by name or domain and filters directional links by availability, jamming, or queued traffic. Select a terminal to inspect its connections, focus its neighborhood, or browse messages to and from it. Selecting a link scopes message history to that exact direction. The message inspector shows authorized content, structured fields, delivery timing, classification, and drop reasons; history can be searched and filtered by lifecycle state.
+
+Dragged terminal positions remain in place across live updates and filtering. **Fit view** frames the current filters; **Reset layout** restores the grid. A disconnected stream retains the last topology with a reconnecting notice, and malformed updates trigger a fresh snapshot. On narrow screens, the graph and inspector stack vertically. Press **Escape** or choose **Back to map** to close the workspace.
+
+The standalone browser regressions use deterministic role-visible network fixtures and do not require a running Rust server, Docker, or Space-Track credentials:
+
+```sh
+cd web
+npx playwright install chromium
+npm run test:e2e:network
+```
 
 ## Repository layout
 

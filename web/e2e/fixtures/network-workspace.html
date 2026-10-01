@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>Network workspace test</title></head>
+<body><div id="root"></div><script type="module">
+  import React from "react";
+  import { createRoot } from "react-dom/client";
+  import { NetworkWorkspace } from "/src/NetworkWorkspace.tsx";
+  import "/src/styles.css";
+  const root = createRoot(document.getElementById("root"));
+  root.render(React.createElement(NetworkWorkspace, {
+    apiBase: "", gameId: "network-test", playerId: "test-player", roleId: "test-role",
+    onClose: () => { root.unmount(); document.body.textContent = "Returned to map"; }
+  }));
+</script></body></html>
