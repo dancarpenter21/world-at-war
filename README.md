@@ -20,6 +20,8 @@ The broader target architecture, planned simulation fidelity, and acceptance cri
 - A Docker Compose edge proxy that serves the web client and routes `/health`, `/v1/`, and WebSocket traffic to the Rust server.
 - A versioned public-safe communications catalog, per-game seed/policy/checksum pinning, delivery-gated orders and authority handoffs, append-only message lifecycle events, and role-filtered map and full-screen network views.
 
+[Verified gameplay screenshots](docs/gameplay-checkpoints.md) show delivered sensor knowledge, executed movement, network inspection, and map loading.
+
 Current limitations: command messages traverse the active packet topology, but fragmentation/reassembly, bounded application retries, acknowledgements, controller ground-truth privileges, and durable packet-level history remain planned. Sensor and track behavior is intentionally simplified, and the broader platform, terrain, logistics, cyber, and multi-source catalog systems remain planned work.
 
 ## Prerequisites
