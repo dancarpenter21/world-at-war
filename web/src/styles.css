@@ -232,3 +232,6 @@ select, textarea { width: 100%; padding: 9px; color: #eef7fa; background: #0e171
   .game-session-notice { left: 8px; right: 8px; top: 8px; padding: 10px; align-items: stretch; flex-direction: column; gap: 8px; }
   .game-session-notice .secondary { align-self: flex-start; }
 }
+.communication-summary { display: grid; gap: 5px; color: #dce8ee; font-size: 12px; }
+.communication-summary span { color: #91a7b1; font-size: 11px; }
+.communication-preview-label { font-size: 10px; line-height: 1.5; }

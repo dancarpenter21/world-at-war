@@ -1,11 +1,11 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
-import { PLAYER_ID, sessionAuthority, sessionGame, sessionProjection, sessionRole } from "./fixtures/game-session-data";
+import { PLAYER_ID, denseSessionProjection, sessionAuthority, sessionGame, sessionProjection, sessionRole } from "./fixtures/game-session-data";
 
 test.use({ actionTimeout: 10_000 });
 
-async function openSession(page: Page, guest = false) {
+async function openSession(page: Page, guest = false, projection = sessionProjection()) {
   const state = {
-    game: sessionGame(), role: sessionRole(), tick: 12, created: guest,
+    game: sessionGame(), role: sessionRole(), tick: 12, created: guest, projection,
     projectionFailure: false, projectionDenied: false, controlFailure: false, holdProjection: false, holdControl: false, holdSummary: false,
     projectionRequests: 0, controls: [] as string[], pendingProjections: [] as Route[], pendingControls: [] as Route[], pendingSummaries: [] as Route[],
     errors: [] as string[]
@@ -64,7 +64,7 @@ async function openSession(page: Page, guest = false) {
       state.projectionRequests += 1;
       if (state.holdProjection) { state.pendingProjections.push(route); return; }
       if (state.projectionDenied) { await json({ error: "Role is not held by this player.", code: "role_not_held" }, 403); return; }
-      await json(state.projectionFailure ? { error: "Map service temporarily unavailable." } : sessionProjection(state.tick), state.projectionFailure ? 503 : 200); return;
+      await json(state.projectionFailure ? { error: "Map service temporarily unavailable." } : { ...state.projection, tick: state.tick }, state.projectionFailure ? 503 : 200); return;
     }
     if (pathname === "/v1/airports") { await json({ airports: [], total: 0 }); return; }
     await json({ error: "Unexpected test endpoint: " + pathname }, 404);
@@ -93,6 +93,12 @@ test("host pauses and resumes without replacing the map, and orders follow game 
   await expect(page.locator("header .tick")).toHaveText("TICK 12");
   await expect(canvas).toHaveAttribute("data-retained", "yes");
   await expect(page.getByRole("button", { name: "Turn north", exact: true })).toBeDisabled();
+  const beforePan = await canvas.screenshot();
+  await page.keyboard.down("KeyD");
+  await page.waitForTimeout(250);
+  await page.keyboard.up("KeyD");
+  await expect.poll(async () => (await canvas.screenshot()).equals(beforePan)).toBe(false);
+  await expect(page.locator("header .tick")).toHaveText("TICK 12");
   await page.screenshot({ path: testInfo.outputPath("paused-operational-map.png") });
   await page.getByRole("button", { name: "Resume scenario", exact: true }).click();
   await expect(page.locator("header .tick")).toHaveText("TICK 13");
@@ -253,5 +259,24 @@ test("a delayed game summary cannot undo a successful host pause", async ({ page
   await state.pendingSummaries[0].fulfill({ contentType: "application/json", body: JSON.stringify([obsoleteSummary]) }).catch(() => undefined);
   await expect(page.getByRole("button", { name: "Resume scenario", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Turn north", exact: true })).toBeDisabled();
+  expect(state.errors).toEqual([]);
+});
+
+test("bounds the map communications preview and updates failures and queued traffic first", async ({ page }) => {
+  const state = await openSession(page, false, denseSessionProjection());
+  const inspector = page.getByRole("complementary", { name: "Operational picture" });
+  await expect(inspector.locator(".communication-summary")).toContainText("4,032 monitored links");
+  const rows = inspector.locator(".communication-status");
+  await expect(rows).toHaveCount(8);
+  await expect(rows.nth(0)).toContainText("Blue One → Blue 2");
+  await expect(rows.nth(0)).toContainText("Unavailable");
+  await expect(rows.nth(1)).toContainText("Blue One → Blue 3");
+  await expect(rows.nth(1)).toContainText("3 queued");
+  await expect(inspector.getByRole("button", { name: "Inspect full network" })).toBeVisible();
+  const previouslyFailed = state.projection.communication_links.find((link) => !link.available)!;
+  previouslyFailed.available = true;
+  await expect(rows.nth(0)).toContainText("Blue One → Blue 3");
+  await expect(inspector.locator(".communication-summary")).toContainText("0 unavailable");
+  await expect(rows).toHaveCount(8);
   expect(state.errors).toEqual([]);
 });

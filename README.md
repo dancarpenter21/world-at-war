@@ -162,6 +162,8 @@ The structural schema is checked in at `data/communications/schema/catalog.schem
 
 Role-held network access is available at `/v1/games/{id}/network`, the sequenced WebSocket `/v1/games/{id}/network/stream`, cursor-paginated `/v1/games/{id}/network/events`, and authorized `/v1/games/{id}/network/messages/{message_id}`. Message content is limited to originating roles and destination roles. The event endpoint paginates immutable queued, in-transit, and terminal transitions; projections contain one current record per message. Stream sequence numbers track network revisions independently of the simulation tick.
 
+The operational map previews up to eight links involving your terminal or commanded units, placing failures and queued traffic first. Its summary covers all monitored links; **Inspect full network** opens the full topology. Cesium redraws when units, map layers, or the camera change, suspends rendering beneath a full-screen workspace, and preserves the map and camera when you return.
+
 The **Network** workspace searches role-visible terminals by name or domain and filters directional links by availability, jamming, or queued traffic. Select a terminal to inspect its connections, focus its neighborhood, or browse messages to and from it. Selecting a link scopes message history to that exact direction. The message inspector shows authorized content, structured fields, delivery timing, queue wait, network transit time, classification, and drop reasons; history can be searched and filtered by lifecycle state.
 
 Dragged terminal positions remain in place across live updates and filtering. **Fit view** frames the current filters; **Reset layout** restores the grid. A disconnected stream retains the last topology with a reconnecting notice, and malformed updates trigger a fresh snapshot. On narrow screens, the graph and inspector stack vertically. Press **Escape** or choose **Back to map** to close the workspace.
@@ -174,14 +176,14 @@ npx playwright install chromium
 npm run test:e2e:network
 ```
 
-The standalone session tests exercise the actual Cesium map with mocked REST responses, covering host and guest pause/resume, retained maps during outages, request timeouts, revoked roles, delayed responses after leaving, and mobile controls:
+The standalone session tests exercise the actual Cesium map with mocked REST responses, covering host and guest pause/resume, retained maps during outages, request timeouts, revoked roles, delayed responses after leaving, mobile controls, keyboard camera movement while paused, and a bounded communications preview across 4,032 directional links:
 
 ```sh
 cd web
 npm run test:e2e:session
 ```
 
-The real-server gameplay regression creates Global Crisis through the browser, sends a networked command, checks lifecycle events in both the API and JSONL store, verifies role access, inspects message timing, and exercises host pause/resume. Its Space-Track and airport providers use small local fixtures in an isolated runtime directory:
+The real-server gameplay regression creates Global Crisis through the browser, sends a networked command, checks lifecycle events in both the API and JSONL store, verifies role access, inspects message timing, and exercises host pause/resume. It also attaches per-stage elapsed time and DOM counts for diagnosing client performance. Its Space-Track and airport providers use small local fixtures in an isolated runtime directory:
 
 ```sh
 cd web

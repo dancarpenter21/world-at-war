@@ -12,6 +12,10 @@ test.beforeAll(async () => { backend = await startGameBackend(); });
 test.afterAll(async () => { if (backend) await backend.close(); });
 
 test("runs a real game, persists networked command delivery, and retains the map through host pause", async ({ page, request }, testInfo) => {
+  const started = Date.now();
+  const timings: { stage: string; elapsed_ms: number; dom_nodes: number; communications_rows: number }[] = [];
+  const mark = async (stage: string) => timings.push({ stage, elapsed_ms: Date.now() - started,
+    ...await page.evaluate(() => ({ dom_nodes: document.querySelectorAll("*").length, communications_rows: document.querySelectorAll(".communication-status").length })) });
   const connected = await request.post(backend.url + "/v1/admin/space-track/connect", {
     data: { username: "fixture-user", password: "fixture-password", remember: false }
   });
@@ -22,6 +26,7 @@ test("runs a real game, persists networked command delivery, and retains the map
   await page.route(/https:\/\/[^/]*tile\.openstreetmap\.org\//, (route) => route.abort());
   await page.goto("/");
   await expect(page.locator(".catalog-tab-status.ready")).toBeVisible();
+  await mark("catalog-ready");
   await page.getByRole("button", { name: /^Global Crisis/ }).click();
   const creation = page.waitForResponse((response) => response.url().endsWith("/v1/games") && response.request().method() === "POST");
   await page.getByRole("button", { name: "Create game", exact: true }).click();
@@ -35,6 +40,8 @@ test("runs a real game, persists networked command delivery, and retains the map
   await expect(canvas).toBeVisible();
   await expect(page.getByRole("button", { name: "Turn north", exact: true })).toBeEnabled();
   await canvas.evaluate((element) => element.setAttribute("data-retained", "yes"));
+  await expect(page.locator(".communication-status")).toHaveCount(8);
+  await mark("map-ready");
 
   const intent = await request.post(`${backend.url}/v1/games/${gameId}/roles/${roleId}/intent`, {
     data: {
@@ -64,10 +71,12 @@ test("runs a real game, persists networked command delivery, and retains the map
   expect(persisted.filter((record) => record.message?.id === submission.message_id).map((record) => record.state))
     .toEqual(["queued", "in_transit", "delivered"]);
 
+  await mark("command-delivered");
   const outsider = await request.get(`${backend.url}/v1/games/${gameId}/network?player_id=00000000-0000-4000-8000-000000008099&role_id=${roleId}`);
   expect(outsider.status()).toBe(403);
   await page.getByRole("button", { name: "Network", exact: true }).click();
   await expect(page.getByRole("region", { name: "C2 network workspace", exact: true })).toBeVisible();
+  await mark("network-open");
   await page.getByRole("tab", { name: /^Messages/ }).click();
   await expect(page.getByRole("button", { name: /^Inspect message: move order/ })).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: /^Inspect message: move order/ }).click();
@@ -75,6 +84,7 @@ test("runs a real game, persists networked command delivery, and retains the map
   await expect(details.locator(".network-state")).toHaveText("delivered");
   await expect(details.getByText("Queue wait", { exact: true })).toBeVisible();
   await expect(details.getByText("Network transit", { exact: true })).toBeVisible();
+  await mark("message-inspected");
   await page.screenshot({ path: testInfo.outputPath("real-network-command-delivered.png") });
   await page.getByRole("button", { name: "Back to map", exact: true }).click();
   await page.getByRole("button", { name: "Pause scenario", exact: true }).click();
@@ -88,7 +98,11 @@ test("runs a real game, persists networked command delivery, and retains the map
   await page.getByRole("button", { name: "Resume scenario", exact: true }).click();
   await expect(page.getByRole("button", { name: "Turn north", exact: true })).toBeEnabled();
   await expect(canvas).toHaveAttribute("data-retained", "yes");
+  await mark("resumed");
   await page.getByRole("button", { name: "Leave scenario", exact: true }).click();
   await expect(page.getByRole("button", { name: "Create game", exact: true })).toBeVisible();
   expect(errors).toEqual([]);
+  await mark("left-game");
+  await testInfo.attach("gameplay-performance", { body: JSON.stringify(timings, null, 2), contentType: "application/json" });
+  console.log("gameplay performance", JSON.stringify(timings));
 });

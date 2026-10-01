@@ -12,6 +12,7 @@ import { AirportLayer, type AirportDetail, type AirportListResponse } from "./ai
 import { GlobeEntityReconciler, type Projection } from "./globeEntities";
 import { attachMapKeyboardControls, type AttachedMapKeyboardControls } from "./mapKeyboardControls";
 import { MapFilterDialog, type MapFilters } from "./MapFilterDialog";
+import { OperationalInspector } from "./OperationalInspector";
 import { SpaceAssetLayer } from "./spaceAssetLayer";
 import { ApiError, apiRequest } from "./apiClient";
 import { usePollingResource, type PollingStatus } from "./usePollingResource";
@@ -87,7 +88,7 @@ function symbolCanvas(sidc: string, size = 32) {
   return canvas;
 }
 
-function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnabled, keyboardEnabled }: {
+function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnabled, keyboardEnabled, renderingEnabled }: {
   projection: Projection;
   filters: MapFilters;
   gameId: string;
@@ -95,6 +96,7 @@ function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnab
   roleId: string;
   spaceCatalogEnabled: boolean;
   keyboardEnabled: boolean;
+  renderingEnabled: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Viewer | null>(null);
@@ -118,7 +120,8 @@ function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnab
       baseLayer: new ImageryLayer(new OpenStreetMapImageryProvider({ url: "https://tile.openstreetmap.org/", credit: "OpenStreetMap contributors" })),
       baseLayerPicker: false, fullscreenButton: false, geocoder: false, homeButton: false,
       infoBox: true, navigationHelpButton: false, sceneModePicker: false, selectionIndicator: true,
-      terrainProvider: new EllipsoidTerrainProvider(), timeline: false
+      terrainProvider: new EllipsoidTerrainProvider(), timeline: false,
+      requestRenderMode: true, maximumRenderTimeChange: Infinity
     });
     viewer.scene.globe.baseColor = Color.fromCssColorString("#1f3340");
     viewer.camera.setView({ destination: Cartesian3.fromDegrees(-40, 30, 20_000_000) });
@@ -208,6 +211,15 @@ function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnab
   }, [keyboardEnabled]);
 
   useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+    viewer.useDefaultRenderLoop = renderingEnabled;
+    if (renderingEnabled) viewer.scene.requestRender();
+  }, [renderingEnabled]);
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!renderingEnabled || !viewer) return;
     reconcilerRef.current?.reconcile({
       ...projection,
       communication_links: filters.network.visible ? projection.communication_links : []
@@ -219,7 +231,8 @@ function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnab
         void viewerRef.current.flyTo(entities, { duration: 0 });
       }
     }
-  }, [projection, filters.network.visible]);
+    viewer.scene.requestRender();
+  }, [projection, filters.network.visible, renderingEnabled]);
 
   useEffect(() => {
     if (spaceCatalogEnabled && (filters.spaceAssets.showAll || filters.spaceAssets.showStarlink)) {
@@ -580,11 +593,11 @@ function App() {
       <aside className="sidebar"><h1>{role.name}</h1><p className="message">{game.title}</p><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command network-launch" onClick={() => setShowNetwork(true)}>Network</button><button className="command map-filter-launch" onClick={() => setShowMapFilters((value) => !value)}>Map filters</button><h2>Catalog</h2><p className="muted">{game.space_catalog_enabled ? spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status" : "No orbital catalog in this scenario"}</p><p className="session-command-feedback" role="status">{message}</p></aside>
       <section className="map-region">
         <GameSessionNotice game={game} status={connectionStatus} error={connectionError} controlError={controlError} hasProjection={true} onRetry={retryConnection} />
-        <Globe key={`${game.id}:${role.id}:${role.lease_generation}`} projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} keyboardEnabled={!showAuthority && !showNetwork && !showMapFilters} />
+        <Globe key={`${game.id}:${role.id}:${role.lease_generation}`} projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} keyboardEnabled={!showAuthority && !showNetwork && !showMapFilters} renderingEnabled={!showAuthority && !showNetwork} />
         {showMapFilters && <MapFilterDialog filters={mapFilters} spaceAssetsAvailable={game.space_catalog_enabled} onChange={setMapFilters} onClose={() => setShowMapFilters(false)} />}
         <div className="map-caption">{role.name} · {role.side} · operational picture</div>
       </section>
-      <aside className="inspector"><h2>Operational picture</h2><div className="metric"><span>Own units</span><strong>{projection.own_units.length}</strong></div><div className="metric"><span>Tracks</span><strong>{projection.tracks.length}</strong></div><h2>Actions</h2><button className="command" disabled={!role.command_units.length || !canIssueOrders} onClick={() => void turnNorth()}>Turn north</button><h2>Communications</h2>{projection.communication_links.length ? projection.communication_links.map((link) => { const from = projection.own_units.find((unit) => unit.id === link.from_entity_id)?.name ?? link.from_entity_id; const to = projection.own_units.find((unit) => unit.id === link.to_entity_id)?.name ?? link.to_entity_id; return <div className={`communication-status ${link.available ? "available" : "blocked"}`} key={link.id}><span>{from} → {to}</span><small>{link.available ? `${((link.effective_bit_rate_bps ?? 0) / 1_000_000).toFixed(1)} Mbit/s` : `Jammed ${Math.round(link.jammed * 100)}%`}</small></div>; }) : <p className="muted">No monitored links.</p>}<h2>Tracks</h2>{projection.tracks.length ? projection.tracks.map((track) => <div className="track" key={track.track_id}><span>Uncertain {track.target_side} contact</span><small>{Math.round(track.identity_confidence * 100)}% identity</small></div>) : <p className="muted">No reports received.</p>}</aside>
+      <OperationalInspector projection={projection} role={role} canIssueOrders={canIssueOrders} onTurnNorth={() => void turnNorth()} onInspectNetwork={() => setShowNetwork(true)} />
     </section>}
     {showAuthority && authority && game && <Suspense fallback={<div className="authority-loading">Loading authority graph…</div>}><AuthorityWorkspace definition={authority} runtimeRoles={roles} units={authorityUnits} requests={authorityRequests} currentRole={role} isHost={game.host_player_id === playerId} tick={projection?.tick ?? 0} onClose={() => setShowAuthority(false)} onSave={saveAuthority} onCreateRequest={createAuthorityRequest} onDecision={decideAuthorityRequest} /></Suspense>}
     {showNetwork && game && role && <Suspense fallback={<div className="authority-loading">Loading C2 network…</div>}><NetworkWorkspace key={`${game.id}:${role.id}`} apiBase={API_BASE} gameId={game.id} playerId={playerId} roleId={role.id} onClose={() => setShowNetwork(false)} /></Suspense>}

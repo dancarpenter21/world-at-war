@@ -198,6 +198,7 @@ export class AirportLayer {
         scaleByDistance: new NearFarScalar(100_000, 1.1, 20_000_000, 0.65)
       });
     }
+    this.viewer.scene.requestRender();
   }
 
   hide() {
@@ -206,6 +207,7 @@ export class AirportLayer {
     const selectedAirport = this.viewer.entities.getById(AIRPORT_DETAIL_ID);
     this.viewer.entities.removeById(AIRPORT_DETAIL_ID);
     if (this.viewer.selectedEntity === selectedAirport) this.viewer.selectedEntity = undefined;
+    this.viewer.scene.requestRender();
   }
 
   private async select(airportId: string) {

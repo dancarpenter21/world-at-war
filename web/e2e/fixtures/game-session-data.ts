@@ -27,3 +27,22 @@ export function sessionProjection(tick = 12): Projection {
     tracks: [], jamming_regions: [], communication_links: []
   };
 }
+
+export function denseSessionProjection(): Projection {
+  const projection = sessionProjection();
+  for (let index = 1; index < 64; index++) {
+    projection.own_units.push({ ...projection.own_units[0], id: `blue-${index + 1}`, name: `Blue ${index + 1}`,
+      position: { latitude_deg: 34 + index / 100, longitude_deg: -118, altitude_m: 8_000 } });
+  }
+  for (const from of projection.own_units) {
+    for (const to of projection.own_units) {
+      if (from.id === to.id) continue;
+      const failed = from.id === "blue-one" && to.id === "blue-2";
+      const queued = from.id === "blue-one" && to.id === "blue-3";
+      projection.communication_links.push({ id: `${from.id}:${to.id}`, from_entity_id: from.id, to_entity_id: to.id,
+        available: !failed, jammed: failed ? 1 : 0, effective_bit_rate_bps: failed ? undefined : 1_000_000,
+        queued_packets: queued ? 3 : 0, queued_bytes: queued ? 300 : 0 });
+    }
+  }
+  return projection;
+}
