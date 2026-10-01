@@ -11,8 +11,8 @@ const backendUrl = `http://${browserHost}:18101`;
 const backendHealthUrl = "http://127.0.0.1:18101";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const serverBinary = path.join(repoRoot, "target/debug/world-at-war-server");
-const liveUsername = process.env.SPACETRACK_E2E_USERNAME;
-const livePassword = process.env.SPACETRACK_E2E_PASSWORD;
+const liveUsername = process.env.SPACETRACK_E2E_USERNAME || undefined;
+const livePassword = process.env.SPACETRACK_E2E_PASSWORD || undefined;
 const useLiveProvider = Boolean(liveUsername && livePassword);
 const savedPasswordMask = "••••••••••••";
 
@@ -152,6 +152,7 @@ test("downloads and persists a Space-Track catalog through the login form", asyn
   await expect(page.getByLabel("Space-Track username")).toBeVisible({ timeout: 15_000 });
   await page.getByLabel("Space-Track username").fill(liveUsername ?? "integration-user");
   await page.getByLabel("Space-Track password").fill(livePassword ?? "integration-password");
+  await expect(page.getByRole("button", { name: "Connect and synchronize", exact: true })).toBeEnabled();
 
   const connectResponse = page.waitForResponse((response) =>
     response.url() === `${backendUrl}/v1/admin/space-track/connect`

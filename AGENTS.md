@@ -14,7 +14,7 @@ Keep domain data separate from executable code so simulation logic can be tested
 
 ## Build, Test, and Development Commands
 
-Rust builds require a compatible packet-engine revision of the sibling `../c3mesh` checkout; see `README.md` for the required APIs.
+Rust builds require Rust 1.89+ and the sibling `../c3mesh` checkout pinned in `c3mesh-revision.txt`. Run `scripts/setup-c3mesh.ps1` (or `sh scripts/setup-c3mesh.sh`) before a fresh build; use its verify mode for reproducible validation.
 
 - `cargo fmt --check`: check Rust formatting.
 - `cargo check --workspace --locked`: validate Rust compilation.

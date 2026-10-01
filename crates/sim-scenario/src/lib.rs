@@ -353,7 +353,6 @@ fn global_communications(
         SimulatorOptions {
             seed: 0xC3_2026,
             channels: channel_options,
-            ..Default::default()
         },
     )
 }

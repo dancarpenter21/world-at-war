@@ -1767,10 +1767,7 @@ fn process_vacant_authority_requests(game: &mut Game) {
             .and_then(|role| role.owner)
             .is_some();
         match request.status {
-            AuthorityRequestStatus::WaitingVacant {
-                resolves_at_tick: _,
-                ..
-            } if occupied => {
+            AuthorityRequestStatus::WaitingVacant { .. } if occupied => {
                 request.status = AuthorityRequestStatus::PendingHuman {
                     role_id: step.role_id,
                 };

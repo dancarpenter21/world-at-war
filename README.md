@@ -23,13 +23,27 @@ Current limitations: command messages traverse the active packet topology, but f
 
 ## Prerequisites
 
-- Rust toolchain compatible with the Rust 2021 workspace.
-- The pre-publish **packet-engine revision** of `c3mesh` in a sibling directory, so this repository and the crate resolve as `world-at-war/` and `c3mesh/` under the same parent. It must include `SimulatorOptions`, `QueueConfig`, `QueueDiscipline`, and tick-boundary advancement; the earlier jamming-only revision is incompatible.
+- Rust 1.89 or newer for the Rust 2021 workspace and its locked dependencies.
+- GitHub read access to [c3mesh](https://github.com/dancarpenter21/c3mesh), checked out as the sibling `../c3mesh` at the tested commit in [c3mesh-revision.txt](c3mesh-revision.txt). The setup scripts clone the dependency when missing and select the pinned revision when its working tree is clean.
 - Node.js 22+ and npm for frontend development.
 - Docker Compose v2 for the container workflows.
 - A Space-Track account only when creating a scenario that requires the public orbital catalog.
 
 ## Run locally
+
+Prepare the pinned Rust dependency once from the repository root:
+
+```powershell
+./scripts/setup-c3mesh.ps1
+./scripts/setup-c3mesh.ps1 -VerifyOnly
+```
+
+On Linux or macOS, use `sh scripts/setup-c3mesh.sh` and
+`sh scripts/setup-c3mesh.sh --verify-only`. Setup preserves branches and refuses
+to switch a dependency with local changes. When working on both projects, keep
+the sibling checkout on your development branch; update the pinned revision
+after its tested changes are pushed. The verification mode requires the exact
+clean checkpoint used for reproducible builds.
 
 Run the server from the repository root:
 
