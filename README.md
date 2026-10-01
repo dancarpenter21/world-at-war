@@ -190,6 +190,8 @@ cd web
 npm run test:e2e:gameplay
 ```
 
+**Continuous integration** checks the pinned c3mesh checkout, formatting, strict lints, and workspace tests on Linux and Windows using Rust 1.89.0 and current stable. The Linux web job uses the npm lockfile, builds the production client, and runs all browser tests with local catalog providers. Browser reports, screenshots, and failure traces are retained for seven days. See [.github/workflows/checks.yml](.github/workflows/checks.yml).
+
 ## Repository layout
 
 - `crates/sim-core/` — deterministic ECS simulation, projections, orders, and authority model.

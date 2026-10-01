@@ -12,6 +12,8 @@ export default defineConfig({
   use: {
     baseURL: `http://${browserHost}:4173`,
     browserName: "chromium",
+    screenshot: "only-on-failure",
+    trace: "retain-on-failure",
     ...(wsEndpoint ? { connectOptions: { wsEndpoint } } : {})
   },
   webServer: {
