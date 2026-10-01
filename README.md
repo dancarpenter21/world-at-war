@@ -2,14 +2,14 @@
 
 World At War is a server-authoritative, low-fidelity war-simulation prototype. It combines a Rust entity-component simulation, a Cesium/React operational map, a public Space-Track orbital catalog, and an authority workflow for command decisions.
 
-The current implementation ships **Command Link Exercise**, a catalog-free command post and two aircraft on a slow shared training net; **Global Crisis**, with 64 authored entities and a pinned public orbital snapshot; and **Jammed Flight Test**, with two pilot-controlled Blue aircraft and directional receiver jamming. Authored entities and uncertain tracks use MIL-STD-2525D symbols.
+The current implementation ships **Command Link Exercise**, a catalog-free command post and two aircraft on a slow shared training net; **Sensor Relay Exercise**, where local detections reach a commander only after radio delivery; **Global Crisis**, with 64 authored entities and a pinned public orbital snapshot; and **Jammed Flight Test**, with two pilot-controlled Blue aircraft and directional receiver jamming. Authored entities and uncertain tracks use MIL-STD-2525D symbols.
 
 The broader target architecture, planned simulation fidelity, and acceptance criteria are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Features described there are not necessarily implemented yet.
 
 ## What is implemented
 
 - A deterministic Rust ECS simulation with one-second ticks, platform movement, server-side projections, and Red patrol AI that plans each aircraft once, waits for delivery, and limits retries over failed links.
-- Local geometric sensor detections with spherical Earth occlusion and slant range; lost contacts retain their last observed position and timestamps.
+- Local geometric sensor detections with spherical Earth occlusion and slant range, game/terminal-scoped track identities, and delivery-gated sensor reports. Lost contacts retain their last observed position and timestamps; the map and inspector display their age and report delay.
 - Mandatory per-entity c3mesh network endpoints, bounded packet queues, deterministic loss and weighted scheduling, cyclic flight paths, geographic receiver-jamming regions, and directional link status.
 - A lobby that creates and joins games, role claiming, host start/pause/resume controls, and REST/WebSocket state delivery. Paused games keep their operational map and inspectors available.
 - A Cesium operational map that keeps authored owned units and uncertain tracks visually separate from the public orbital catalog, reconciling entities in place so movement ticks do not recreate or flicker MIL-STD-2525D icons.
@@ -144,7 +144,13 @@ The generic prototype sensor uses straight-line distance between the observer an
 
 Platform altitude is the sensor/target height above that reference sphere; no separate antenna offset is assumed. Terrain, atmospheric refraction, weather, signatures, scan patterns, probabilistic measurement error, and underwater sensor modalities remain planned. Sensor ranges and initial coordinates must be finite and valid. Identification confidence remains a simple range threshold and does not disclose the target's actual platform symbol.
 
-Observations update only the detecting unit's local knowledge. A different command terminal does not automatically inherit those tracks. When detection stops, the track keeps its last position and observation/receipt ticks rather than following the hidden target. Track aging, fusion, and delivery of sensor reports over communications remain planned.
+Observations update only the detecting unit's local knowledge. A different command terminal does not automatically inherit those tracks. When detection stops, the track keeps its last position and observation/receipt ticks rather than following the hidden target. Track IDs are scoped to the game and terminal instead of exposing enemy entity IDs. The inspector separates observation age, time since receipt, and delivery delay; map tracks fade when they represent an earlier observation. Confidence decay, uncertainty growth, track expiry, and multisensor fusion remain planned.
+
+The authored [Sensor Relay Exercise](data/scenarios/sensor-relay-exercise.v1.json) opts CAP Alpha 1 into reporting to the exercise command post once every ten ticks per currently observed track. The pilot sees the contact locally; the commander receives a snapshot after its packet arrives; CAP Alpha 2 receives no automatic knowledge. The fictional target periodically leaves sensor range, making the difference between current observations and retained tracks visible. No orbital catalog or provider credentials are needed.
+
+Report routes are explicit same-side subscriptions with validated sensing roles, recipients, links, and positive intervals. Reports use the frozen public-safe track-report message profile and compete with orders on the shared training radio. At most one report from a source track to a recipient is pending; failed attempts are paced, and the next attempt samples a fresh local observation. An expired report terminates at its deadline even on a very slow link, while already reserved physical serialization remains non-preemptive.
+
+The recipient's state, network view, message detail endpoint, REST event history, and network stream withhold incoming report contents until delivery is persisted. Dropped, expired, or failed-persistence reports do not update the recipient's knowledge. Received tracks retain their original observation tick, use the actual receive tick, and never read the target's current truth. Older or duplicate reports cannot overwrite a newer report from the same source. Report routes are disabled in the other existing scenarios; automatic forwarding and multisensor fusion remain planned.
 
 ## Gameplay and authority workflow
 

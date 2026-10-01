@@ -429,6 +429,14 @@ pub struct Track {
 #[derive(Resource, Debug, Default)]
 pub struct KnowledgeBases(pub BTreeMap<Uuid, Vec<Track>>);
 
+#[derive(Resource)]
+struct KnowledgeNamespace(Uuid);
+
+fn scoped_track_id(namespace: Uuid, observer: Uuid, subject: Uuid) -> Uuid {
+    let terminal_namespace = Uuid::new_v5(&namespace, observer.as_bytes());
+    Uuid::new_v5(&terminal_namespace, subject.as_bytes())
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum OrderKind {
     Move { north_mps: f64, east_mps: f64 },
@@ -725,6 +733,15 @@ impl Simulation {
         platforms: Vec<PlatformSpawn>,
         communications: CommunicationsConfig,
     ) -> Result<Self, SimulationBuildError> {
+        Self::new_with_knowledge_namespace(platforms, communications, Uuid::nil())
+    }
+
+    /// Keep track identities stable within a replay while isolating different games.
+    pub fn new_with_knowledge_namespace(
+        platforms: Vec<PlatformSpawn>,
+        communications: CommunicationsConfig,
+        knowledge_namespace: Uuid,
+    ) -> Result<Self, SimulationBuildError> {
         Self::validate_configuration(&platforms, &communications)?;
         let entity_devices = platforms
             .iter()
@@ -744,6 +761,7 @@ impl Simulation {
         world.insert_resource(SimClock { tick: 0 });
         world.insert_resource(Observations::default());
         world.insert_resource(KnowledgeBases::default());
+        world.insert_resource(KnowledgeNamespace(knowledge_namespace));
         world.insert_resource(PendingIntents::default());
         world.insert_resource(OrderResults::default());
 
@@ -810,6 +828,61 @@ impl Simulation {
 
     pub fn tick(&self) -> u64 {
         self.world.resource::<SimClock>().tick
+    }
+
+    /// Only tracks refreshed by this terminal's own sensors during the current tick.
+    pub fn current_sensor_tracks(&self, observer: Uuid) -> Vec<Track> {
+        let namespace = self.world.resource::<KnowledgeNamespace>().0;
+        let knowledge = self.world.resource::<KnowledgeBases>();
+        let Some(tracks) = knowledge.0.get(&observer) else {
+            return vec![];
+        };
+        self.world
+            .resource::<Observations>()
+            .0
+            .iter()
+            .filter(|contact| contact.observer == observer)
+            .filter_map(|contact| {
+                let id = scoped_track_id(namespace, observer, contact.target);
+                tracks.iter().find(|track| track.track_id == id).cloned()
+            })
+            .collect()
+    }
+
+    /// Apply a received report without reading the target's authoritative position.
+    /// Older reports from the same source track cannot overwrite a newer report.
+    pub fn receive_track_report(&mut self, recipient: Uuid, mut track: Track) -> bool {
+        if track.observed_tick > self.tick()
+            || !geo_pose_is_finite(track.position)
+            || !track.identity_confidence.is_finite()
+            || !(0.0..=1.0).contains(&track.identity_confidence)
+        {
+            return false;
+        }
+        let mut units = self.world.query::<(&SimEntityId, &Ownership)>();
+        let Some((_, ownership)) = units.iter(&self.world).find(|(id, _)| id.0 == recipient) else {
+            return false;
+        };
+        if ownership.0 == track.target_side {
+            return false;
+        }
+        let namespace = self.world.resource::<KnowledgeNamespace>().0;
+        track.track_id = scoped_track_id(namespace, recipient, track.track_id);
+        track.received_tick = self.tick();
+        let mut knowledge = self.world.resource_mut::<KnowledgeBases>();
+        let tracks = knowledge.0.entry(recipient).or_default();
+        if let Some(existing) = tracks
+            .iter_mut()
+            .find(|existing| existing.track_id == track.track_id)
+        {
+            if existing.observed_tick >= track.observed_tick {
+                return false;
+            }
+            *existing = track;
+        } else {
+            tracks.push(track);
+        }
+        true
     }
 
     pub fn drain_order_results(&mut self) -> Vec<OrderResult> {
@@ -1297,21 +1370,20 @@ fn detect_contacts(
 fn deliver_reports(
     clock: Res<SimClock>,
     observations: Res<Observations>,
+    namespace: Res<KnowledgeNamespace>,
     mut knowledge: ResMut<KnowledgeBases>,
 ) {
     for contact in &observations.0 {
+        let track_id = scoped_track_id(namespace.0, contact.observer, contact.target);
         let tracks = knowledge.0.entry(contact.observer).or_default();
-        if let Some(track) = tracks
-            .iter_mut()
-            .find(|track| track.track_id == contact.target)
-        {
+        if let Some(track) = tracks.iter_mut().find(|track| track.track_id == track_id) {
             track.position = contact.position;
             track.identity_confidence = contact.identity_confidence;
             track.observed_tick = contact.observed_tick;
             track.received_tick = clock.tick;
         } else {
             tracks.push(Track {
-                track_id: contact.target,
+                track_id,
                 target_side: contact.side,
                 position: contact.position,
                 identity_confidence: contact.identity_confidence,

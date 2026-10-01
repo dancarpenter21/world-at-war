@@ -2,7 +2,7 @@
 
 mod radio_exercise;
 
-pub use radio_exercise::command_link_exercise_scenario;
+pub use radio_exercise::{command_link_exercise_scenario, sensor_relay_exercise_scenario};
 
 use std::collections::BTreeMap;
 
@@ -35,6 +35,17 @@ pub struct Scenario {
     pub communication_links: Vec<CommunicationLinkDefinition>,
     pub jamming_regions: Vec<JammingRegion>,
     pub authority: AuthorityDefinition,
+    #[serde(default)]
+    pub sensor_report_routes: Vec<SensorReportRoute>,
+}
+
+/// An explicit subscription to a sensing role's local observations, not side-wide awareness.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SensorReportRoute {
+    pub origin_role_id: Uuid,
+    pub recipient_unit_id: Uuid,
+    pub interval_ticks: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,6 +100,33 @@ impl Scenario {
         self.authority
             .validate(&ids)
             .map_err(ScenarioError::InvalidAuthority)?;
+        let mut report_routes = std::collections::BTreeSet::new();
+        for route in &self.sensor_report_routes {
+            let origin = self
+                .authority
+                .roles
+                .iter()
+                .find(|role| role.id == route.origin_role_id);
+            let valid = origin.is_some_and(|role| {
+                route.interval_ticks > 0
+                    && role.location_unit_id != route.recipient_unit_id
+                    && self
+                        .units
+                        .iter()
+                        .any(|unit| unit.id == role.location_unit_id && unit.sensor.is_some())
+                    && self
+                        .units
+                        .iter()
+                        .any(|unit| unit.id == route.recipient_unit_id && unit.side == role.side)
+                    && self.communication_links.iter().any(|link| {
+                        link.from_entity_id == role.location_unit_id
+                            && link.to_entity_id == route.recipient_unit_id
+                    })
+            });
+            if !valid || !report_routes.insert((route.origin_role_id, route.recipient_unit_id)) {
+                return Err(ScenarioError::InvalidSimulation("sensor report routes require a unique sensing role, a same-side reachable recipient, and a positive interval".into()));
+            }
+        }
         let platforms = self.platforms();
         Simulation::validate_configuration(&platforms, &self.communications())
             .map_err(|error| ScenarioError::InvalidSimulation(error.to_string()))?;
@@ -108,6 +146,15 @@ impl Scenario {
         seed: u64,
         queue_discipline: Option<QueueDiscipline>,
     ) -> Result<Simulation, ScenarioError> {
+        self.spawn_with_knowledge_namespace(seed, queue_discipline, Uuid::nil())
+    }
+
+    pub fn spawn_with_knowledge_namespace(
+        &self,
+        seed: u64,
+        queue_discipline: Option<QueueDiscipline>,
+        namespace: Uuid,
+    ) -> Result<Simulation, ScenarioError> {
         self.validate()?;
         let mut communications = self.communications();
         communications.simulator_options.seed = seed;
@@ -116,7 +163,7 @@ impl Scenario {
                 channel.queue.discipline = discipline;
             }
         }
-        Simulation::new(self.platforms(), communications)
+        Simulation::new_with_knowledge_namespace(self.platforms(), communications, namespace)
             .map_err(|error| ScenarioError::InvalidSimulation(error.to_string()))
     }
 
@@ -268,6 +315,7 @@ pub fn global_crisis_scenario() -> Scenario {
         communication_links,
         jamming_regions: vec![],
         authority,
+        sensor_report_routes: vec![],
     }
 }
 
@@ -352,6 +400,21 @@ fn global_communications(
                 channel_id: channel,
             });
         }
+    }
+    // A lone unit on a side still needs its mandatory network endpoint, even
+    // when no same-side point-to-point link is authored.
+    for unit in units
+        .iter_mut()
+        .filter(|unit| unit.network_device_ids.is_empty())
+    {
+        let id = DeviceId::new(format!("entity-{}-network", unit.id));
+        unit.network_device_ids.push(id.clone());
+        devices.push(DeviceConfig {
+            id,
+            kind: DeviceKind::Sink,
+            mobility: Default::default(),
+            interference: vec![],
+        });
     }
     (
         NetworkConfig { devices, channels },
@@ -1074,6 +1137,7 @@ pub fn jammed_flight_scenario() -> Scenario {
             jammed: 1.0,
         }],
         authority,
+        sensor_report_routes: vec![],
     }
 }
 
@@ -1172,6 +1236,7 @@ mod tests {
             global_crisis_scenario(),
             jammed_flight_scenario(),
             command_link_exercise_scenario(),
+            sensor_relay_exercise_scenario(),
         ];
         let missing: Vec<_> = scenarios
             .iter()

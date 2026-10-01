@@ -60,6 +60,22 @@ describe("GlobeEntityReconciler", () => {
     expect(renderSymbol).toHaveBeenCalledTimes(2);
   });
 
+  it("ages retained tracks without recreating their entities or symbols", () => {
+    const entities = new EntityCollection();
+    const renderSymbol = vi.fn((sidc: string, size: number) => `${sidc}:${size}`);
+    const reconciler = new GlobeEntityReconciler(entities, renderSymbol);
+    reconciler.reconcile(projection());
+    const track = entities.getById("track-1");
+    expect(track?.name).toContain("observed this tick");
+    expect(track?.billboard?.color?.getValue().alpha).toBe(1);
+    const position = track?.position?.getValue(JulianDate.now());
+    reconciler.reconcile(projection({ tick: 26 }));
+    expect(entities.getById("track-1")).toBe(track);
+    expect(track?.name).toContain("observed 25s ago");
+    expect(track?.billboard?.color?.getValue().alpha).toBe(0.65);
+    expect(Cartesian3.equals(track?.position?.getValue(JulianDate.now()), position)).toBe(true);
+    expect(renderSymbol).toHaveBeenCalledTimes(2);
+  });
   it("changes an image only when its SIDC changes", () => {
     const entities = new EntityCollection();
     const renderSymbol = vi.fn((sidc: string, size: number) => `${sidc}:${size}`);

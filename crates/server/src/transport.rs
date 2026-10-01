@@ -3,6 +3,10 @@ use sim_core::{NetworkEvent, NetworkTime, PacketMetadata};
 
 pub(super) enum DeliveryAction {
     ExecuteIntent(AuthorizedIntent),
+    ReceiveTrackReport {
+        recipient_unit_id: Uuid,
+        source_track: sim_core::Track,
+    },
     ActivateRequest {
         request_id: Uuid,
         step: usize,
@@ -184,11 +188,20 @@ fn apply_to_request(game: &mut Game, request: &mut AuthorityRequest, action: Del
 fn apply_delivery(game: &mut Game, message_id: Uuid, action: DeliveryAction) {
     match action {
         DeliveryAction::ExecuteIntent(intent) => game.simulation.queue_authorized_intent(intent),
+        DeliveryAction::ReceiveTrackReport {
+            recipient_unit_id,
+            source_track,
+        } => {
+            game.simulation
+                .receive_track_report(recipient_unit_id, source_track);
+        }
         action => {
             let request_id = match &action {
                 DeliveryAction::ActivateRequest { request_id, .. }
                 | DeliveryAction::ExecuteRequest { request_id, .. } => *request_id,
-                DeliveryAction::ExecuteIntent(_) => unreachable!(),
+                DeliveryAction::ExecuteIntent(_) | DeliveryAction::ReceiveTrackReport { .. } => {
+                    unreachable!()
+                }
             };
             let Some(mut request) = game.authority_requests.remove(&request_id) else {
                 return;
@@ -206,7 +219,7 @@ fn fail_delivery(game: &mut Game, message_id: Uuid, action: DeliveryAction) {
     let request_id = match action {
         DeliveryAction::ActivateRequest { request_id, .. }
         | DeliveryAction::ExecuteRequest { request_id, .. } => Some(request_id),
-        DeliveryAction::ExecuteIntent(_) => None,
+        DeliveryAction::ExecuteIntent(_) | DeliveryAction::ReceiveTrackReport { .. } => None,
     };
     if let Some(request) = request_id.and_then(|id| game.authority_requests.get_mut(&id)) {
         if matches!(request.status, AuthorityRequestStatus::InTransit { message_id: awaiting } if awaiting == message_id)

@@ -2,6 +2,7 @@ mod ai_orders;
 mod airport_catalog;
 mod credential_cookie;
 mod intents;
+mod sensor_reports;
 mod space_assets;
 mod space_catalog;
 mod transport;
@@ -42,7 +43,8 @@ use sim_core::{
     PlayerIntent, RoleProjection, Side, Simulation,
 };
 use sim_scenario::{
-    command_link_exercise_scenario, global_crisis_scenario, jammed_flight_scenario, Scenario,
+    command_link_exercise_scenario, global_crisis_scenario, jammed_flight_scenario,
+    sensor_relay_exercise_scenario, Scenario,
 };
 use space_assets::{SpaceAssetDetail, SpaceAssetService, SpaceAssetsResponse};
 use space_catalog::{SpaceCatalogService, SpaceCatalogSnapshot, SpaceCatalogStatus};
@@ -92,6 +94,7 @@ struct Game {
     packet_messages: BTreeMap<u64, Uuid>,
     pending_deliveries: BTreeMap<Uuid, DeliveryAction>,
     ai_planner: ai_orders::AiPlannerState,
+    sensor_reports: sensor_reports::SensorReportState,
     intent_submissions: BTreeMap<Uuid, intents::IntentSubmission>,
     network_projection_sequence: u64,
     network_event_path: Option<PathBuf>,
@@ -467,6 +470,7 @@ async fn main() -> anyhow::Result<()> {
         global_crisis_scenario(),
         jammed_flight_scenario(),
         command_link_exercise_scenario(),
+        sensor_relay_exercise_scenario(),
     ];
     for scenario in &scenarios {
         scenario.validate()?;
@@ -702,8 +706,13 @@ async fn create_game(
     } else {
         None
     };
+    let game_id = Uuid::new_v4();
     let simulation = scenario
-        .spawn_with_network_policy(network_seed, Some(network_policy.queue_discipline))
+        .spawn_with_knowledge_namespace(
+            network_seed,
+            Some(network_policy.queue_discipline),
+            game_id,
+        )
         .map_err(|error| {
             api_error(
                 StatusCode::UNPROCESSABLE_ENTITY,
@@ -733,7 +742,6 @@ async fn create_game(
             )
         })
         .collect();
-    let game_id = Uuid::new_v4();
     let network_event_path = state
         .network_event_dir
         .join(format!("{game_id}.network-events.jsonl"));
@@ -775,6 +783,9 @@ async fn create_game(
         packet_messages: BTreeMap::new(),
         pending_deliveries: BTreeMap::new(),
         ai_planner: ai_orders::AiPlannerState::default(),
+        sensor_reports: sensor_reports::SensorReportState::new(
+            scenario.sensor_report_routes.clone(),
+        ),
         intent_submissions: BTreeMap::new(),
         network_projection_sequence: 0,
         network_event_path: Some(network_event_path),
@@ -1873,7 +1884,9 @@ async fn get_network_message(
 
 fn network_message_visible(record: &NetworkMessageRecord, role: &Role) -> bool {
     record.message.header.origin_role_id == role.id
-        || record.message.header.recipient_entity_id == role.location_unit_id
+        || (record.message.header.recipient_entity_id == role.location_unit_id
+            && (record.message.profile_id != sensor_reports::TRACK_REPORT_PROFILE
+                || record.state == MessageState::Delivered))
 }
 
 async fn game_space_catalog(
@@ -2623,6 +2636,11 @@ fn advance_game_tick(game: &mut Game) {
     if game.status != GameStatus::Running {
         return;
     }
+    sensor_reports::send_current_reports(game);
+    process_network_messages(game);
+    if game.status != GameStatus::Running {
+        return;
+    }
     process_vacant_authority_requests(game);
     process_network_messages(game);
 }
@@ -2742,7 +2760,13 @@ mod authority_tests {
             title: "Test".into(),
             host: Uuid::from_u128(901),
             status: GameStatus::Running,
-            simulation: scenario.spawn().unwrap(),
+            simulation: scenario
+                .spawn_with_knowledge_namespace(
+                    scenario.simulator_options.seed,
+                    None,
+                    Uuid::from_u128(900),
+                )
+                .unwrap(),
             roles,
             authority,
             authority_requests: BTreeMap::new(),
@@ -2763,6 +2787,9 @@ mod authority_tests {
             packet_messages: BTreeMap::new(),
             pending_deliveries: BTreeMap::new(),
             ai_planner: ai_orders::AiPlannerState::default(),
+            sensor_reports: sensor_reports::SensorReportState::new(
+                scenario.sensor_report_routes.clone(),
+            ),
             intent_submissions: BTreeMap::new(),
             network_projection_sequence: 0,
             network_event_path: None,

@@ -9,6 +9,8 @@ import {
   type EntityCollection
 } from "cesium";
 
+import { trackTiming } from "./trackTiming";
+
 export type Side = "Blue" | "Red";
 export type Position = { latitude_deg: number; longitude_deg: number; altitude_m: number };
 export type Unit = { velocity?: { north_mps: number; east_mps: number; climb_mps: number }; following_flight_path?: boolean; id: string; name: string; domain: string; position: Position; sidc: string; receiver_jammed: boolean };
@@ -76,24 +78,28 @@ export class GlobeEntityReconciler {
       for (const track of projection.tracks) {
         visibleIds.add(track.track_id);
         const position = Cartesian3.fromDegrees(track.position.longitude_deg, track.position.latitude_deg, track.position.altitude_m);
-        const name = `Uncertain ${track.target_side} track`;
+        const timing = trackTiming(track, projection.tick);
+        const name = `Uncertain ${track.target_side} track · ${timing.observationLabel.toLowerCase()}`;
+        const trackColor = timing.isCurrentObservation ? Color.WHITE : Color.WHITE.withAlpha(0.65);
         let record = this.recordFor(track.track_id, "track");
         if (!record) {
           const positionProperty = new ConstantPositionProperty(position);
           const imageProperty = new ConstantProperty(this.renderSymbol(track.observed_sidc, 34));
+          const color = new ConstantProperty(trackColor);
           const entity = this.entities.add({
             id: track.track_id,
             name,
             position: positionProperty,
-            billboard: { image: imageProperty, width: 42, height: 42 },
+            billboard: { image: imageProperty, color, width: 42, height: 42 },
             ellipse: { semiMajorAxis: 12_000, semiMinorAxis: 8_000, material: Color.RED.withAlpha(0.16), outline: true, outlineColor: Color.RED }
           });
-          record = { entity, kind: "track", sidc: track.observed_sidc, name, position: positionProperty, image: imageProperty };
+          record = { entity, kind: "track", sidc: track.observed_sidc, name, position: positionProperty, image: imageProperty, color };
           this.records.set(track.track_id, record);
         } else {
           record.position.setValue(position);
           this.updateName(record, name);
           this.updateSymbol(record, track.observed_sidc, 34);
+          record.color?.setValue(trackColor);
         }
       }
 

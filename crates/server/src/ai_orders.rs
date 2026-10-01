@@ -19,7 +19,7 @@ fn order_is_pending(game: &Game, unit_id: Uuid) -> bool {
     game.pending_deliveries.values().any(|action| match action {
         DeliveryAction::ExecuteIntent(order)
         | DeliveryAction::ExecuteRequest { intent: order, .. } => order.intent.target == unit_id,
-        DeliveryAction::ActivateRequest { .. } => false,
+        DeliveryAction::ActivateRequest { .. } | DeliveryAction::ReceiveTrackReport { .. } => false,
     }) || game.authority_requests.values().any(|request| {
         request.target_unit_id == unit_id
             && request.action == sim_core::ACTION_MOVE

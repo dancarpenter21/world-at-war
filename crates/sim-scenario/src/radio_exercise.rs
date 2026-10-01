@@ -14,6 +14,8 @@ struct RadioScenarioDefinition {
     units: Vec<ScenarioUnit>,
     radio: TrainingRadio,
     authority: AuthorityDefinition,
+    #[serde(default)]
+    sensor_report_routes: Vec<SensorReportRoute>,
 }
 
 #[derive(Deserialize)]
@@ -80,6 +82,7 @@ fn parse_radio_scenario(data: &str) -> Result<Scenario, ScenarioError> {
         communication_links,
         jamming_regions: Vec::new(),
         authority: definition.authority,
+        sensor_report_routes: definition.sensor_report_routes,
     };
     scenario.validate()?;
     Ok(scenario)
@@ -88,6 +91,14 @@ fn parse_radio_scenario(data: &str) -> Result<Scenario, ScenarioError> {
 /// A catalog-free exercise whose radio values deliberately expose congestion.
 pub fn command_link_exercise_scenario() -> Scenario {
     parse_radio_scenario(EXERCISE_DATA).expect("committed command exercise data must be valid")
+}
+
+/// A local sensor report must traverse a slow training radio before reaching the commander.
+pub fn sensor_relay_exercise_scenario() -> Scenario {
+    parse_radio_scenario(include_str!(
+        "../../../data/scenarios/sensor-relay-exercise.v1.json"
+    ))
+    .expect("committed sensor relay exercise data must be valid")
 }
 
 #[cfg(test)]
@@ -213,5 +224,94 @@ mod tests {
             parse_radio_scenario(&value.to_string()),
             Err(ScenarioError::InvalidAuthoredData(_))
         ));
+    }
+}
+
+#[cfg(test)]
+mod report_route_tests {
+    use super::*;
+
+    #[test]
+    fn sensor_exercise_authors_a_local_sensor_and_one_explicit_report_recipient() {
+        let scenario = sensor_relay_exercise_scenario();
+        assert!(!scenario.requires_space_catalog);
+        assert_eq!(scenario.units.len(), 4);
+        assert_eq!(scenario.sensor_report_routes.len(), 1);
+        assert_eq!(
+            scenario.sensor_report_routes[0].origin_role_id,
+            Uuid::from_u128(20103)
+        );
+        assert_eq!(
+            scenario.sensor_report_routes[0].recipient_unit_id,
+            Uuid::from_u128(5)
+        );
+        assert_eq!(scenario.sensor_report_routes[0].interval_ticks, 10);
+        assert_eq!(
+            scenario
+                .units
+                .iter()
+                .filter(|unit| unit.sensor.is_some())
+                .count(),
+            1
+        );
+        let mut simulation = scenario.spawn().unwrap();
+        simulation.step();
+        assert_eq!(
+            simulation
+                .projection_for(Uuid::from_u128(11), Side::Blue)
+                .tracks
+                .len(),
+            1
+        );
+        assert!(simulation
+            .projection_for(Uuid::from_u128(5), Side::Blue)
+            .tracks
+            .is_empty());
+        assert!(scenario
+            .units
+            .iter()
+            .all(|unit| !unit.network_device_ids.is_empty()));
+    }
+
+    #[test]
+    fn report_routes_reject_unknown_roles_zero_intervals_friendly_sensor_absence_and_enemy_recipients(
+    ) {
+        for (origin, recipient, interval) in [
+            (999, 5, 10),
+            (20103, 5, 0),
+            (20104, 5, 10),
+            (20103, 51, 10),
+            (20103, 11, 10),
+        ] {
+            let mut scenario = sensor_relay_exercise_scenario();
+            scenario.sensor_report_routes[0] = SensorReportRoute {
+                origin_role_id: Uuid::from_u128(origin),
+                recipient_unit_id: Uuid::from_u128(recipient),
+                interval_ticks: interval,
+            };
+            assert!(scenario
+                .validate()
+                .unwrap_err()
+                .to_string()
+                .contains("sensor report routes"));
+        }
+        let mut scenario = sensor_relay_exercise_scenario();
+        scenario
+            .sensor_report_routes
+            .push(scenario.sensor_report_routes[0].clone());
+        assert!(scenario
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("sensor report routes"));
+        let mut scenario = sensor_relay_exercise_scenario();
+        scenario.communication_links.retain(|link| {
+            !(link.from_entity_id == Uuid::from_u128(11) && link.to_entity_id == Uuid::from_u128(5))
+        });
+        assert!(scenario
+            .validate()
+            .unwrap_err()
+            .to_string()
+            .contains("sensor report routes"));
     }
 }

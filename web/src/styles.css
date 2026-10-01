@@ -262,3 +262,6 @@ select, textarea { width: 100%; padding: 9px; color: #eef7fa; background: #0e171
   .sidebar.commands-open .movement-orders fieldset { grid-row: span 3; }
   .sidebar.commands-open .movement-current { margin-bottom: 6px; }
 }
+.track small { margin-top: 4px; line-height: 1.4; }
+.track .track-timing { color: #98abb5; }
+.track.last-known > span { color: #d4b8b8; }

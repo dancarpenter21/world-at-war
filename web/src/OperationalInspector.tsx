@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { Role } from "./AuthorityWorkspace";
 import type { Projection } from "./globeEntities";
 import { formatBitRate } from "./networkModel";
+import { trackTiming } from "./trackTiming";
 
 const MAX_LINK_PREVIEW = 8;
 
@@ -29,6 +30,16 @@ export function OperationalInspector({ projection, role, onInspectNetwork }: {
     <h2>Operational picture</h2>
     <div className="metric"><span>Own units</span><strong>{projection.own_units.length}</strong></div>
     <div className="metric"><span>Tracks</span><strong>{projection.tracks.length}</strong></div>
+    <h2>Tracks</h2>
+    {projection.tracks.length ? projection.tracks.map((track) => {
+      const timing = trackTiming(track, projection.tick);
+      return <div className={`track ${timing.isCurrentObservation ? "current" : "last-known"}`} key={track.track_id}>
+        <span>Uncertain {track.target_side} contact</span>
+        <small>{Math.round(track.identity_confidence * 100)}% identity · {timing.isCurrentObservation ? "Current observation" : "Last known position"}</small>
+        <small className="track-timing">{timing.observationLabel} · {timing.receiptLabel}</small>
+        <small className="track-timing">{timing.deliveryLabel}</small>
+      </div>;
+    }) : <p className="muted">No reports received.</p>}
     <h2>Communications</h2>
     <p className="communication-summary">{projection.communication_links.length.toLocaleString()} monitored links
       <span>{communications.unavailable.toLocaleString()} unavailable · {communications.congested.toLocaleString()} with queued traffic</span>
@@ -43,9 +54,5 @@ export function OperationalInspector({ projection, role, onInspectNetwork }: {
       </div>)}
     </> : <p className="muted">No monitored links involving your role.</p>}
     {projection.communication_links.length > 0 && <button className="text-command" onClick={onInspectNetwork}>Inspect full network</button>}
-    <h2>Tracks</h2>
-    {projection.tracks.length ? projection.tracks.map((track) => <div className="track" key={track.track_id}>
-      <span>Uncertain {track.target_side} contact</span><small>{Math.round(track.identity_confidence * 100)}% identity</small>
-    </div>) : <p className="muted">No reports received.</p>}
   </aside>;
 }
