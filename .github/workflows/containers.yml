@@ -57,6 +57,11 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '22'
+      - name: Install the tested Compose version
+        uses: docker/setup-compose-action@54042514f505b273907334ae2b9cdbb9a0213c1a # v2
+        with:
+          version: v5.1.1
+      - run: docker compose version
       - name: Prepare pinned packet engine
         run: sh scripts/setup-c3mesh.sh
       - name: Prepare writable runtime directories
