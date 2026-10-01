@@ -121,7 +121,7 @@ function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnab
       baseLayerPicker: false, fullscreenButton: false, geocoder: false, homeButton: false,
       infoBox: true, navigationHelpButton: false, sceneModePicker: false, selectionIndicator: true,
       terrainProvider: new EllipsoidTerrainProvider(), timeline: false,
-      requestRenderMode: true, maximumRenderTimeChange: Infinity
+      requestRenderMode: true, maximumRenderTimeChange: Infinity, targetFrameRate: 30
     });
     viewer.scene.globe.baseColor = Color.fromCssColorString("#1f3340");
     viewer.camera.setView({ destination: Cartesian3.fromDegrees(-40, 30, 20_000_000) });

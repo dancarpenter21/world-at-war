@@ -113,11 +113,12 @@ test("guest follows host pause and resume while retaining the same operational m
   await expect(page.getByRole("button", { name: "Pause scenario", exact: true })).toHaveCount(0);
   await page.locator(".globe canvas").evaluate((element) => element.setAttribute("data-retained", "yes"));
   state.game.status = "paused";
-  await expect(page.getByText("Scenario paused", { exact: true })).toBeVisible();
+  // Allow the two-second summary poll and software-rendered map startup in CI.
+  await expect(page.getByText("Scenario paused", { exact: true })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByRole("button", { name: "Resume scenario", exact: true })).toHaveCount(0);
   await expect(page.locator(".globe canvas")).toHaveAttribute("data-retained", "yes");
   state.game.status = "running"; state.tick = 14;
-  await expect(page.locator("header .tick")).toHaveText("TICK 14");
+  await expect(page.locator("header .tick")).toHaveText("TICK 14", { timeout: 10_000 });
   await expect(page.getByText("Scenario paused", { exact: true })).toHaveCount(0);
   expect(state.controls).toEqual([]);
   expect(state.errors).toEqual([]);
