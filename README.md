@@ -9,6 +9,7 @@ The broader target architecture, planned simulation fidelity, and acceptance cri
 ## What is implemented
 
 - A deterministic Rust ECS simulation with one-second ticks, platform movement, server-side projections, and Red patrol AI that plans each aircraft once, waits for delivery, and limits retries over failed links.
+- Local geometric sensor detections with spherical Earth occlusion and slant range; lost contacts retain their last observed position and timestamps.
 - Mandatory per-entity c3mesh network endpoints, bounded packet queues, deterministic loss and weighted scheduling, cyclic flight paths, geographic receiver-jamming regions, and directional link status.
 - A lobby that creates and joins games, role claiming, host start/pause/resume controls, and REST/WebSocket state delivery. Paused games keep their operational map and inspectors available.
 - A Cesium operational map that keeps authored owned units and uncertain tracks visually separate from the public orbital catalog, reconciling entities in place so movement ticks do not recreate or flicker MIL-STD-2525D icons.
@@ -136,6 +137,14 @@ cargo run -p sim-catalog --bin airport-cache-sync
 ```
 
 The REST API exposes catalog status at `/v1/airport-catalog/status`, paginated search at `/v1/airports`, airport/runway details at `/v1/airports/{airport_id}`, and conservative runway compatibility evaluation at `/v1/airports/{airport_id}/compatibility`. Airport search accepts `west`, `south`, `east`, and `north` degree bounds for viewport loading, including bounds that cross the antimeridian. Optional `horizon_latitude`, `horizon_longitude`, and `horizon_radius_deg` parameters further restrict results to a spherical camera-horizon cap. The Cesium operational map uses both filters to display a compact, globe-occluded crossed-runway airport symbol and prioritizes major airports when a viewport contains more than 500 facilities. Compatibility requests supply aircraft mass, landing-gear category, operation, and already-adjusted required distance. Missing pavement-strength information returns `unknown` rather than assuming compatibility.
+
+## Sensor model
+
+The generic prototype sensor uses straight-line distance between the observer and target, including altitude. Detection also requires the line joining those positions to clear a sphere with mean radius 6,371 km. Each endpoint contributes its own geometric horizon angle, so a climbing aircraft can become visible before its surface position changes. The calculation follows the tangent geometry described in NASA's [Distance to the Horizon](https://cdaweb.gsfc.nasa.gov/pub/documents/archived_websites/pwg.gsfc.nasa.gov/stargaze/Shorizon.htm), with a submillimeter angular tolerance at tangency.
+
+Platform altitude is the sensor/target height above that reference sphere; no separate antenna offset is assumed. Terrain, atmospheric refraction, weather, signatures, scan patterns, probabilistic measurement error, and underwater sensor modalities remain planned. Sensor ranges and initial coordinates must be finite and valid. Identification confidence remains a simple range threshold and does not disclose the target's actual platform symbol.
+
+Observations update only the detecting unit's local knowledge. A different command terminal does not automatically inherit those tracks. When detection stops, the track keeps its last position and observation/receipt ticks rather than following the hidden target. Track aging, fusion, and delivery of sensor reports over communications remain planned.
 
 ## Gameplay and authority workflow
 

@@ -1,5 +1,10 @@
 //! Deterministic, server-authoritative primitives for World At War.
 
+pub mod geodesy;
+
+#[cfg(test)]
+mod sensor_tests;
+
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use bevy_ecs::prelude::*;
@@ -568,6 +573,28 @@ impl Simulation {
             if !platform_ids.insert(platform.id) {
                 return Err(SimulationBuildError::InvalidConfiguration(format!(
                     "duplicate platform id {}",
+                    platform.id
+                )));
+            }
+            if !geo_pose_is_finite(platform.pose)
+                || !platform.velocity.north_mps.is_finite()
+                || !platform.velocity.east_mps.is_finite()
+                || !platform.velocity.climb_mps.is_finite()
+            {
+                return Err(SimulationBuildError::InvalidConfiguration(format!(
+                    "platform {} has an invalid position or velocity",
+                    platform.id
+                )));
+            }
+            if platform.sensor.is_some_and(|sensor| {
+                !sensor.range_m.is_finite()
+                    || sensor.range_m <= 0.0
+                    || !sensor.identification_range_m.is_finite()
+                    || sensor.identification_range_m < 0.0
+                    || sensor.identification_range_m > sensor.range_m
+            }) {
+                return Err(SimulationBuildError::InvalidConfiguration(format!(
+                    "platform {} has invalid sensor ranges",
                     platform.id
                 )));
             }
@@ -1246,8 +1273,10 @@ fn detect_contacts(
             if observer_side.0 == target_side.0 {
                 continue;
             }
-            let range = great_circle_distance_m(*observer_pose, *target_pose);
-            if range <= sensor.range_m {
+            let range = geodesy::slant_distance_m(*observer_pose, *target_pose);
+            if range <= sensor.range_m
+                && geodesy::has_geometric_line_of_sight(*observer_pose, *target_pose)
+            {
                 observations.0.push(Contact {
                     observer: observer_id.0,
                     target: target_id.0,
@@ -1302,14 +1331,7 @@ fn unknown_sidc(side: Side) -> &'static str {
 }
 
 fn great_circle_distance_m(a: GeoPose, b: GeoPose) -> f64 {
-    let earth_radius_m = 6_371_000.0;
-    let d_lat = (b.latitude_deg - a.latitude_deg).to_radians();
-    let d_lon = (b.longitude_deg - a.longitude_deg).to_radians();
-    let h = (d_lat / 2.0).sin().powi(2)
-        + a.latitude_deg.to_radians().cos()
-            * b.latitude_deg.to_radians().cos()
-            * (d_lon / 2.0).sin().powi(2);
-    2.0 * earth_radius_m * h.sqrt().asin()
+    geodesy::surface_distance_m(a, b)
 }
 
 #[cfg(test)]
