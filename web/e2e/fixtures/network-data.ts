@@ -30,3 +30,17 @@ export function networkProjection(): NetworkProjection {
     ]
   };
 }
+
+export function denseNetworkProjection(): NetworkProjection {
+  const dense = networkProjection();
+  dense.tick = 20;
+  dense.nodes = Array.from({ length: 64 }, (_, index) => ({
+    id: `unit-${index}`, name: `Blue unit ${index + 1}`, domain: ["Air", "Land", "Sea", "Cyber"][index % 4], receiver_jammed: index === 7
+  }));
+  dense.links = dense.nodes.flatMap((from, fromIndex) => dense.nodes.filter((to) => to.id !== from.id).map((to) => ({
+    id: `${from.id}-${to.id}`, from_entity_id: from.id, to_entity_id: to.id,
+    available: !to.receiver_jammed, jammed: to.receiver_jammed ? 1 : 0, effective_bit_rate_bps: to.receiver_jammed ? 0 : 32_000_000,
+    queued_packets: fromIndex === 0 && to.id === "unit-4" ? 3 : 0, queued_bytes: fromIndex === 0 && to.id === "unit-4" ? 960 : 0
+  })));
+  return dense;
+}

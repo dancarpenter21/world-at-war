@@ -1,19 +1,19 @@
 import { expect, test, type Page, type WebSocketRoute } from "@playwright/test";
-import { networkProjection } from "./fixtures/network-data";
+import { denseNetworkProjection, networkProjection } from "./fixtures/network-data";
 
 test.use({ actionTimeout: 10_000 });
 
-async function openWorkspace(page: Page) {
+async function openWorkspace(page: Page, initialFocusNodeId?: string, initialProjection = networkProjection()) {
   const sockets: WebSocketRoute[] = [];
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.routeWebSocket(/\/v1\/games\/network-test\/network\/stream/, (socket) => {
     sockets.push(socket);
-    socket.send(JSON.stringify({ sequence: 12, resync: true, projection: networkProjection() }));
+    socket.send(JSON.stringify({ sequence: 12, resync: true, projection: initialProjection }));
   });
-  await page.goto("/e2e/fixtures/network-workspace.html");
+  await page.goto("/e2e/fixtures/network-workspace.html" + (initialFocusNodeId ? "?focus=" + encodeURIComponent(initialFocusNodeId) : ""));
   await expect(page.getByRole("status")).toHaveText("Live");
-  await expect(page.locator(".react-flow__node")).toHaveCount(4);
+  if (!initialFocusNodeId) await expect(page.locator(".react-flow__node")).toHaveCount(initialProjection.nodes.length);
   return { sockets, errors };
 }
 
@@ -135,16 +135,7 @@ test("shows graph and inspector together on a narrow screen and closes with Esca
 
 test("filters a scenario-sized topology and retains filters across subsequent live snapshots", async ({ page }, testInfo) => {
   const { sockets, errors } = await openWorkspace(page);
-  const dense = networkProjection();
-  dense.tick = 20;
-  dense.nodes = Array.from({ length: 64 }, (_, index) => ({
-    id: `unit-${index}`, name: `Blue unit ${index + 1}`, domain: ["Air", "Land", "Sea", "Cyber"][index % 4], receiver_jammed: index === 7
-  }));
-  dense.links = dense.nodes.flatMap((from, fromIndex) => dense.nodes.filter((to) => to.id !== from.id).map((to) => ({
-    id: `${from.id}-${to.id}`, from_entity_id: from.id, to_entity_id: to.id,
-    available: !to.receiver_jammed, jammed: to.receiver_jammed ? 1 : 0, effective_bit_rate_bps: to.receiver_jammed ? 0 : 32_000_000,
-    queued_packets: fromIndex === 0 && to.id === "unit-4" ? 3 : 0, queued_bytes: fromIndex === 0 && to.id === "unit-4" ? 960 : 0
-  })));
+  const dense = denseNetworkProjection();
   sockets[0].send(JSON.stringify({ sequence: 20, resync: true, projection: dense }));
   const summary = page.locator('[aria-label="Visible network summary"]');
   await expect(summary).toContainText("64 / 64 terminals");
@@ -167,5 +158,45 @@ test("filters a scenario-sized topology and retains filters across subsequent li
   await expect(page.locator('.react-flow__node[data-id="unit-0"]')).toBeInViewport({ ratio: 0.99 });
   await expect(page.locator('.react-flow__node[data-id="unit-60"]')).toBeInViewport({ ratio: 0.99 });
   await page.screenshot({ path: testInfo.outputPath("network-workspace-scenario.png") });
+  expect(errors).toEqual([]);
+});
+test("starts at the issuing terminal with bounded rendering and preserves access to the full graph", async ({ page }, testInfo) => {
+  const dense = denseNetworkProjection();
+  const { sockets, errors } = await openWorkspace(page, "unit-0", dense);
+  const summary = page.locator('[aria-label="Visible network summary"]');
+  await expect(summary).toContainText("64 / 64 terminals");
+  await expect(summary).toContainText("126 directional links");
+  await expect(summary).toContainText("Connections of Blue unit 1");
+  await expect(page.locator(".react-flow__edge")).toHaveCount(126);
+  expect(await page.locator("*").count()).toBeLessThan(3_000);
+  await page.screenshot({ path: testInfo.outputPath("focused-scenario-network.png") });
+  await page.getByRole("button", { name: "All connections", exact: true }).click();
+  await expect(summary).toContainText("4032 directional links");
+  await expect(page.locator(".react-flow__edge")).toHaveCount(4_032);
+  await page.getByRole("button", { name: "My terminal", exact: true }).click();
+  await expect(page.locator(".react-flow__edge")).toHaveCount(126);
+  dense.tick = 21;
+  sockets[0].send(JSON.stringify({ sequence: 21, resync: false, projection: dense }));
+  await expect(page.getByText("TICK 21 · ROLE-VISIBLE TOPOLOGY", { exact: true })).toBeVisible();
+  await expect(summary).toContainText("Connections of Blue unit 1");
+  await expect(page.locator(".react-flow__edge")).toHaveCount(126);
+  expect(errors).toEqual([]);
+});
+
+test("opening a focused topology retains all role-authorized messages and recovers when the terminal disappears", async ({ page }) => {
+  const initial = networkProjection();
+  const { sockets, errors } = await openWorkspace(page, "command", initial);
+  const summary = page.locator('[aria-label="Visible network summary"]');
+  await expect(summary).toContainText("2 / 4 terminals");
+  await expect(page.locator(".react-flow__edge")).toHaveCount(2);
+  await page.getByRole("tab", { name: /^Messages/ }).click();
+  await expect(page.locator(".network-message-list > button")).toHaveCount(3);
+  initial.tick = 13;
+  initial.nodes = initial.nodes.filter((node) => node.id !== "command");
+  initial.links = initial.links.filter((link) => link.from_entity_id !== "command" && link.to_entity_id !== "command");
+  sockets[0].send(JSON.stringify({ sequence: 13, resync: false, projection: initial }));
+  await expect(summary).toContainText("3 / 3 terminals");
+  await expect(page.locator(".react-flow__edge")).toHaveCount(2);
+  await expect(page.getByRole("button", { name: "My terminal", exact: true })).toHaveCount(0);
   expect(errors).toEqual([]);
 });

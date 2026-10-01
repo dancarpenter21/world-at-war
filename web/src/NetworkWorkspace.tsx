@@ -54,12 +54,12 @@ function MessageDetails({ record, name }: { record: MessageRecord; name: (id: st
   </section>;
 }
 
-export function NetworkWorkspace({ apiBase, gameId, playerId, roleId, onClose }: {
-  apiBase: string; gameId: string; playerId: string; roleId: string; onClose: () => void;
+export function NetworkWorkspace({ apiBase, gameId, playerId, roleId, initialFocusNodeId, onClose }: {
+  apiBase: string; gameId: string; playerId: string; roleId: string; initialFocusNodeId?: string; onClose: () => void;
 }) {
   const { projection, status, notice } = useNetworkStream(apiBase, gameId, playerId, roleId);
   const [nodes, setNodes, onNodesChange] = useNodesState<NetworkFlowNode>([]);
-  const [filters, setFilters] = useState<NetworkFilters>(DEFAULT_NETWORK_FILTERS);
+  const [filters, setFilters] = useState<NetworkFilters>(() => ({ ...DEFAULT_NETWORK_FILTERS, focusNodeId: initialFocusNodeId ?? null }));
   const [selection, setSelection] = useState<TopologySelection>(null);
   const [tab, setTab] = useState<"topology" | "messages">("topology");
   const [messageState, setMessageState] = useState<"all" | MessageState>("all");
@@ -128,6 +128,13 @@ export function NetworkWorkspace({ apiBase, gameId, playerId, roleId, onClose }:
   const availableCount = visible.links.filter((link) => link.available).length;
   const queuedPackets = visible.links.reduce((total, link) => total + link.queued_packets, 0);
   const filterActive = filters.query !== "" || filters.domain !== "all" || filters.linkState !== "all" || filters.focusNodeId !== null;
+  const atMyTerminal = filters.focusNodeId === initialFocusNodeId && filters.query === "" && filters.domain === "all" && filters.linkState === "all";
+  const focusMyTerminal = () => {
+    if (!initialFocusNodeId) return;
+    setFilters({ ...DEFAULT_NETWORK_FILTERS, focusNodeId: initialFocusNodeId });
+    setSelection(null);
+    setTab("topology");
+  };
 
   return <section className="network-workspace" aria-label="C2 network workspace">
     <header className="network-header">
@@ -142,7 +149,8 @@ export function NetworkWorkspace({ apiBase, gameId, playerId, roleId, onClose }:
         <label>Link status<select value={filters.linkState} onChange={(event) => setFilters({ ...filters, linkState: event.target.value as LinkFilter })}><option value="all">All links</option><option value="available">Available</option><option value="unavailable">Unavailable</option><option value="jammed">Jammed</option><option value="queued">Queued traffic</option></select></label>
         <button className="secondary" disabled={!projection || visible.nodes.length === 0} onClick={fitVisible}>Fit view</button>
         <button className="secondary" disabled={!projection} onClick={resetLayout}>Reset layout</button>
-        {filterActive && <button className="text-command" onClick={() => setFilters(DEFAULT_NETWORK_FILTERS)}>Clear filters</button>}
+        {initialFocusNodeId && names.has(initialFocusNodeId) && <button className="secondary" disabled={atMyTerminal} onClick={focusMyTerminal}>My terminal</button>}
+        {filterActive && <button className="text-command" onClick={() => setFilters(DEFAULT_NETWORK_FILTERS)}>{filters.focusNodeId ? "All connections" : "Clear filters"}</button>}
       </div>
       <div className="network-summary" aria-label="Visible network summary">
         <span><strong>{visible.nodes.length}</strong> / {snapshot.nodes.length} terminals</span><span><strong>{visible.links.length}</strong> directional links</span>

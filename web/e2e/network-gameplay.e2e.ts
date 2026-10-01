@@ -202,7 +202,7 @@ test("runs a real game, persists networked command delivery, and retains the map
   const gameId = created.game.id;
   const claim = page.waitForResponse((response) => response.url().endsWith(`/roles/${roleId}/claim`));
   await page.getByRole("button", { name: /^Joint Force Air Component Commander/ }).click();
-  const heldRole = await (await claim).json() as { lease_generation: number };
+  const heldRole = await (await claim).json() as { lease_generation: number; location_unit_id: string };
   await page.getByRole("button", { name: "Start scenario", exact: true }).click();
   const canvas = page.locator(".globe canvas");
   await expect(canvas).toBeVisible();
@@ -261,6 +261,15 @@ test("runs a real game, persists networked command delivery, and retains the map
   expect(outsiderReceipt.status()).toBe(403);
   await page.getByRole("button", { name: "Network", exact: true }).click();
   await expect(page.getByRole("region", { name: "C2 network workspace", exact: true })).toBeVisible();
+  const visibleNetwork = await (await request.get(`${backend.url}/v1/games/${gameId}/network?${authorization}`)).json() as {
+    nodes: { id: string; name: string }[]; links: { from_entity_id: string; to_entity_id: string }[];
+  };
+  const issuingTerminal = visibleNetwork.nodes.find((node) => node.id === heldRole.location_unit_id)!;
+  const incidentLinks = visibleNetwork.links.filter((link) => link.from_entity_id === issuingTerminal.id || link.to_entity_id === issuingTerminal.id);
+  await expect(page.locator(".network-focus")).toHaveText(`Connections of ${issuingTerminal.name}`);
+  await expect(page.locator(".react-flow__edge")).toHaveCount(incidentLinks.length);
+  expect(incidentLinks.length).toBeLessThan(250);
+  expect(await page.locator("*").count()).toBeLessThan(2_000);
   await mark("network-open");
   await page.getByRole("tab", { name: /^Messages/ }).click();
   await expect(page.getByRole("button", { name: /^Inspect message: move order/ })).toBeVisible({ timeout: 15_000 });
