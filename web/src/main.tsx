@@ -13,6 +13,7 @@ import { GlobeEntityReconciler, type Projection } from "./globeEntities";
 import { attachMapKeyboardControls, type AttachedMapKeyboardControls } from "./mapKeyboardControls";
 import { MapFilterDialog, type MapFilters } from "./MapFilterDialog";
 import { OperationalInspector } from "./OperationalInspector";
+import { MovementOrders } from "./MovementOrders";
 import { SpaceAssetLayer } from "./spaceAssetLayer";
 import { ApiError, apiRequest } from "./apiClient";
 import { usePollingResource, type PollingStatus } from "./usePollingResource";
@@ -285,6 +286,7 @@ function App() {
   const [showAuthority, setShowAuthority] = useState(false);
   const [showNetwork, setShowNetwork] = useState(false);
   const [showMapFilters, setShowMapFilters] = useState(false);
+  const [showCommands, setShowCommands] = useState(false);
   const [mapFilters, setMapFilters] = useState<MapFilters>({
     spaceAssets: { showAll: false, showStarlink: false },
     runways: { visible: true, minimumLengthM: 0 },
@@ -510,12 +512,6 @@ function App() {
 
   async function start() { await controlGame("running"); }
 
-  async function turnNorth() {
-    if (!game || !role || !projection || !canIssueOrders) return;
-    const target = role.command_units[0]; if (!target) return;
-    await request<{ status: "queued" | "pending_authority" }>(`/v1/games/${game.id}/roles/${role.id}/intent`, { method: "POST", body: JSON.stringify({ player_id: playerId, lease_generation: role.lease_generation, intent: { intent_id: crypto.randomUUID(), issuer_role: role.id, target, kind: { Move: { north_mps: 130, east_mps: 0 } }, requested_tick: projection.tick + 1 } }) }).then((outcome) => setMessage(outcome.status === "pending_authority" ? "Order awaiting authority approval." : "Order queued for delivery.")).catch((error: Error) => setMessage(error.message));
-  }
-
   async function saveAuthority(draft: AuthorityDefinition) {
     if (!game || !authority) return;
     try {
@@ -540,7 +536,7 @@ function App() {
   function leave() {
     activeGameId.current = null; controlRequest.current?.abort(); controlPending.current = false;
     setGame(null); setRole(null); setRoles([]); setAuthority(null); setAuthorityRequests([]);
-    setShowAuthority(false); setShowNetwork(false); setShowMapFilters(false); setControlError("");
+    setShowAuthority(false); setShowNetwork(false); setShowMapFilters(false); setShowCommands(false); setControlError("");
     setMessage("Create a scenario or join a running game");
     void refreshLobby().catch((error: Error) => setMessage(error.message));
   }
@@ -550,6 +546,7 @@ function App() {
       <span className={"status-dot " + (playable ? connectionStatus : "")} />
       {game && game.status !== "lobby" ? <GameSessionControls game={game} isHost={game.host_player_id === playerId} pending={pendingControl} onControl={(status) => void controlGame(status)} /> : <span>{game?.status ?? "scenario lobby"}</span>}
       <span className="tick">{projection ? `TICK ${projection.tick}` : ""}</span>
+      {playable && <button className="secondary mobile-command-toggle" aria-expanded={showCommands} aria-controls="command-panel" onClick={() => setShowCommands((value) => !value)}>Commands</button>}
       {game && <button className="secondary session-leave" onClick={leave}>Leave scenario</button>}
     </header>
     {!playable && <div className="lobby-stage"><section className="scenario-modal" aria-modal="true" role="dialog">
@@ -589,15 +586,15 @@ function App() {
     {playable && !projection && game && <section className="workspace-loading">
       <GameSessionNotice game={game} status={connectionStatus} error={connectionError} controlError={controlError} hasProjection={false} onRetry={retryConnection} />
     </section>}
-    {playable && projection && <section className="workspace">
-      <aside className="sidebar"><h1>{role.name}</h1><p className="message">{game.title}</p><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command network-launch" onClick={() => setShowNetwork(true)}>Network</button><button className="command map-filter-launch" onClick={() => setShowMapFilters((value) => !value)}>Map filters</button><h2>Catalog</h2><p className="muted">{game.space_catalog_enabled ? spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status" : "No orbital catalog in this scenario"}</p><p className="session-command-feedback" role="status">{message}</p></aside>
+    {playable && projection && <section className={`workspace ${showCommands ? "commands-open" : ""}`}>
+      <aside id="command-panel" className={`sidebar ${showCommands ? "commands-open" : ""}`}><h1>{role.name}</h1><p className="message">{game.title}</p><MovementOrders key={`${game.id}:${role.id}:${role.lease_generation}`} apiBase={API_BASE} gameId={game.id} playerId={playerId} role={role} projection={projection} canIssueOrders={canIssueOrders} canRecoverOrder={connectionStatus === "live"} /><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command network-launch" onClick={() => setShowNetwork(true)}>Network</button><button className="command map-filter-launch" onClick={() => setShowMapFilters((value) => !value)}>Map filters</button><h2>Catalog</h2><p className="muted">{game.space_catalog_enabled ? spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status" : "No orbital catalog in this scenario"}</p><p className="session-command-feedback" role="status">{message}</p></aside>
       <section className="map-region">
         <GameSessionNotice game={game} status={connectionStatus} error={connectionError} controlError={controlError} hasProjection={true} onRetry={retryConnection} />
         <Globe key={`${game.id}:${role.id}:${role.lease_generation}`} projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} keyboardEnabled={!showAuthority && !showNetwork && !showMapFilters} renderingEnabled={!showAuthority && !showNetwork} />
         {showMapFilters && <MapFilterDialog filters={mapFilters} spaceAssetsAvailable={game.space_catalog_enabled} onChange={setMapFilters} onClose={() => setShowMapFilters(false)} />}
         <div className="map-caption">{role.name} · {role.side} · operational picture</div>
       </section>
-      <OperationalInspector projection={projection} role={role} canIssueOrders={canIssueOrders} onTurnNorth={() => void turnNorth()} onInspectNetwork={() => setShowNetwork(true)} />
+      <OperationalInspector projection={projection} role={role} onInspectNetwork={() => setShowNetwork(true)} />
     </section>}
     {showAuthority && authority && game && <Suspense fallback={<div className="authority-loading">Loading authority graph…</div>}><AuthorityWorkspace definition={authority} runtimeRoles={roles} units={authorityUnits} requests={authorityRequests} currentRole={role} isHost={game.host_player_id === playerId} tick={projection?.tick ?? 0} onClose={() => setShowAuthority(false)} onSave={saveAuthority} onCreateRequest={createAuthorityRequest} onDecision={decideAuthorityRequest} /></Suspense>}
     {showNetwork && game && role && <Suspense fallback={<div className="authority-loading">Loading C2 network…</div>}><NetworkWorkspace key={`${game.id}:${role.id}`} apiBase={API_BASE} gameId={game.id} playerId={playerId} roleId={role.id} onClose={() => setShowNetwork(false)} /></Suspense>}

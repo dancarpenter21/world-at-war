@@ -235,3 +235,30 @@ select, textarea { width: 100%; padding: 9px; color: #eef7fa; background: #0e171
 .communication-summary { display: grid; gap: 5px; color: #dce8ee; font-size: 12px; }
 .communication-summary span { color: #91a7b1; font-size: 11px; }
 .communication-preview-label { font-size: 10px; line-height: 1.5; }
+.movement-orders fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.movement-orders label { font-size: 10px; letter-spacing: .03em; }
+.movement-orders select, .movement-orders input { height: 36px; min-width: 0; font-size: 12px; }
+.movement-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.movement-current { color: #99b3be; font-size: 11px; line-height: 1.5; }
+.movement-orders .command { width: 100%; margin: 0; padding: 9px 7px; font-size: 11px; }
+.movement-shortcuts { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.movement-shortcuts .secondary { margin-top: 8px; padding: 8px 3px; font-size: 10px; }
+.movement-orders .movement-retry { margin-top: 10px; border-color: #a8813e; background: #5e4521; }
+.movement-feedback { display: grid; gap: 5px; margin-top: 10px; color: #a0b8c3; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.movement-feedback strong { font-weight: 600; color: #dcc58c; }
+.movement-feedback.executed strong { color: #76d6ad; }
+.movement-feedback.rejected strong, .movement-feedback.dropped strong, .movement-feedback.expired strong, .movement-feedback.denied strong { color: #efaaa2; }
+.movement-feedback small { font-size: 10px; }
+.mobile-command-toggle { display: none; }
+@media (max-width: 620px) {
+  .app-header .mobile-command-toggle { display: block; order: 3; }
+  .workspace { grid-template-rows: minmax(0, 1fr); }
+  .workspace.commands-open { grid-template-rows: auto minmax(150px, 1fr); }
+  .workspace .sidebar.commands-open { display: block; max-height: 42vh; padding: 12px 16px; border-bottom: 1px solid #30414c; }
+  .sidebar.commands-open h1 { font-size: 12px; }
+  .sidebar.commands-open h2 { margin-top: 12px; }
+  .sidebar.commands-open .message { margin: 5px 0; }
+  .sidebar.commands-open .movement-orders form { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; align-items: end; }
+  .sidebar.commands-open .movement-orders fieldset { grid-row: span 3; }
+  .sidebar.commands-open .movement-current { margin-bottom: 6px; }
+}

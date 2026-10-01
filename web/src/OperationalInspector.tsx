@@ -5,11 +5,9 @@ import { formatBitRate } from "./networkModel";
 
 const MAX_LINK_PREVIEW = 8;
 
-export function OperationalInspector({ projection, role, canIssueOrders, onTurnNorth, onInspectNetwork }: {
+export function OperationalInspector({ projection, role, onInspectNetwork }: {
   projection: Projection;
   role: Pick<Role, "location_unit_id" | "command_units">;
-  canIssueOrders: boolean;
-  onTurnNorth: () => void;
   onInspectNetwork: () => void;
 }) {
   const communications = useMemo(() => {
@@ -31,8 +29,6 @@ export function OperationalInspector({ projection, role, canIssueOrders, onTurnN
     <h2>Operational picture</h2>
     <div className="metric"><span>Own units</span><strong>{projection.own_units.length}</strong></div>
     <div className="metric"><span>Tracks</span><strong>{projection.tracks.length}</strong></div>
-    <h2>Actions</h2>
-    <button className="command" disabled={!role.command_units.length || !canIssueOrders} onClick={onTurnNorth}>Turn north</button>
     <h2>Communications</h2>
     <p className="communication-summary">{projection.communication_links.length.toLocaleString()} monitored links
       <span>{communications.unavailable.toLocaleString()} unavailable · {communications.congested.toLocaleString()} with queued traffic</span>

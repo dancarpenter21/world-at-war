@@ -137,6 +137,8 @@ The REST API exposes catalog status at `/v1/airport-catalog/status`, paginated s
 
 ## Gameplay and authority workflow
 
+Use **Movement orders** to choose a commanded unit, a clockwise course from north (0–360°), and speed (0–1,000 m/s). **Turn north** sends a 130 m/s northbound order; **Stop unit** cancels movement after its command arrives. The panel prefers an aircraft over a command base and reports packet delivery, authority approval, and the actual execution tick. On a narrow screen, open **Commands** to access the same controls while retaining the map. A lost or timed-out response exposes **Retry order**, which sends the original ID and payload and can recover an accepted order while the scenario is paused.
+
 Owned-unit projections include the last commanded velocity and whether an authored flight path still controls motion. The Red planner uses reports at its issuing role terminal, assigns overlapping command scopes to the most specific AI role, and leaves non-aircraft units stationary. It submits a new patrol only when the desired movement changes, waits for pending delivery or approval, and retries unchanged failures no more often than every ten simulation ticks.
 
 1. Select a scenario. **Global Crisis** requires a usable Space-Track catalog; **Jammed Flight Test** does not.

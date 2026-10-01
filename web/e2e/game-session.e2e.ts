@@ -3,11 +3,17 @@ import { PLAYER_ID, denseSessionProjection, sessionAuthority, sessionGame, sessi
 
 test.use({ actionTimeout: 10_000 });
 
-async function openSession(page: Page, guest = false, projection = sessionProjection()) {
+type OrderBody = { player_id: string; lease_generation: number; intent: {
+  intent_id: string; issuer_role: string; target: string; kind: { Move: { north_mps: number; east_mps: number } }; requested_tick: number
+} };
+
+async function openSession(page: Page, guest = false, projection = sessionProjection(), role = sessionRole()) {
   const state = {
-    game: sessionGame(), role: sessionRole(), tick: 12, created: guest, projection,
+    game: sessionGame(), role, tick: 12, created: guest, projection,
     projectionFailure: false, projectionDenied: false, controlFailure: false, holdProjection: false, holdControl: false, holdSummary: false,
     projectionRequests: 0, controls: [] as string[], pendingProjections: [] as Route[], pendingControls: [] as Route[], pendingSummaries: [] as Route[],
+    lostOrderResponse: false, holdOrder: false, orderDeclined: false, receiptFailure: false, receiptState: "awaiting_execution",
+    orderBodies: [] as OrderBody[], submittedIntents: new Map<string, OrderBody>(), pendingOrders: [] as Route[], receiptRequests: 0,
     errors: [] as string[]
   };
   if (guest) { state.game.host_player_id = "another-player"; state.game.status = "running"; }
@@ -56,6 +62,29 @@ async function openSession(page: Page, guest = false, projection = sessionProjec
       state.game.status = pathname.endsWith("/pause") ? "paused" : "running";
       if (state.controls.length > 1 && state.game.status === "running") state.tick += 1;
       await json(state.game); return;
+    }
+    if (pathname.endsWith("/intent")) {
+      const body = request.postDataJSON() as OrderBody;
+      state.orderBodies.push(body);
+      expect(body.player_id).toBe(PLAYER_ID);
+      expect(body.lease_generation).toBe(state.role.lease_generation);
+      expect(body.intent.issuer_role).toBe(state.role.id);
+      if (state.orderDeclined) { await json({ error: "This unit cannot accept that movement order.", code: "invalid_movement" }, 422); return; }
+      state.submittedIntents.set(body.intent.intent_id, body);
+      if (state.holdOrder) { state.pendingOrders.push(route); return; }
+      if (state.lostOrderResponse) { state.lostOrderResponse = false; await route.abort("failed"); return; }
+      await json({ status: "queued", intent_id: body.intent.intent_id, message_id: "message-" + body.intent.intent_id }); return;
+    }
+    if (pathname.includes("/intents/")) {
+      state.receiptRequests += 1;
+      const query = new URL(request.url()).searchParams;
+      expect(query.get("player_id")).toBe(PLAYER_ID);
+      expect(query.get("lease_generation")).toBe(String(state.role.lease_generation));
+      const body = state.submittedIntents.get(pathname.split("/").at(-1)!);
+      if (!body) { await json({ error: "Order not found." }, 404); return; }
+      if (state.receiptFailure) { await json({ error: "Receipt temporarily unavailable." }, 503); return; }
+      await json({ intent: body.intent, state: state.receiptState, submitted_tick: 12,
+        executed_tick: state.receiptState === "executed" ? 14 : undefined }); return;
     }
     if (pathname.endsWith("/state")) {
       const query = new URL(request.url()).searchParams;
@@ -279,5 +308,135 @@ test("bounds the map communications preview and updates failures and queued traf
   await expect(rows.nth(0)).toContainText("Blue One → Blue 3");
   await expect(inspector.locator(".communication-summary")).toContainText("0 unavailable");
   await expect(rows).toHaveCount(8);
+  expect(state.errors).toEqual([]);
+});
+test("selects an aircraft, submits the selected course, follows execution, and stops it", async ({ page }, testInfo) => {
+  const projection = sessionProjection();
+  const base = { ...projection.own_units[0], id: "blue-base", name: "Blue Base", domain: "Land" };
+  projection.own_units.unshift(base);
+  projection.own_units.push({ ...projection.own_units[1], id: "blue-two", name: "Blue Two" });
+  const role = sessionRole(); role.command_units = ["blue-base", "blue-one", "blue-two"];
+  const state = await openSession(page, false, projection, role);
+  const orders = page.getByRole("region", { name: "Movement orders" });
+  await expect(orders.getByLabel("Command unit")).toHaveValue("blue-one");
+  await orders.getByLabel("Command unit").selectOption("blue-two");
+  await orders.getByLabel("Course (°)").fill("90");
+  await orders.getByLabel("Speed (m/s)").fill("80");
+  await orders.getByRole("button", { name: "Send movement order", exact: true }).click();
+  await expect.poll(() => state.orderBodies.length).toBe(1);
+  expect(state.orderBodies[0].intent).toMatchObject({ target: "blue-two", kind: { Move: { north_mps: 0, east_mps: 80 } }, requested_tick: 13 });
+  await expect(orders.getByRole("status")).toContainText("Delivered; awaiting execution");
+  state.receiptState = "executed";
+  await expect(orders.getByRole("status")).toContainText("Order executed at tick 14", { timeout: 10_000 });
+  await expect(orders.getByRole("status")).toContainText("Blue Two · 90° at 80 m/s");
+  await page.screenshot({ path: testInfo.outputPath("movement-order-executed.png") });
+  await orders.getByRole("button", { name: "Stop unit", exact: true }).click();
+  await expect.poll(() => state.orderBodies.length).toBe(2);
+  expect(state.orderBodies[1].intent.kind.Move).toEqual({ north_mps: 0, east_mps: 0 });
+  expect(state.orderBodies[1].intent.intent_id).not.toBe(state.orderBodies[0].intent.intent_id);
+  await expect(orders.getByRole("status")).toContainText("Blue Two · Stopped");
+  expect(state.errors).toEqual([]);
+});
+
+test("retries a lost response using the original order even after the host pauses", async ({ page }) => {
+  const state = await openSession(page);
+  state.lostOrderResponse = true;
+  const orders = page.getByRole("region", { name: "Movement orders" });
+  await orders.getByRole("button", { name: "Turn north", exact: true }).click();
+  await expect(orders.getByRole("status")).toContainText("The server response was lost");
+  await expect(orders.getByRole("button", { name: "Send movement order", exact: true })).toBeDisabled();
+  await expect(orders.getByLabel("Course (°)")).toBeDisabled();
+  await page.getByRole("button", { name: "Pause scenario", exact: true }).click();
+  await expect(page.getByText("Scenario paused", { exact: true })).toBeVisible();
+  await orders.getByRole("button", { name: "Retry order", exact: true }).click();
+  await expect.poll(() => state.orderBodies.length).toBe(2);
+  expect(state.orderBodies[1]).toEqual(state.orderBodies[0]);
+  expect(state.submittedIntents.size).toBe(1);
+  await expect(orders.getByRole("status")).toContainText("Delivered; awaiting execution");
+  await expect(orders.getByRole("button", { name: "Retry order", exact: true })).toHaveCount(0);
+  expect(state.errors).toEqual([]);
+});
+
+test("serializes a pending order and ignores its response after leaving", async ({ page }) => {
+  const state = await openSession(page);
+  state.holdOrder = true;
+  const orders = page.getByRole("region", { name: "Movement orders" });
+  await orders.getByRole("button", { name: "Turn north", exact: true }).click();
+  await expect.poll(() => state.pendingOrders.length).toBe(1);
+  await expect(orders.getByRole("button", { name: "Sending order…", exact: true })).toBeDisabled();
+  await orders.locator("form").dispatchEvent("submit");
+  expect(state.orderBodies.length).toBe(1);
+  await page.getByRole("button", { name: "Leave scenario", exact: true }).click();
+  await state.pendingOrders[0].fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ status: "queued", message_id: "delayed-message" }) }).catch(() => undefined);
+  await expect(page.getByRole("button", { name: "Create game", exact: true })).toBeVisible();
+  expect(state.receiptRequests).toBe(0);
+  expect(state.errors).toEqual([]);
+});
+
+test("reports a definitive order rejection and permits a fresh command", async ({ page }) => {
+  const state = await openSession(page);
+  state.orderDeclined = true;
+  const orders = page.getByRole("region", { name: "Movement orders" });
+  await orders.getByRole("button", { name: "Turn north", exact: true }).click();
+  await expect(orders.getByRole("status")).toContainText("This unit cannot accept that movement order.");
+  await expect(orders.getByRole("button", { name: "Retry order", exact: true })).toHaveCount(0);
+  await expect(orders.getByRole("button", { name: "Send movement order", exact: true })).toBeEnabled();
+  state.orderDeclined = false;
+  await orders.getByRole("button", { name: "Turn north", exact: true }).click();
+  await expect.poll(() => state.orderBodies.length).toBe(2);
+  expect(state.orderBodies[1].intent.intent_id).not.toBe(state.orderBodies[0].intent.intent_id);
+  await expect(orders.getByRole("status")).toContainText("Delivered; awaiting execution");
+  expect(state.errors).toEqual([]);
+});
+
+test("opens movement controls on a phone while retaining the operational map", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const state = await openSession(page);
+  const canvas = page.locator(".globe canvas");
+  await canvas.evaluate((element) => element.setAttribute("data-retained", "yes"));
+  await page.getByRole("button", { name: "Commands", exact: true }).click();
+  const orders = page.getByRole("region", { name: "Movement orders" });
+  await expect(orders).toBeVisible();
+  await expect(canvas).toBeVisible();
+  await orders.getByRole("button", { name: "Turn north", exact: true }).click();
+  await expect(orders.getByRole("status")).toContainText("Delivered; awaiting execution");
+  await page.screenshot({ path: testInfo.outputPath("phone-movement-controls.png") });
+  await page.getByRole("button", { name: "Commands", exact: true }).click();
+  await expect(orders).not.toBeVisible();
+  await expect(canvas).toHaveAttribute("data-retained", "yes");
+  const mapBox = await canvas.boundingBox();
+  expect(mapBox!.height).toBeGreaterThan(500);
+  expect(state.orderBodies.length).toBe(1);
+  expect(state.errors).toEqual([]);
+});
+test("times out a hung order submission and retries its original command", async ({ page }) => {
+  const state = await openSession(page);
+  await page.clock.install();
+  state.holdOrder = true;
+  const orders = page.getByRole("region", { name: "Movement orders" });
+  await orders.getByRole("button", { name: "Turn north", exact: true }).click();
+  await expect.poll(() => state.pendingOrders.length).toBe(1);
+  await page.clock.fastForward(10_100);
+  await expect(orders.getByRole("status")).toContainText("The server response was lost");
+  state.holdOrder = false;
+  await orders.getByRole("button", { name: "Retry order", exact: true }).click();
+  await expect.poll(() => state.orderBodies.length).toBe(2);
+  expect(state.orderBodies[1]).toEqual(state.orderBodies[0]);
+  await expect(orders.getByRole("status")).toContainText("Delivered; awaiting execution");
+  expect(state.errors).toEqual([]);
+});
+
+test("retains the latest order receipt during an outage and recovers its execution status", async ({ page }) => {
+  const state = await openSession(page);
+  const orders = page.getByRole("region", { name: "Movement orders" });
+  await orders.getByRole("button", { name: "Turn north", exact: true }).click();
+  await expect(orders.getByRole("status")).toContainText("Delivered; awaiting execution");
+  state.receiptFailure = true;
+  await expect(orders.getByRole("status")).toContainText("Order status temporarily unavailable; reconnecting.", { timeout: 10_000 });
+  await expect(orders.getByRole("status")).toContainText("Blue One · 0° at 130 m/s");
+  state.receiptFailure = false; state.receiptState = "executed";
+  await expect(orders.getByRole("status")).toContainText("Order executed at tick 14", { timeout: 10_000 });
+  await expect(orders.getByRole("status")).not.toContainText("temporarily unavailable");
+  expect(state.orderBodies.length).toBe(1);
   expect(state.errors).toEqual([]);
 });
