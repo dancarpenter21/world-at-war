@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository currently contains the project brief in `README.md`. The intended system is a realistic low-fidelity war simulator with a Rust simulation core, a Cesium web client, and Docker-based local runtime. As implementation is added, keep the layout predictable:
+This repository implements a low-fidelity war simulator with a Rust simulation core, a Cesium/React web client, communications catalogs, and Docker-based local runtime. Keep the layout predictable:
 
 - `crates/` or `src/`: Rust entity-component simulation, line-of-sight, sensors, movement, communications, and authority logic.
 - `web/`: Cesium map client and browser-facing assets.
@@ -14,11 +14,17 @@ Keep domain data separate from executable code so simulation logic can be tested
 
 ## Build, Test, and Development Commands
 
-No build manifests are present yet. Add commands here when `Cargo.toml`, `package.json`, or Docker files are introduced. Expected commands:
+Rust builds require Rust 1.89+ and the sibling `../c3mesh` checkout pinned in `c3mesh-revision.txt`. Run `scripts/setup-c3mesh.ps1` (or `sh scripts/setup-c3mesh.sh`) before a fresh build; use its verify mode for reproducible validation.
 
-- `cargo test`: run Rust unit and integration tests.
-- `cargo check`: validate Rust compilation quickly during development.
-- `npm install` and `npm run dev` from `web/`: install and run the Cesium client.
+- `cargo fmt --check`: check Rust formatting.
+- `cargo check --workspace --locked`: validate Rust compilation.
+- `cargo test --workspace`: run Rust unit and integration tests.
+- `cargo clippy --workspace --all-targets -- -D warnings`: run Rust lint checks.
+- From `web/`, `npm ci` and `npm run dev`: install locked dependencies and run the Cesium client.
+- From `web/`, `npm test` and `npm run build`: run frontend unit tests, typecheck, and build.
+- From `web/`, `npx playwright install chromium`, then `npm run test:e2e:network` or `npm run test:e2e:session`: run standalone browser tests without the Rust server.
+- From `web/`, `npm run test:e2e:gameplay`: build the Rust server and run the real gameplay/transport regression with isolated local providers.
+- From `web/`, `npm run test:e2e`: build the Rust server and run all browser integration tests.
 - `docker compose up --build`: start the full local stack.
 - `docker compose run --rm <service> <command>`: run service-scoped tests or maintenance.
 

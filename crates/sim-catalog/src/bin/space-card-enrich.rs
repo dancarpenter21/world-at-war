@@ -671,7 +671,11 @@ mod tests {
     #[test]
     fn filenames_are_numeric_norad_ids() {
         let path = Path::new("cards").join(format!("{}.md", 25544_u64));
-        assert_eq!(path.to_string_lossy(), "cards/25544.md");
+        assert_eq!(path.parent(), Some(Path::new("cards")));
+        assert_eq!(
+            path.file_name().and_then(|name| name.to_str()),
+            Some("25544.md")
+        );
     }
 
     #[test]

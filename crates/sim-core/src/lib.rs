@@ -1,13 +1,27 @@
 //! Deterministic, server-authoritative primitives for World At War.
 
+pub mod combat;
+pub mod geodesy;
+
+#[cfg(test)]
+mod sensor_tests;
+
+#[cfg(test)]
+mod motion_tests;
+
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use bevy_ecs::prelude::*;
+use bevy_ecs::query::QueryData;
 use c3mesh::{
-    ChannelId, DeviceId, DeviceKind, DropReason, FrequencyBand, NetworkConfig, NetworkEvent,
-    PacketId, ReceiverInterference, SimTime as NetworkTime, Simulator as NetworkSimulator,
-    SimulatorOptions,
+    ChannelId, DeviceId, DeviceKind, DropReason, FrequencyBand, NetworkConfig,
+    ReceiverInterference, Simulator as NetworkSimulator, SimulatorOptions,
 };
+pub use c3mesh::{
+    ChannelState as CommunicationChannelState, DropReason as CommunicationDropReason, NetworkEvent,
+    PacketId, PacketMetadata, SimTime as NetworkTime,
+};
+use combat::CombatState;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
@@ -46,7 +60,7 @@ pub struct GeoPose {
     pub altitude_m: f64,
 }
 
-#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Component, Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Velocity {
     pub north_mps: f64,
     pub east_mps: f64,
@@ -102,6 +116,24 @@ pub struct CyclicFlightPath {
     pub waypoints: Vec<FlightWaypoint>,
 }
 
+#[derive(Component, Debug, Clone, Copy)]
+struct GeodesicMotionState {
+    origin: GeoPose,
+    started_at_tick: u64,
+}
+
+#[derive(QueryData)]
+#[query_data(mutable)]
+struct CommandableUnit {
+    id: &'static SimEntityId,
+    authority: &'static AuthorityNode,
+    side: &'static Ownership,
+    pose: &'static GeoPose,
+    velocity: &'static mut Velocity,
+    motion: &'static mut GeodesicMotionState,
+    flight_path: Option<&'static mut CyclicFlightPathState>,
+}
+
 #[derive(Component, Debug, Clone)]
 struct CyclicFlightPathState {
     path: CyclicFlightPath,
@@ -116,6 +148,16 @@ pub struct JammingRegion {
     pub radius_m: f64,
     pub band: FrequencyBand,
     pub jammed: f64,
+    #[serde(default)]
+    pub active_from_tick: u64,
+    #[serde(default)]
+    pub active_until_tick: Option<u64>,
+}
+
+impl JammingRegion {
+    pub fn active_at(&self, tick: u64) -> bool {
+        tick >= self.active_from_tick && self.active_until_tick.is_none_or(|until| tick < until)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -421,7 +463,15 @@ pub struct Track {
 #[derive(Resource, Debug, Default)]
 pub struct KnowledgeBases(pub BTreeMap<Uuid, Vec<Track>>);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Resource)]
+struct KnowledgeNamespace(Uuid);
+
+fn scoped_track_id(namespace: Uuid, observer: Uuid, subject: Uuid) -> Uuid {
+    let terminal_namespace = Uuid::new_v5(&namespace, observer.as_bytes());
+    Uuid::new_v5(&terminal_namespace, subject.as_bytes())
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum OrderKind {
     Move { north_mps: f64, east_mps: f64 },
     Engage { track_id: Uuid },
@@ -436,7 +486,7 @@ impl OrderKind {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlayerIntent {
     pub intent_id: Uuid,
     pub issuer_role: Uuid,
@@ -541,6 +591,7 @@ pub struct Simulation {
     world: World,
     schedule: Schedule,
     communications: CommunicationsRuntime,
+    reporting_ticks: u64,
 }
 
 impl Simulation {
@@ -565,6 +616,28 @@ impl Simulation {
             if !platform_ids.insert(platform.id) {
                 return Err(SimulationBuildError::InvalidConfiguration(format!(
                     "duplicate platform id {}",
+                    platform.id
+                )));
+            }
+            if !geo_pose_is_finite(platform.pose)
+                || !platform.velocity.north_mps.is_finite()
+                || !platform.velocity.east_mps.is_finite()
+                || !platform.velocity.climb_mps.is_finite()
+            {
+                return Err(SimulationBuildError::InvalidConfiguration(format!(
+                    "platform {} has an invalid position or velocity",
+                    platform.id
+                )));
+            }
+            if platform.sensor.is_some_and(|sensor| {
+                !sensor.range_m.is_finite()
+                    || sensor.range_m <= 0.0
+                    || !sensor.identification_range_m.is_finite()
+                    || sensor.identification_range_m < 0.0
+                    || sensor.identification_range_m > sensor.range_m
+            }) {
+                return Err(SimulationBuildError::InvalidConfiguration(format!(
+                    "platform {} has invalid sensor ranges",
                     platform.id
                 )));
             }
@@ -679,6 +752,9 @@ impl Simulation {
                 || !region.radius_m.is_finite()
                 || region.radius_m <= 0.0
                 || region.band.lower_hz >= region.band.upper_hz
+                || region
+                    .active_until_tick
+                    .is_some_and(|until| until <= region.active_from_tick)
                 || !region.jammed.is_finite()
                 || !(0.0..=1.0).contains(&region.jammed)
             {
@@ -694,6 +770,15 @@ impl Simulation {
     pub fn new(
         platforms: Vec<PlatformSpawn>,
         communications: CommunicationsConfig,
+    ) -> Result<Self, SimulationBuildError> {
+        Self::new_with_knowledge_namespace(platforms, communications, Uuid::nil())
+    }
+
+    /// Keep track identities stable within a replay while isolating different games.
+    pub fn new_with_knowledge_namespace(
+        platforms: Vec<PlatformSpawn>,
+        communications: CommunicationsConfig,
+        knowledge_namespace: Uuid,
     ) -> Result<Self, SimulationBuildError> {
         Self::validate_configuration(&platforms, &communications)?;
         let entity_devices = platforms
@@ -714,20 +799,24 @@ impl Simulation {
         world.insert_resource(SimClock { tick: 0 });
         world.insert_resource(Observations::default());
         world.insert_resource(KnowledgeBases::default());
+        world.insert_resource(KnowledgeNamespace(knowledge_namespace));
         world.insert_resource(PendingIntents::default());
         world.insert_resource(OrderResults::default());
+        world.insert_resource(CombatState::default());
 
         let mut schedule = Schedule::default();
         schedule.add_systems((
             advance_clock,
             apply_orders.after(advance_clock),
             move_platforms.after(apply_orders),
-            detect_contacts.after(move_platforms),
+            combat::resolve_impacts.after(move_platforms),
+            detect_contacts.after(combat::resolve_impacts),
             deliver_reports.after(detect_contacts),
         ));
         let mut simulation = Self {
             world,
             schedule,
+            reporting_ticks: 0,
             communications: CommunicationsRuntime {
                 simulator,
                 entity_devices,
@@ -752,6 +841,10 @@ impl Simulation {
             DomainKind(platform.domain),
             platform.pose,
             platform.velocity,
+            GeodesicMotionState {
+                origin: platform.pose,
+                started_at_tick: 0,
+            },
             AuthorityNode {
                 echelon: 1,
                 can_order: true,
@@ -765,6 +858,61 @@ impl Simulation {
         }
     }
 
+    pub fn configure_combat(&mut self, config: combat::CombatConfig) -> Result<(), String> {
+        if self.tick() != 0 {
+            return Err("combat configuration must be installed before simulation starts".into());
+        }
+        let mut query = self.world.query::<(&SimEntityId, &Ownership)>();
+        let sides = query
+            .iter(&self.world)
+            .map(|(id, side)| (id.0, side.0))
+            .collect();
+        config.validate(&sides)?;
+        self.world
+            .insert_resource(CombatState::from_config(config, sides));
+        Ok(())
+    }
+
+    /// Freeze only the issuing terminal's reported position, never an enemy truth identity.
+    pub fn designate_engagement(
+        &mut self,
+        intent_id: Uuid,
+        attacker: Uuid,
+        terminal: Uuid,
+        track_id: Uuid,
+    ) -> Result<(), String> {
+        let mut query = self.world.query::<(&SimEntityId, &Ownership)>();
+        let sides: BTreeMap<_, _> = query
+            .iter(&self.world)
+            .map(|(id, side)| (id.0, side.0))
+            .collect();
+        let side = *sides
+            .get(&attacker)
+            .ok_or("firing platform does not exist")?;
+        if sides.get(&terminal) != Some(&side) {
+            return Err("target report must come from a friendly command terminal".into());
+        }
+        let track = self
+            .world
+            .resource::<KnowledgeBases>()
+            .0
+            .get(&terminal)
+            .and_then(|tracks| tracks.iter().find(|track| track.track_id == track_id))
+            .cloned()
+            .ok_or("this contact is not known to your command terminal")?;
+        let tick = self.tick();
+        self.world
+            .resource_mut::<CombatState>()
+            .designate(intent_id, attacker, side, track, tick)
+    }
+
+    pub fn engagement_designation(&self, intent_id: Uuid) -> Option<&Track> {
+        self.world.resource::<CombatState>().designation(intent_id)
+    }
+
+    pub fn mission_complete(&self) -> bool {
+        self.world.resource::<CombatState>().complete()
+    }
     pub fn queue_authorized_intent(&mut self, intent: AuthorizedIntent) {
         self.world
             .resource_mut::<PendingIntents>()
@@ -778,8 +926,93 @@ impl Simulation {
             .expect("validated network must accept tick interference");
     }
 
+    /// Advance radio traffic after an objective ends without moving or sensing platforms.
+    pub fn advance_reporting_clock(&mut self) {
+        assert!(
+            self.mission_complete(),
+            "reporting clock requires a completed mission"
+        );
+        self.reporting_ticks = self.reporting_ticks.saturating_add(1);
+        self.sync_network_interference()
+            .expect("validated interference");
+    }
+
+    pub fn radio_tick(&self) -> u64 {
+        self.tick().saturating_add(self.reporting_ticks)
+    }
+
+    pub fn local_impact_reports(&self, terminal: Uuid) -> Vec<combat::ImpactReport> {
+        self.world.resource::<CombatState>().local_reports(terminal)
+    }
+
+    pub fn receive_impact_report(
+        &mut self,
+        terminal: Uuid,
+        report: combat::ImpactReport,
+        received_tick: u64,
+    ) {
+        self.world
+            .resource_mut::<CombatState>()
+            .receive(terminal, report, received_tick);
+    }
+
     pub fn tick(&self) -> u64 {
         self.world.resource::<SimClock>().tick
+    }
+
+    /// Only tracks refreshed by this terminal's own sensors during the current tick.
+    pub fn current_sensor_tracks(&self, observer: Uuid) -> Vec<Track> {
+        let namespace = self.world.resource::<KnowledgeNamespace>().0;
+        let knowledge = self.world.resource::<KnowledgeBases>();
+        let Some(tracks) = knowledge.0.get(&observer) else {
+            return vec![];
+        };
+        self.world
+            .resource::<Observations>()
+            .0
+            .iter()
+            .filter(|contact| contact.observer == observer)
+            .filter_map(|contact| {
+                let id = scoped_track_id(namespace, observer, contact.target);
+                tracks.iter().find(|track| track.track_id == id).cloned()
+            })
+            .collect()
+    }
+
+    /// Apply a received report without reading the target's authoritative position.
+    /// Older reports from the same source track cannot overwrite a newer report.
+    pub fn receive_track_report(&mut self, recipient: Uuid, mut track: Track) -> bool {
+        if track.observed_tick > self.tick()
+            || !geo_pose_is_finite(track.position)
+            || !track.identity_confidence.is_finite()
+            || !(0.0..=1.0).contains(&track.identity_confidence)
+        {
+            return false;
+        }
+        let mut units = self.world.query::<(&SimEntityId, &Ownership)>();
+        let Some((_, ownership)) = units.iter(&self.world).find(|(id, _)| id.0 == recipient) else {
+            return false;
+        };
+        if ownership.0 == track.target_side {
+            return false;
+        }
+        let namespace = self.world.resource::<KnowledgeNamespace>().0;
+        track.track_id = scoped_track_id(namespace, recipient, track.track_id);
+        track.received_tick = self.tick();
+        let mut knowledge = self.world.resource_mut::<KnowledgeBases>();
+        let tracks = knowledge.0.entry(recipient).or_default();
+        if let Some(existing) = tracks
+            .iter_mut()
+            .find(|existing| existing.track_id == track.track_id)
+        {
+            if existing.observed_tick >= track.observed_tick {
+                return false;
+            }
+            *existing = track;
+        } else {
+            tracks.push(track);
+        }
+        true
     }
 
     pub fn drain_order_results(&mut self) -> Vec<OrderResult> {
@@ -854,6 +1087,37 @@ impl Simulation {
         )?)
     }
 
+    /// Queues endpoint scheduling metadata and a forwarding-hop budget without advancing time.
+    pub fn queue_transmission_with_metadata(
+        &mut self,
+        from_entity_id: Uuid,
+        to_entity_id: Uuid,
+        payload: Vec<u8>,
+        hop_limit: u16,
+        metadata: PacketMetadata,
+    ) -> Result<PacketId, CommunicationError> {
+        let link = self
+            .communications
+            .links
+            .iter()
+            .find(|link| link.from_entity_id == from_entity_id && link.to_entity_id == to_entity_id)
+            .ok_or(CommunicationError::NoLink {
+                from: from_entity_id,
+                to: to_entity_id,
+            })?;
+        Ok(self
+            .communications
+            .simulator
+            .schedule_send_with_hop_limit_and_metadata(
+                self.network_time(),
+                link.source_device_id.clone(),
+                link.destination_device_id.clone(),
+                payload,
+                hop_limit,
+                metadata,
+            )?)
+    }
+
     /// Advances pending network traffic to the current ECS tick boundary.
     pub fn advance_network(&mut self) -> Result<Vec<NetworkEvent>, c3mesh::SimulationError> {
         self.communications
@@ -892,16 +1156,24 @@ impl Simulation {
             &DomainKind,
             &GeoPose,
             &PlatformSidc,
+            &Velocity,
+            Option<&CyclicFlightPathState>,
         )>();
-        for (id, name, ownership, domain, pose, sidc) in query.iter(&self.world) {
+        for (id, name, ownership, domain, pose, sidc, velocity, flight_path) in
+            query.iter(&self.world)
+        {
             if ownership.0 == side {
                 own_units.push(VisibleUnit {
                     id: id.0,
                     name: name.0.clone(),
                     domain: domain.0,
                     position: *pose,
+                    velocity: *velocity,
+                    following_flight_path: flight_path.is_some_and(|path| path.active),
                     sidc: sidc.0.clone(),
                     receiver_jammed: receiver_jammed.get(&id.0).copied().unwrap_or(false),
+                    weapon: self.world.resource::<CombatState>().weapon_status(id.0),
+                    hit_points: self.world.resource::<CombatState>().hit_points(id.0),
                 });
             }
         }
@@ -917,14 +1189,24 @@ impl Simulation {
             tick: self.tick(),
             own_units,
             tracks,
-            jamming_regions: self.communications.jamming_regions.clone(),
+            jamming_regions: self
+                .communications
+                .jamming_regions
+                .iter()
+                .filter(|region| region.active_at(self.radio_tick()))
+                .cloned()
+                .collect(),
             communication_links: link_statuses,
+            combat: self
+                .world
+                .resource::<CombatState>()
+                .projection(knowledge_owner, side),
         }
     }
 
     fn network_time(&self) -> NetworkTime {
         let tick_ns = self
-            .tick()
+            .radio_tick()
             .saturating_mul(TICK_SECONDS)
             .saturating_mul(1_000_000_000);
         NetworkTime::from_nanos(tick_ns.max(self.communications.simulator.now().as_nanos()))
@@ -949,7 +1231,9 @@ impl Simulation {
                     .cloned()
                     .unwrap_or_default();
                 for region in &self.communications.jamming_regions {
-                    if great_circle_distance_m(*position, region.center) <= region.radius_m {
+                    if region.active_at(self.radio_tick())
+                        && great_circle_distance_m(*position, region.center) <= region.radius_m
+                    {
                         snapshot.push(ReceiverInterference {
                             band: region.band,
                             jammed: region.jammed,
@@ -993,6 +1277,11 @@ impl Simulation {
                         at,
                     )
                     .expect("validated monitored link must remain queryable");
+                let queue = self
+                    .communications
+                    .simulator
+                    .channel_queue_metrics(link.channel_id.clone())
+                    .expect("validated monitored link queue must remain queryable");
                 CommunicationLinkStatus {
                     id: link.id.clone(),
                     from_entity_id: link.from_entity_id,
@@ -1004,22 +1293,8 @@ impl Simulation {
                         metrics.jammed
                     },
                     effective_bit_rate_bps: metrics.effective_bit_rate_bps,
-                    queued_packets: {
-                        let queue = self
-                            .communications
-                            .simulator
-                            .channel_queue_metrics(link.channel_id.clone())
-                            .expect("validated monitored link queue must remain queryable");
-                        queue.packets_0_to_1 + queue.packets_1_to_0
-                    },
-                    queued_bytes: {
-                        let queue = self
-                            .communications
-                            .simulator
-                            .channel_queue_metrics(link.channel_id.clone())
-                            .expect("validated monitored link queue must remain queryable");
-                        queue.bytes_0_to_1 + queue.bytes_1_to_0
-                    },
+                    queued_packets: queue.packets_0_to_1 + queue.packets_1_to_0,
+                    queued_bytes: queue.bytes_0_to_1 + queue.bytes_1_to_0,
                 }
             })
             .collect()
@@ -1032,8 +1307,17 @@ pub struct VisibleUnit {
     pub name: String,
     pub domain: Domain,
     pub position: GeoPose,
+    /// Last commanded velocity; an active authored path controls motion instead.
+    #[serde(default)]
+    pub velocity: Velocity,
+    #[serde(default)]
+    pub following_flight_path: bool,
     pub sidc: String,
     pub receiver_jammed: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weapon: Option<combat::WeaponStatus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hit_points: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1043,6 +1327,8 @@ pub struct RoleProjection {
     pub tracks: Vec<Track>,
     pub jamming_regions: Vec<JammingRegion>,
     pub communication_links: Vec<CommunicationLinkStatus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub combat: Option<combat::CombatProjection>,
 }
 
 fn advance_clock(mut clock: ResMut<SimClock>) {
@@ -1053,12 +1339,8 @@ fn apply_orders(
     clock: Res<SimClock>,
     mut pending: ResMut<PendingIntents>,
     mut results: ResMut<OrderResults>,
-    mut units: Query<(
-        &SimEntityId,
-        &AuthorityNode,
-        &mut Velocity,
-        Option<&mut CyclicFlightPathState>,
-    )>,
+    mut units: Query<CommandableUnit>,
+    mut combat: ResMut<CombatState>,
 ) {
     let mut deferred = VecDeque::new();
     while let Some(authorized) = pending.0.pop_front() {
@@ -1070,16 +1352,14 @@ fn apply_orders(
             });
             continue;
         }
-        let Some((_, authority, mut velocity, mut flight_path)) =
-            units.iter_mut().find(|(id, _, _, _)| id.0 == intent.target)
-        else {
+        let Some(mut unit) = units.iter_mut().find(|unit| unit.id.0 == intent.target) else {
             results.0.push(OrderResult {
                 intent_id: intent.intent_id,
                 status: OrderStatus::Rejected("target does not exist".into()),
             });
             continue;
         };
-        if !authority.can_order {
+        if !unit.authority.can_order {
             results.0.push(OrderResult {
                 intent_id: intent.intent_id,
                 status: OrderStatus::Rejected("target cannot accept orders".into()),
@@ -1091,9 +1371,23 @@ fn apply_orders(
                 north_mps,
                 east_mps,
             } => {
-                velocity.north_mps = north_mps;
-                velocity.east_mps = east_mps;
-                if let Some(path) = flight_path.as_deref_mut() {
+                if !north_mps.is_finite()
+                    || !east_mps.is_finite()
+                    || !north_mps.hypot(east_mps).is_finite()
+                {
+                    results.0.push(OrderResult {
+                        intent_id: intent.intent_id,
+                        status: OrderStatus::Rejected(
+                            "movement vector must have finite speed".into(),
+                        ),
+                    });
+                    continue;
+                }
+                unit.velocity.north_mps = north_mps;
+                unit.velocity.east_mps = east_mps;
+                unit.motion.origin = *unit.pose;
+                unit.motion.started_at_tick = clock.tick.saturating_sub(1);
+                if let Some(path) = unit.flight_path.as_deref_mut() {
                     path.active = false;
                 }
                 results.0.push(OrderResult {
@@ -1103,9 +1397,10 @@ fn apply_orders(
             }
             OrderKind::Engage { .. } => results.0.push(OrderResult {
                 intent_id: intent.intent_id,
-                status: OrderStatus::Rejected(
-                    "engagement modelling is not available in the training slice".into(),
-                ),
+                status: match combat.launch(&intent, unit.side.0, *unit.pose, clock.tick) {
+                    Ok(()) => OrderStatus::Accepted,
+                    Err(error) => OrderStatus::Rejected(error),
+                },
             }),
         }
     }
@@ -1114,17 +1409,29 @@ fn apply_orders(
 
 fn move_platforms(
     clock: Res<SimClock>,
-    mut units: Query<(&mut GeoPose, &Velocity, Option<&CyclicFlightPathState>)>,
+    mut units: Query<(
+        &mut GeoPose,
+        &Velocity,
+        &GeodesicMotionState,
+        Option<&CyclicFlightPathState>,
+    )>,
 ) {
-    for (mut pose, velocity, flight_path) in &mut units {
+    for (mut pose, velocity, motion, flight_path) in &mut units {
         if let Some(path) = flight_path.filter(|path| path.active) {
             *pose = position_on_flight_path(&path.path, clock.tick);
             continue;
         }
-        pose.latitude_deg += velocity.north_mps * TICK_SECONDS as f64 / 111_320.0;
-        let longitude_scale = 111_320.0 * pose.latitude_deg.to_radians().cos().abs().max(0.01);
-        pose.longitude_deg += velocity.east_mps * TICK_SECONDS as f64 / longitude_scale;
-        pose.altitude_m = (pose.altitude_m + velocity.climb_mps * TICK_SECONDS as f64).max(0.0);
+        let elapsed_seconds =
+            clock.tick.saturating_sub(motion.started_at_tick) as f64 * TICK_SECONDS as f64;
+        if let Some(mut moved) = geodesy::advance_position(
+            motion.origin,
+            velocity.north_mps * elapsed_seconds,
+            velocity.east_mps * elapsed_seconds,
+            velocity.climb_mps * elapsed_seconds,
+        ) {
+            moved.altitude_m = moved.altitude_m.max(0.0);
+            *pose = moved;
+        }
     }
 }
 
@@ -1180,14 +1487,8 @@ fn position_on_flight_path(path: &CyclicFlightPath, tick: u64) -> GeoPose {
         )
     };
     let fraction = (cycle_tick - lower.at_tick) as f64 / (upper_tick - lower.at_tick) as f64;
-    GeoPose {
-        latitude_deg: lower.position.latitude_deg
-            + (upper.position.latitude_deg - lower.position.latitude_deg) * fraction,
-        longitude_deg: lower.position.longitude_deg
-            + (upper.position.longitude_deg - lower.position.longitude_deg) * fraction,
-        altitude_m: lower.position.altitude_m
-            + (upper.position.altitude_m - lower.position.altitude_m) * fraction,
-    }
+    geodesy::interpolate_position(lower.position, upper.position, fraction)
+        .expect("validated flight path has finite positions and interpolation fraction")
 }
 
 fn geo_pose_is_finite(position: GeoPose) -> bool {
@@ -1210,8 +1511,10 @@ fn detect_contacts(
             if observer_side.0 == target_side.0 {
                 continue;
             }
-            let range = great_circle_distance_m(*observer_pose, *target_pose);
-            if range <= sensor.range_m {
+            let range = geodesy::slant_distance_m(*observer_pose, *target_pose);
+            if range <= sensor.range_m
+                && geodesy::has_geometric_line_of_sight(*observer_pose, *target_pose)
+            {
                 observations.0.push(Contact {
                     observer: observer_id.0,
                     target: target_id.0,
@@ -1232,21 +1535,20 @@ fn detect_contacts(
 fn deliver_reports(
     clock: Res<SimClock>,
     observations: Res<Observations>,
+    namespace: Res<KnowledgeNamespace>,
     mut knowledge: ResMut<KnowledgeBases>,
 ) {
     for contact in &observations.0 {
+        let track_id = scoped_track_id(namespace.0, contact.observer, contact.target);
         let tracks = knowledge.0.entry(contact.observer).or_default();
-        if let Some(track) = tracks
-            .iter_mut()
-            .find(|track| track.track_id == contact.target)
-        {
+        if let Some(track) = tracks.iter_mut().find(|track| track.track_id == track_id) {
             track.position = contact.position;
             track.identity_confidence = contact.identity_confidence;
             track.observed_tick = contact.observed_tick;
             track.received_tick = clock.tick;
         } else {
             tracks.push(Track {
-                track_id: contact.target,
+                track_id,
                 target_side: contact.side,
                 position: contact.position,
                 identity_confidence: contact.identity_confidence,
@@ -1266,14 +1568,7 @@ fn unknown_sidc(side: Side) -> &'static str {
 }
 
 fn great_circle_distance_m(a: GeoPose, b: GeoPose) -> f64 {
-    let earth_radius_m = 6_371_000.0;
-    let d_lat = (b.latitude_deg - a.latitude_deg).to_radians();
-    let d_lon = (b.longitude_deg - a.longitude_deg).to_radians();
-    let h = (d_lat / 2.0).sin().powi(2)
-        + a.latitude_deg.to_radians().cos()
-            * b.latitude_deg.to_radians().cos()
-            * (d_lon / 2.0).sin().powi(2);
-    2.0 * earth_radius_m * h.sqrt().asin()
+    geodesy::surface_distance_m(a, b)
 }
 
 #[cfg(test)]
@@ -1601,6 +1896,7 @@ mod tests {
                 .longitude_deg,
             1.0
         );
+        assert!(sim.projection_for(unit, Side::Blue).own_units[0].following_flight_path);
         sim.queue_authorized_intent(AuthorizedIntent {
             intent: PlayerIntent {
                 intent_id: Uuid::from_u128(41),
@@ -1621,8 +1917,11 @@ mod tests {
             },
         });
         sim.step();
-        let position = sim.projection_for(unit, Side::Blue).own_units[0].position;
+        let projection = sim.projection_for(unit, Side::Blue);
+        assert!(!projection.own_units[0].following_flight_path);
+        assert_eq!(projection.own_units[0].velocity.north_mps, 111.32);
+        let position = projection.own_units[0].position;
         assert!((position.latitude_deg - 0.001).abs() < 0.00001);
-        assert_eq!(position.longitude_deg, 1.0);
+        assert!((position.longitude_deg - 1.0).abs() < 1.0e-9);
     }
 }

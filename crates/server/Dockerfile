@@ -3,10 +3,11 @@ FROM rust:1.89-bookworm AS build
 WORKDIR /workspace
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
+COPY data/scenarios ./data/scenarios
 COPY --from=c3mesh Cargo.toml Cargo.lock README.md /c3mesh/
 COPY --from=c3mesh src /c3mesh/src
 COPY --from=c3mesh examples /c3mesh/examples
-RUN cargo build --release --package world-at-war-server
+RUN cargo build --release --package world-at-war-server --locked
 
 FROM rust:1.89-bookworm AS development
 WORKDIR /workspace
@@ -16,13 +17,14 @@ RUN apt-get update \
   && cargo install cargo-watch --locked
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
+COPY data/scenarios ./data/scenarios
 COPY --from=c3mesh Cargo.toml Cargo.lock README.md /c3mesh/
 COPY --from=c3mesh src /c3mesh/src
 COPY --from=c3mesh examples /c3mesh/examples
 COPY data/space-cards ./data/space-cards
 EXPOSE 8000
 ENV BIND_ADDR=0.0.0.0:8000
-CMD ["cargo", "watch", "--poll", "--watch", "Cargo.toml", "--watch", "Cargo.lock", "--watch", "crates", "--watch", "/c3mesh/src", "--watch", "/c3mesh/Cargo.toml", "--exec", "run --package world-at-war-server"]
+CMD ["cargo", "watch", "--poll", "--watch", "Cargo.toml", "--watch", "Cargo.lock", "--watch", "crates", "--watch", "data/scenarios", "--watch", "/c3mesh/src", "--watch", "/c3mesh/Cargo.toml", "--exec", "run --package world-at-war-server --locked"]
 
 FROM debian:bookworm-slim
 RUN apt-get update \

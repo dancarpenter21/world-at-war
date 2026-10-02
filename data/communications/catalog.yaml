@@ -213,6 +213,7 @@ messages:
   - { id: public-safe.usmtf.authority-request.v1, family: usmtf_public_safe, display_name: Authority request, default_priority: 230, ttl_hops: 64, expiry_ticks: 300, reliable: true }
   - { id: public-safe.usmtf.authority-decision.v1, family: usmtf_public_safe, display_name: Authority decision, default_priority: 240, ttl_hops: 64, expiry_ticks: 300, reliable: true }
   - { id: public-safe.jseries.track-report.v1, family: j_series_public_safe, display_name: Track report, default_priority: 120, ttl_hops: 32, expiry_ticks: 30, reliable: false }
+  - { id: public-safe.jseries.impact-report.v1, family: j_series_public_safe, display_name: Training impact report, default_priority: 160, ttl_hops: 32, expiry_ticks: 20, reliable: false }
   - { id: public-safe.network.ack.v1, family: network_control, display_name: Acknowledgement, default_priority: 245, ttl_hops: 64, expiry_ticks: 120, reliable: false }
 
 policies:

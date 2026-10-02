@@ -1,5 +1,12 @@
 //! Versioned scenario definitions and spawning.
 
+mod radio_exercise;
+
+pub use radio_exercise::{
+    combat_training_scenario, command_link_exercise_scenario, contested_combat_scenario,
+    sensor_relay_exercise_scenario,
+};
+
 use std::collections::BTreeMap;
 
 use c3mesh::{
@@ -31,6 +38,32 @@ pub struct Scenario {
     pub communication_links: Vec<CommunicationLinkDefinition>,
     pub jamming_regions: Vec<JammingRegion>,
     pub authority: AuthorityDefinition,
+    #[serde(default)]
+    pub sensor_report_routes: Vec<SensorReportRoute>,
+    #[serde(default)]
+    pub combat: Option<sim_core::combat::CombatConfig>,
+    #[serde(default)]
+    pub impact_report_routes: Vec<ImpactReportRoute>,
+    #[serde(default)]
+    pub reporting_window_ticks: u64,
+}
+
+/// An explicit subscription to a sensing role's local observations, not side-wide awareness.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SensorReportRoute {
+    pub origin_role_id: Uuid,
+    pub recipient_unit_id: Uuid,
+    pub interval_ticks: u64,
+}
+
+/// Explicit subscriptions to a firing terminal, with bounded paced retries.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ImpactReportRoute {
+    pub origin_role_id: Uuid,
+    pub recipient_unit_id: Uuid,
+    pub retry_interval_ticks: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,6 +82,8 @@ pub struct ScenarioUnit {
 
 #[derive(Debug, Error)]
 pub enum ScenarioError {
+    #[error("invalid authored scenario data: {0}")]
+    InvalidAuthoredData(String),
     #[error("scenario must include at least one unit")]
     MissingUnits,
     #[error("scenario includes duplicate unit id {0}")]
@@ -83,6 +118,73 @@ impl Scenario {
         self.authority
             .validate(&ids)
             .map_err(ScenarioError::InvalidAuthority)?;
+        let mut report_routes = std::collections::BTreeSet::new();
+        for route in &self.sensor_report_routes {
+            let origin = self
+                .authority
+                .roles
+                .iter()
+                .find(|role| role.id == route.origin_role_id);
+            let valid = origin.is_some_and(|role| {
+                route.interval_ticks > 0
+                    && role.location_unit_id != route.recipient_unit_id
+                    && self
+                        .units
+                        .iter()
+                        .any(|unit| unit.id == role.location_unit_id && unit.sensor.is_some())
+                    && self
+                        .units
+                        .iter()
+                        .any(|unit| unit.id == route.recipient_unit_id && unit.side == role.side)
+                    && self.communication_links.iter().any(|link| {
+                        link.from_entity_id == role.location_unit_id
+                            && link.to_entity_id == route.recipient_unit_id
+                    })
+            });
+            if !valid || !report_routes.insert((route.origin_role_id, route.recipient_unit_id)) {
+                return Err(ScenarioError::InvalidSimulation("sensor report routes require a unique sensing role, a same-side reachable recipient, and a positive interval".into()));
+            }
+        }
+        if let Some(combat) = &self.combat {
+            let sides = self.units.iter().map(|unit| (unit.id, unit.side)).collect();
+            combat
+                .validate(&sides)
+                .map_err(ScenarioError::InvalidSimulation)?;
+        }
+        if self.reporting_window_ticks > 60
+            || (!self.impact_report_routes.is_empty() && self.reporting_window_ticks == 0)
+        {
+            return Err(ScenarioError::InvalidSimulation(
+                "impact reports require a reporting window of 1 to 60 ticks".into(),
+            ));
+        }
+        let mut impact_routes = std::collections::BTreeSet::new();
+        for route in &self.impact_report_routes {
+            let valid = self
+                .authority
+                .roles
+                .iter()
+                .find(|role| role.id == route.origin_role_id)
+                .is_some_and(|role| {
+                    route.retry_interval_ticks > 0
+                        && route.recipient_unit_id != role.location_unit_id
+                        && self.combat.as_ref().is_some_and(|combat| {
+                            combat.units.iter().any(|unit| {
+                                unit.unit_id == role.location_unit_id && unit.weapon.is_some()
+                            })
+                        })
+                        && self.units.iter().any(|unit| {
+                            unit.id == route.recipient_unit_id && unit.side == role.side
+                        })
+                        && self.communication_links.iter().any(|link| {
+                            link.from_entity_id == role.location_unit_id
+                                && link.to_entity_id == route.recipient_unit_id
+                        })
+                });
+            if !valid || !impact_routes.insert((route.origin_role_id, route.recipient_unit_id)) {
+                return Err(ScenarioError::InvalidSimulation("impact report routes require a unique armed terminal, a friendly reachable recipient, and a positive retry interval".into()));
+            }
+        }
         let platforms = self.platforms();
         Simulation::validate_configuration(&platforms, &self.communications())
             .map_err(|error| ScenarioError::InvalidSimulation(error.to_string()))?;
@@ -102,6 +204,15 @@ impl Scenario {
         seed: u64,
         queue_discipline: Option<QueueDiscipline>,
     ) -> Result<Simulation, ScenarioError> {
+        self.spawn_with_knowledge_namespace(seed, queue_discipline, Uuid::nil())
+    }
+
+    pub fn spawn_with_knowledge_namespace(
+        &self,
+        seed: u64,
+        queue_discipline: Option<QueueDiscipline>,
+        namespace: Uuid,
+    ) -> Result<Simulation, ScenarioError> {
         self.validate()?;
         let mut communications = self.communications();
         communications.simulator_options.seed = seed;
@@ -110,8 +221,15 @@ impl Scenario {
                 channel.queue.discipline = discipline;
             }
         }
-        Simulation::new(self.platforms(), communications)
-            .map_err(|error| ScenarioError::InvalidSimulation(error.to_string()))
+        let mut simulation =
+            Simulation::new_with_knowledge_namespace(self.platforms(), communications, namespace)
+                .map_err(|error| ScenarioError::InvalidSimulation(error.to_string()))?;
+        if let Some(combat) = &self.combat {
+            simulation
+                .configure_combat(combat.clone())
+                .map_err(ScenarioError::InvalidSimulation)?;
+        }
+        Ok(simulation)
     }
 
     fn platforms(&self) -> Vec<PlatformSpawn> {
@@ -262,6 +380,10 @@ pub fn global_crisis_scenario() -> Scenario {
         communication_links,
         jamming_regions: vec![],
         authority,
+        sensor_report_routes: vec![],
+        combat: None,
+        impact_report_routes: vec![],
+        reporting_window_ticks: 0,
     }
 }
 
@@ -347,13 +469,27 @@ fn global_communications(
             });
         }
     }
+    // A lone unit on a side still needs its mandatory network endpoint, even
+    // when no same-side point-to-point link is authored.
+    for unit in units
+        .iter_mut()
+        .filter(|unit| unit.network_device_ids.is_empty())
+    {
+        let id = DeviceId::new(format!("entity-{}-network", unit.id));
+        unit.network_device_ids.push(id.clone());
+        devices.push(DeviceConfig {
+            id,
+            kind: DeviceKind::Sink,
+            mobility: Default::default(),
+            interference: vec![],
+        });
+    }
     (
         NetworkConfig { devices, channels },
         links,
         SimulatorOptions {
             seed: 0xC3_2026,
             channels: channel_options,
-            ..Default::default()
         },
     )
 }
@@ -1067,8 +1203,14 @@ pub fn jammed_flight_scenario() -> Scenario {
             radius_m: 5_000.0,
             band: RADIO_BAND,
             jammed: 1.0,
+            active_from_tick: 0,
+            active_until_tick: None,
         }],
         authority,
+        sensor_report_routes: vec![],
+        combat: None,
+        impact_report_routes: vec![],
+        reporting_window_ticks: 0,
     }
 }
 
@@ -1163,7 +1305,12 @@ mod tests {
         let catalog_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../data/communications/catalog.yaml");
         let catalog = CommunicationsCatalog::load(catalog_path).unwrap();
-        let scenarios = [global_crisis_scenario(), jammed_flight_scenario()];
+        let scenarios = [
+            global_crisis_scenario(),
+            jammed_flight_scenario(),
+            command_link_exercise_scenario(),
+            sensor_relay_exercise_scenario(),
+        ];
         let missing: Vec<_> = scenarios
             .iter()
             .flat_map(|scenario| &scenario.units)

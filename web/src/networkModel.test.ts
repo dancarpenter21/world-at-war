@@ -107,6 +107,9 @@ describe("stream frames and telemetry", () => {
     snapshot.links[0].effective_bit_rate_bps = null;
     snapshot.messages[0].delivered_at_ns = null;
     snapshot.messages[0].drop_reason = null;
+    snapshot.messages[0].packet_id = 0;
+    snapshot.messages[0].started_at_ns = 10_000_000_000;
+    snapshot.messages[0].terminal_at_ns = 11_000_000_000;
     expect(decodeNetworkFrame(JSON.stringify({ sequence: 12, resync: true, projection: snapshot }))?.projection).toEqual(snapshot);
   });
   it("rejects malformed JSON, corrupt records, duplicate graph IDs, and invalid rates", () => {
@@ -122,6 +125,11 @@ describe("stream frames and telemetry", () => {
     const invalidRate = projection();
     invalidRate.links[0].effective_bit_rate_bps = -1;
     expect(decodeNetworkFrame(raw(invalidRate))).toBeNull();
+    for (const field of ["packet_id", "started_at_ns", "terminal_at_ns"] as const) {
+      const invalidTime = projection();
+      invalidTime.messages[0][field] = -1;
+      expect(decodeNetworkFrame(raw(invalidTime))).toBeNull();
+    }
   });
   it("shows zero rate accurately and formats radio and backbone rates in suitable units", () => {
     expect(formatBitRate(0)).toBe("0 bit/s");

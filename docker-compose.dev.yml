@@ -57,6 +57,10 @@ services:
           path: ../c3mesh/README.md
           target: /c3mesh/README.md
           initial_sync: true
+        - action: sync
+          path: ./data/scenarios
+          target: /workspace/data/scenarios
+          initial_sync: true
         - action: sync+restart
           path: ./data/space-cards
           target: /workspace/data/space-cards

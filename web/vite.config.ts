@@ -14,6 +14,7 @@ export default defineConfig({
       ]
     })
   ],
+  build: { manifest: true },
   define: {
     CESIUM_BASE_URL: JSON.stringify("/cesium")
   },

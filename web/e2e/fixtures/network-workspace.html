@@ -9,6 +9,7 @@
   const root = createRoot(document.getElementById("root"));
   root.render(React.createElement(NetworkWorkspace, {
     apiBase: "", gameId: "network-test", playerId: "test-player", roleId: "test-role",
+    initialFocusNodeId: new URLSearchParams(location.search).get("focus") ?? undefined,
     onClose: () => { root.unmount(); document.body.textContent = "Returned to map"; }
   }));
 </script></body></html>

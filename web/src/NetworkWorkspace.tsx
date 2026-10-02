@@ -22,6 +22,10 @@ const TerminalNode = memo(function TerminalNode({ data, selected }: NodeProps<Ne
 const nodeTypes = { terminal: TerminalNode };
 const emptyProjection = { tick: 0, nodes: [], links: [], messages: [] };
 const labelState = (state: string) => state.replaceAll("_", " ");
+const formatDuration = (nanoseconds: number) => {
+  const ms = Math.max(0, nanoseconds / 1_000_000);
+  return ms < 1_000 ? `${ms.toFixed(1)} ms` : `${(ms / 1_000).toFixed(2)} s`;
+};
 
 function MessageDetails({ record, name }: { record: MessageRecord; name: (id: string) => string }) {
   const { message } = record;
@@ -38,6 +42,10 @@ function MessageDetails({ record, name }: { record: MessageRecord; name: (id: st
       <div><dt>Created</dt><dd>Tick {message.header.created_tick}</dd></div>
       <div><dt>Expires</dt><dd>Tick {message.header.expires_tick}</dd></div>
       <div><dt>Delivery time</dt><dd>{latencyMs === null ? "Not delivered" : latencyMs < 1_000 ? `${latencyMs.toFixed(1)} ms` : `${(latencyMs / 1_000).toFixed(2)} s`}</dd></div>
+      {record.packet_id != null && <div><dt>Queue wait</dt><dd>{record.started_at_ns == null
+        ? ["dropped", "expired"].includes(record.state) ? "Not transmitted" : "Waiting to transmit"
+        : formatDuration(record.started_at_ns - message.header.created_tick * 1_000_000_000)}</dd></div>}
+      {record.started_at_ns != null && <div><dt>Network transit</dt><dd>{record.terminal_at_ns == null ? "In transit" : formatDuration(record.terminal_at_ns - record.started_at_ns)}</dd></div>}
       {record.encoded_bytes && <div><dt>Encoded size</dt><dd>{record.encoded_bytes.length.toLocaleString()} bytes</dd></div>}
     </dl>
     {record.drop_reason && <p className="network-drop-reason">{record.drop_reason}</p>}
@@ -46,12 +54,12 @@ function MessageDetails({ record, name }: { record: MessageRecord; name: (id: st
   </section>;
 }
 
-export function NetworkWorkspace({ apiBase, gameId, playerId, roleId, onClose }: {
-  apiBase: string; gameId: string; playerId: string; roleId: string; onClose: () => void;
+export function NetworkWorkspace({ apiBase, gameId, playerId, roleId, initialFocusNodeId, onClose }: {
+  apiBase: string; gameId: string; playerId: string; roleId: string; initialFocusNodeId?: string; onClose: () => void;
 }) {
   const { projection, status, notice } = useNetworkStream(apiBase, gameId, playerId, roleId);
   const [nodes, setNodes, onNodesChange] = useNodesState<NetworkFlowNode>([]);
-  const [filters, setFilters] = useState<NetworkFilters>(DEFAULT_NETWORK_FILTERS);
+  const [filters, setFilters] = useState<NetworkFilters>(() => ({ ...DEFAULT_NETWORK_FILTERS, focusNodeId: initialFocusNodeId ?? null }));
   const [selection, setSelection] = useState<TopologySelection>(null);
   const [tab, setTab] = useState<"topology" | "messages">("topology");
   const [messageState, setMessageState] = useState<"all" | MessageState>("all");
@@ -120,6 +128,13 @@ export function NetworkWorkspace({ apiBase, gameId, playerId, roleId, onClose }:
   const availableCount = visible.links.filter((link) => link.available).length;
   const queuedPackets = visible.links.reduce((total, link) => total + link.queued_packets, 0);
   const filterActive = filters.query !== "" || filters.domain !== "all" || filters.linkState !== "all" || filters.focusNodeId !== null;
+  const atMyTerminal = filters.focusNodeId === initialFocusNodeId && filters.query === "" && filters.domain === "all" && filters.linkState === "all";
+  const focusMyTerminal = () => {
+    if (!initialFocusNodeId) return;
+    setFilters({ ...DEFAULT_NETWORK_FILTERS, focusNodeId: initialFocusNodeId });
+    setSelection(null);
+    setTab("topology");
+  };
 
   return <section className="network-workspace" aria-label="C2 network workspace">
     <header className="network-header">
@@ -134,7 +149,8 @@ export function NetworkWorkspace({ apiBase, gameId, playerId, roleId, onClose }:
         <label>Link status<select value={filters.linkState} onChange={(event) => setFilters({ ...filters, linkState: event.target.value as LinkFilter })}><option value="all">All links</option><option value="available">Available</option><option value="unavailable">Unavailable</option><option value="jammed">Jammed</option><option value="queued">Queued traffic</option></select></label>
         <button className="secondary" disabled={!projection || visible.nodes.length === 0} onClick={fitVisible}>Fit view</button>
         <button className="secondary" disabled={!projection} onClick={resetLayout}>Reset layout</button>
-        {filterActive && <button className="text-command" onClick={() => setFilters(DEFAULT_NETWORK_FILTERS)}>Clear filters</button>}
+        {initialFocusNodeId && names.has(initialFocusNodeId) && <button className="secondary" disabled={atMyTerminal} onClick={focusMyTerminal}>My terminal</button>}
+        {filterActive && <button className="text-command" onClick={() => setFilters(DEFAULT_NETWORK_FILTERS)}>{filters.focusNodeId ? "All connections" : "Clear filters"}</button>}
       </div>
       <div className="network-summary" aria-label="Visible network summary">
         <span><strong>{visible.nodes.length}</strong> / {snapshot.nodes.length} terminals</span><span><strong>{visible.links.length}</strong> directional links</span>

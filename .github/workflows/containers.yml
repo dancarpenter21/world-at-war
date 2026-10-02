@@ -1,0 +1,89 @@
+name: Production containers
+
+on:
+  push:
+    branches: [main, 'codex/**']
+    paths:
+      - '.github/workflows/containers.yml'
+      - '**/Dockerfile*'
+      - 'docker-compose*.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'c3mesh-revision.txt'
+      - 'data/scenarios/**'
+      - 'deploy/**'
+      - 'scripts/smoke-command-exercise.mjs'
+      - '.dockerignore'
+  pull_request:
+    paths:
+      - '.github/workflows/containers.yml'
+      - '**/Dockerfile*'
+      - 'docker-compose*.yml'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'c3mesh-revision.txt'
+      - 'data/scenarios/**'
+      - 'deploy/**'
+      - 'scripts/smoke-command-exercise.mjs'
+      - '.dockerignore'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-containers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: world-at-war
+    env:
+      COMPOSE_PROJECT_NAME: world-at-war-ci
+      APP_PORT: '18080'
+      ADMIN_SETUP_TOKEN: ''
+      SPACETRACK_USERNAME: ''
+      SPACETRACK_PASSWORD: ''
+      COOKIE_SECURE: 'false'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: world-at-war
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '22'
+      - name: Install the tested Compose version
+        uses: docker/setup-compose-action@54042514f505b273907334ae2b9cdbb9a0213c1a # v2
+        with:
+          version: v5.1.1
+      - run: docker compose version
+      - name: Prepare pinned packet engine
+        run: sh scripts/setup-c3mesh.sh
+      - name: Prepare writable runtime directories
+        run: |
+          mkdir -p data/cache/space-track data/cache/airports data/generated/space-cards var/network-events
+          echo "HOST_UID=$(id -u)" >> "$GITHUB_ENV"
+          echo "HOST_GID=$(id -g)" >> "$GITHUB_ENV"
+      - name: Validate Compose definitions
+        run: |
+          docker compose config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml config --quiet
+      - name: Build production server and web images
+        run: docker compose build server web
+      - name: Start the production edge stack
+        run: docker compose up --detach --wait --wait-timeout 180 proxy
+      - name: Exercise the production API through the edge proxy
+        run: node scripts/smoke-command-exercise.mjs --base-url http://127.0.0.1:18080
+      - name: Show container diagnostics
+        if: failure()
+        run: |
+          docker compose ps --all
+          docker compose logs --no-color --tail 100
+      - name: Stop the test stack
+        if: always()
+        run: docker compose down --volumes --remove-orphans

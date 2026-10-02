@@ -53,6 +53,7 @@ export class SpaceAssetLayer {
     this.filters = filters;
     this.visible = filters.showAll || filters.showStarlink;
     for (const point of this.pointsById.values()) point.show = this.visible;
+    this.viewer.scene.requestRender();
     if (!this.ready) {
       this.onStatus(this.visible ? "Loading space assets" : "Space assets hidden");
       return;
@@ -82,6 +83,7 @@ export class SpaceAssetLayer {
       const ids = message.ids as number[];
       const visibleIds = new Set(ids);
       for (const [id, point] of this.pointsById) point.show = this.visible && visibleIds.has(id);
+      this.viewer.scene.requestRender();
       if (this.visible) this.onStatus(this.filters.showAll
         ? `${ids.length.toLocaleString()} space assets`
         : `${ids.length.toLocaleString()} Starlink assets`);
