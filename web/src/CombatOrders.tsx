@@ -8,10 +8,11 @@ import { MissionDebrief } from "./MissionDebrief";
 type EngagementBody = { player_id: string; lease_generation: number; intent: {
   intent_id: string; issuer_role: string; target: string; kind: { Engage: { track_id: string } }; requested_tick: number;
 } };
-type Receipt = { state: string; executed_tick?: number; error?: string };
+type Receipt = { state: string; executed_tick?: number; acknowledged_tick?: number; error?: string };
 const receiptText: Record<string, string> = {
   queued: "Engagement queued for delivery", in_transit: "Engagement command in transit",
   awaiting_authority: "Awaiting firing authority", awaiting_execution: "Delivered; awaiting launch",
+  awaiting_acknowledgement: "Delivered; awaiting launch confirmation", unconfirmed: "Launch unconfirmed",
   executed: "Weapon launched", rejected: "Engagement rejected", dropped: "Engagement delivery failed",
   expired: "Engagement expired", denied: "Firing authority denied", approved_no_executor: "Approved; no firing platform available"
 };
@@ -123,6 +124,7 @@ export function CombatOrders({ apiBase, gameId, playerId, role, projection, canI
         {uncertain && <button className="command combat-retry" disabled={pending || !canRecoverOrder} onClick={() => void transmit(uncertain)}>Retry engagement</button>}
         <div role="status" className="combat-feedback" aria-live="polite">
           {pending ? "Submitting engagement…" : feedback || (receipt ? `${receiptText[receipt.state] ?? "Checking engagement"}${receipt.executed_tick !== undefined ? ` at tick ${receipt.executed_tick}` : ""}` : "Orders require firing authority and delivery before launch.")}
+          {receipt?.acknowledged_tick !== undefined && <small>Confirmed at radio tick {receipt.acknowledged_tick}</small>}
           {receipt?.error && <small>{receipt.error}</small>}
           {receiptId && receiptResource.status !== "live" && <small>Checking engagement status; reconnecting if necessary.</small>}
         </div>

@@ -71,14 +71,19 @@ fn duplicate_submission_sends_one_packet_and_executes_once() {
     process_network_messages(&mut game);
     assert_eq!(receipt(&game).state, IntentState::InTransit);
     tick(&mut game);
-    assert_eq!(receipt(&game).state, IntentState::AwaitingExecution);
+    assert_eq!(receipt(&game).state, IntentState::AwaitingAcknowledgement);
+    tick(&mut game);
+    assert_eq!(receipt(&game).state, IntentState::AwaitingAcknowledgement);
+    assert!(receipt(&game).executed_tick.is_none());
+    assert_eq!(game.network_messages.len(), 2);
     tick(&mut game);
     assert_eq!(receipt(&game).state, IntentState::Executed);
     assert_eq!(receipt(&game).executed_tick, Some(2));
+    assert_eq!(receipt(&game).acknowledged_tick, Some(3));
     assert_eq!(submit(&mut game, intent()).unwrap(), first);
     tick(&mut game);
     assert_eq!(receipt(&game).executed_tick, Some(2));
-    assert_eq!(game.network_messages.len(), 1);
+    assert_eq!(game.network_messages.len(), 2);
     assert!(game.simulation.drain_order_results().is_empty());
     let projection = game.simulation.projection_for(TARGET, Side::Blue);
     let unit = projection
@@ -213,7 +218,9 @@ fn authority_receipt_tracks_approval_and_final_command_execution() {
     tick(&mut game);
     assert_eq!(receipt(&game).state, IntentState::InTransit);
     tick(&mut game);
-    assert_eq!(receipt(&game).state, IntentState::AwaitingExecution);
+    assert_eq!(receipt(&game).state, IntentState::AwaitingAcknowledgement);
+    tick(&mut game);
+    assert_eq!(receipt(&game).state, IntentState::AwaitingAcknowledgement);
     tick(&mut game);
     assert_eq!(receipt(&game).state, IntentState::Executed);
     assert!(receipt(&game).request_id.is_some());
@@ -366,7 +373,8 @@ fn engagement_waits_for_radio_delivery_consumes_one_round_and_ends_the_exercise_
         },
     )
     .unwrap();
-    assert_eq!(receipt.state, IntentState::Executed);
+    assert_eq!(receipt.state, IntentState::AwaitingAcknowledgement);
+    assert!(receipt.executed_tick.is_none());
     for _ in 0..12 {
         tick(&mut game);
         if game.simulation.mission_complete() {
@@ -375,6 +383,18 @@ fn engagement_waits_for_radio_delivery_consumes_one_round_and_ends_the_exercise_
     }
     assert!(game.simulation.mission_complete());
     assert_eq!(game.status, GameStatus::Paused);
+    let confirmed = receipt_for(
+        &game,
+        COMBAT_COMMANDER,
+        intent.intent_id,
+        &ReceiptQuery {
+            player_id: PLAYER,
+            lease_generation: 4,
+        },
+    )
+    .unwrap();
+    assert_eq!(confirmed.state, IntentState::Executed);
+    assert!(confirmed.acknowledged_tick.unwrap() > confirmed.executed_tick.unwrap());
     let finished_tick = game.simulation.tick();
     for _ in 0..4 {
         tick(&mut game);
@@ -507,7 +527,7 @@ fn combat_time_limit_pauses_the_server_clock_and_preserves_the_failure_outcome()
 }
 
 #[test]
-fn a_delivered_order_scheduled_after_the_mission_deadline_gets_a_terminal_receipt() {
+fn a_delivered_order_scheduled_after_the_mission_deadline_has_no_execution_confirmation() {
     let mut game = combat_game();
     let intent = PlayerIntent {
         intent_id: Uuid::from_u128(91004),
@@ -533,8 +553,8 @@ fn a_delivered_order_scheduled_after_the_mission_deadline_gets_a_terminal_receip
         },
     )
     .unwrap();
-    assert_eq!(receipt.state, IntentState::Rejected);
-    assert!(receipt.error.unwrap().contains("mission ended"));
+    assert_eq!(receipt.state, IntentState::Unconfirmed);
+    assert!(receipt.error.unwrap().contains("not been confirmed"));
     assert!(receipt.executed_tick.is_none());
 }
 

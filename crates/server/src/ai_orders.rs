@@ -20,6 +20,7 @@ fn order_is_pending(game: &Game, unit_id: Uuid) -> bool {
         DeliveryAction::ExecuteIntent(order)
         | DeliveryAction::ExecuteRequest { intent: order, .. } => order.intent.target == unit_id,
         DeliveryAction::ActivateRequest { .. }
+        | DeliveryAction::ReceiveExecutionAck { .. }
         | DeliveryAction::ReceiveTrackReport { .. }
         | DeliveryAction::ReceiveImpactReport { .. } => false,
     }) || game.authority_requests.values().any(|request| {

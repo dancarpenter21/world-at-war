@@ -2,9 +2,19 @@
 
 These screenshots come from the deterministic Playwright regressions. Training radio settings and target motion are authored scenario data; catalog-dependent tests use an isolated local provider fixture.
 
+## Radio-delivered execution confirmation
+
+The real-server regression sends a movement order, waits for the aircraft to execute it, then pauses while its reply is still on the shared radio. The commander's receipt continues to say **Delivered; awaiting execution confirmation** and provides no execution tick. The reply is visible at the aircraft's terminal and withheld from the commander's network projection, message detail, REST history, and WebSocket stream.
+
+![Executed movement awaiting its return-radio confirmation](screenshots/execution-awaiting-confirmation.png)
+
+After resume, the acknowledgement arrives. The movement panel shows the original execution tick and the later confirmation receipt tick without sending another command.
+
+![Received execution acknowledgement with separate execution and receipt ticks](screenshots/execution-confirmed.png)
+
 ## Contested mission debrief
 
-The real-server regression waits through the initial command-post blackout, compares moving target reports, reacquires the drone during its hold, and sends a firing order. The commander first sees a launch receipt with no impact result. The final hit report reaches the command post over the radio after combat time stops. The debrief shows separate observation, delivery, launch, impact, and receipt ticks; its radio history includes the delivered firing order and impact packet. It also checks stale-lease rejection and a 390-pixel phone layout.
+The real-server regression waits through the initial command-post blackout, compares moving target reports, reacquires the drone during its hold, and sends a firing order. The commander first waits for a radio-delivered launch acknowledgement, with no impact result. The final hit report reaches the command post over the radio after combat time stops. The debrief shows separate observation, delivery, launch, acknowledgement, impact, and report-receipt ticks; its radio history includes the delivered firing order, execution acknowledgement, and impact packet. It also checks stale-lease rejection and a 390-pixel phone layout.
 
 ![Role-scoped contested mission debrief with separate combat and radio clocks](screenshots/contested-mission-debrief.png)
 
@@ -32,7 +42,7 @@ In [Sensor Relay Exercise](../data/scenarios/sensor-relay-exercise.v1.json), CAP
 
 ## Executed movement order
 
-The movement controls select a unit, course, and speed. The execution receipt confirms when the delivered and authorized command reaches the simulation. Course changes start a new great-circle arc from the current position, and Stop holds the resulting position.
+The movement controls select a unit, course, and speed. The execution receipt confirms when the delivered and authorized command reached the simulation, after its acknowledgement returns to the issuing terminal. Course changes start a new great-circle arc from the current position, and Stop holds the resulting position.
 
 ![Selected aircraft with an executed movement command](screenshots/real-movement-order-executed.png)
 

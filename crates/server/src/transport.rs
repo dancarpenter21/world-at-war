@@ -3,6 +3,9 @@ use sim_core::{NetworkEvent, NetworkTime, PacketMetadata};
 
 pub(super) enum DeliveryAction {
     ExecuteIntent(AuthorizedIntent),
+    ReceiveExecutionAck {
+        intent_id: Uuid,
+    },
     ReceiveImpactReport {
         recipient_unit_id: Uuid,
         report: sim_core::combat::ImpactReport,
@@ -63,6 +66,24 @@ pub(super) fn transmit_c2_message_with_fields(
     fields: BTreeMap<String, serde_json::Value>,
 ) -> Option<Uuid> {
     let origin_entity_id = game.roles.get(&origin_role_id)?.location_unit_id;
+    transmit_c2_message_from_entity(
+        game,
+        (origin_role_id, origin_entity_id),
+        recipient_entity_id,
+        profile_id,
+        rendered_text,
+        fields,
+    )
+}
+
+pub(super) fn transmit_c2_message_from_entity(
+    game: &mut Game,
+    (origin_role_id, origin_entity_id): (Uuid, Uuid),
+    recipient_entity_id: Uuid,
+    profile_id: &str,
+    rendered_text: String,
+    fields: BTreeMap<String, serde_json::Value>,
+) -> Option<Uuid> {
     let profile = game.message_profiles.get(profile_id)?.clone();
     let tick = game.simulation.radio_tick();
     let message = C2Message {
@@ -197,6 +218,9 @@ fn apply_delivery(game: &mut Game, message_id: Uuid, action: DeliveryAction) {
             game.simulation.queue_authorized_intent(intent)
         }
         DeliveryAction::ExecuteIntent(_) => {}
+        DeliveryAction::ReceiveExecutionAck { intent_id } => {
+            execution_acks::receive(game, message_id, intent_id);
+        }
         DeliveryAction::ReceiveImpactReport {
             recipient_unit_id,
             report,
@@ -223,6 +247,7 @@ fn apply_delivery(game: &mut Game, message_id: Uuid, action: DeliveryAction) {
                 DeliveryAction::ActivateRequest { request_id, .. }
                 | DeliveryAction::ExecuteRequest { request_id, .. } => *request_id,
                 DeliveryAction::ExecuteIntent(_)
+                | DeliveryAction::ReceiveExecutionAck { .. }
                 | DeliveryAction::ReceiveImpactReport { .. }
                 | DeliveryAction::ReceiveTrackReport { .. } => {
                     unreachable!()
@@ -245,6 +270,7 @@ fn fail_delivery(game: &mut Game, message_id: Uuid, action: DeliveryAction) {
         DeliveryAction::ActivateRequest { request_id, .. }
         | DeliveryAction::ExecuteRequest { request_id, .. } => Some(request_id),
         DeliveryAction::ExecuteIntent(_)
+        | DeliveryAction::ReceiveExecutionAck { .. }
         | DeliveryAction::ReceiveImpactReport { .. }
         | DeliveryAction::ReceiveTrackReport { .. } => None,
     };

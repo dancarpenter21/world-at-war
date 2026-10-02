@@ -66,7 +66,11 @@ fn until_complete(game: &mut Game) {
         }
         tick(game);
     }
-    panic!("mission did not complete");
+    panic!(
+        "mission did not complete at tick {}: {:?}",
+        game.simulation.tick(),
+        game.simulation.local_impact_reports(SHOOTER)
+    );
 }
 fn received(game: &mut Game) -> Vec<sim_core::combat::ReceivedImpactReport> {
     game.simulation
@@ -284,6 +288,15 @@ fn timed_blackout_prevents_initial_reports_and_patrol_positions_require_reacquis
     }
     assert!(!game.simulation.local_impact_reports(SHOOTER)[0].hit);
     assert!(received(&mut game).iter().any(|impact| !impact.report.hit));
+    for _ in 0..15 {
+        let track = &game.simulation.projection_for(POST, Side::Blue).tracks[0];
+        if track.observed_tick >= 20 && game.simulation.tick() - track.observed_tick <= 5 {
+            break;
+        }
+        tick(&mut game);
+    }
+    let track = &game.simulation.projection_for(POST, Side::Blue).tracks[0];
+    assert!(track.observed_tick >= 20 && game.simulation.tick() - track.observed_tick <= 5);
     fire(&mut game, COMMANDER, 98004);
     until_complete(&mut game);
     for _ in 0..20 {

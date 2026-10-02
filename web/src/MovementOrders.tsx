@@ -11,11 +11,12 @@ type MovementIntent = {
 };
 type OrderBody = { player_id: string; lease_generation: number; intent: MovementIntent };
 type Submission = { status: "queued" | "pending_authority"; message_id: string; request_id?: string };
-type IntentState = "queued" | "in_transit" | "awaiting_authority" | "awaiting_execution" | "executed" | "rejected" | "dropped" | "expired" | "denied" | "approved_no_executor";
-type Receipt = { intent: MovementIntent; state: IntentState; executed_tick?: number; error?: string };
+type IntentState = "queued" | "in_transit" | "awaiting_authority" | "awaiting_execution" | "awaiting_acknowledgement" | "unconfirmed" | "executed" | "rejected" | "dropped" | "expired" | "denied" | "approved_no_executor";
+type Receipt = { intent: MovementIntent; state: IntentState; executed_tick?: number; acknowledged_tick?: number; error?: string };
 const statusText: Record<IntentState, string> = {
   queued: "Queued for delivery", in_transit: "Command in transit", awaiting_authority: "Awaiting authority approval",
-  awaiting_execution: "Delivered; awaiting execution", executed: "Order executed", rejected: "Order rejected",
+  awaiting_execution: "Delivered; awaiting execution", awaiting_acknowledgement: "Delivered; awaiting execution confirmation",
+  unconfirmed: "Execution unconfirmed", executed: "Order executed", rejected: "Order rejected",
   dropped: "Command delivery failed", expired: "Command expired", denied: "Authority denied the order",
   approved_no_executor: "Approved; no executor available"
 };
@@ -128,6 +129,7 @@ export function MovementOrders({ apiBase, gameId, playerId, role, projection, ca
         {pending ? "Submitting movement order…" : feedback || (receipt ? <>
           <strong>{statusText[receipt.state]}{receipt.executed_tick !== undefined ? ` at tick ${receipt.executed_tick}` : ""}</strong>
           <span>{receiptUnit?.name ?? "Commanded unit"} · {movementDescription(receipt.intent.kind.Move)}</span>
+          {receipt.acknowledged_tick !== undefined && <small>Confirmed at radio tick {receipt.acknowledged_tick}</small>}
           {receipt.error && <small>{receipt.error}</small>}
         </> : receiptId ? "Checking order status…" : "Choose a unit, course, and speed. Remote orders take effect after delivery." )}
         {receiptId && receiptResource.status === "reconnecting" && <small>Order status temporarily unavailable; reconnecting.</small>}

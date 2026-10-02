@@ -1,5 +1,5 @@
 use super::*;
-use sim_core::{OrderKind, OrderResult, OrderStatus};
+use sim_core::{OrderKind, OrderStatus};
 
 pub(super) type SubmissionResult = Result<SubmissionOutcome, (StatusCode, Json<ErrorResponse>)>;
 
@@ -9,7 +9,6 @@ pub(super) struct IntentSubmission {
     intent: PlayerIntent,
     submitted_tick: u64,
     result: SubmissionResult,
-    execution: Option<(u64, OrderResult)>,
 }
 
 #[derive(Deserialize)]
@@ -25,6 +24,8 @@ pub(super) enum IntentState {
     InTransit,
     AwaitingAuthority,
     AwaitingExecution,
+    AwaitingAcknowledgement,
+    Unconfirmed,
     Executed,
     Rejected,
     Dropped,
@@ -44,6 +45,8 @@ pub(super) struct IntentReceipt {
     request_id: Option<Uuid>,
     #[serde(skip_serializing_if = "Option::is_none")]
     executed_tick: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    acknowledged_tick: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
 }
@@ -134,7 +137,6 @@ pub(super) fn submit_player_intent(
             intent,
             submitted_tick,
             result: result.clone(),
-            execution: None,
         },
     );
     result
@@ -143,8 +145,14 @@ pub(super) fn submit_player_intent(
 pub(super) fn record_execution_results(game: &mut Game) {
     let tick = game.simulation.tick();
     for result in game.simulation.drain_order_results() {
-        if let Some(submission) = game.intent_submissions.get_mut(&result.intent_id) {
-            submission.execution = Some((tick, result));
+        if let Some(submission) = game.intent_submissions.get(&result.intent_id) {
+            execution_acks::record_result(
+                game,
+                submission.role_id,
+                submission.intent.target,
+                tick,
+                result,
+            );
         }
     }
 }
@@ -175,11 +183,13 @@ pub(super) fn receipt_for(
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "intent_not_found", "order not found"))?;
     let intent_key = intent_id.to_string();
     let latest_message = game.network_messages.iter().rev().find(|record| {
-        record
-            .message
-            .fields
-            .get("intent_id")
-            .is_some_and(|id| id.as_str() == Some(intent_key.as_str()))
+        record.message.profile_id != execution_acks::ACK_PROFILE
+            && record.message.profile_id != impact_reports::IMPACT_REPORT_PROFILE
+            && record
+                .message
+                .fields
+                .get("intent_id")
+                .is_some_and(|id| id.as_str() == Some(intent_key.as_str()))
     });
     let mut receipt = IntentReceipt {
         intent: submission.intent.clone(),
@@ -188,6 +198,7 @@ pub(super) fn receipt_for(
         message_id: latest_message.map(|record| record.message.id),
         request_id: None,
         executed_tick: None,
+        acknowledged_tick: None,
         error: None,
     };
     match &submission.result {
@@ -249,8 +260,14 @@ pub(super) fn receipt_for(
             .error
             .or_else(|| latest_message.and_then(|record| record.drop_reason.clone()));
     }
-    if let Some((tick, result)) = &submission.execution {
-        receipt.executed_tick = Some(*tick);
+    if receipt.state == IntentState::AwaitingExecution
+        && game.roles[&role_id].location_unit_id != submission.intent.target
+    {
+        receipt.state = IntentState::AwaitingAcknowledgement;
+    }
+    if let Some((tick, received_tick, result)) = execution_acks::confirmation(game, intent_id) {
+        receipt.executed_tick = Some(tick);
+        receipt.acknowledged_tick = Some(received_tick);
         receipt.state = match &result.status {
             OrderStatus::Accepted => IntentState::Executed,
             OrderStatus::Rejected(reason) => {
@@ -258,6 +275,20 @@ pub(super) fn receipt_for(
                 IntentState::Rejected
             }
         };
+    }
+    if receipt.state == IntentState::AwaitingAcknowledgement {
+        let delivered_tick = latest_message
+            .and_then(|record| record.delivered_at_ns)
+            .map(|at| at.div_ceil(1_000_000_000));
+        if (game.simulation.mission_complete() && game.status == GameStatus::Paused)
+            || delivered_tick.is_some_and(|delivered| {
+                game.simulation.radio_tick().saturating_sub(delivered)
+                    >= execution_acks::confirmation_timeout(game)
+            })
+        {
+            receipt.state = IntentState::Unconfirmed;
+            receipt.error = Some("execution has not been confirmed over the radio".into());
+        }
     }
     if game.simulation.mission_complete()
         && matches!(
@@ -337,6 +368,7 @@ pub(super) struct DebriefEntry {
     observed_tick: Option<u64>,
     approval_ticks: Vec<u64>,
     launch_tick: Option<u64>,
+    acknowledged_tick: Option<u64>,
     impact_tick: Option<u64>,
     report_received_tick: Option<u64>,
     hit: Option<bool>,
@@ -466,6 +498,9 @@ pub(super) fn mission_debrief(game: &mut Game, role: &Role) -> MissionDebrief {
                     .and_then(|receipt| receipt.executed_tick)
             }),
             impact_tick: report.map(|report| report.resolved_tick),
+            acknowledged_tick: receipt
+                .as_ref()
+                .and_then(|receipt| receipt.acknowledged_tick),
             report_received_tick: received.map(|received| received.received_tick),
             hit: report.map(|report| report.hit),
             error: receipt.and_then(|receipt| receipt.error),
@@ -547,6 +582,7 @@ pub(super) fn mission_debrief(game: &mut Game, role: &Role) -> MissionDebrief {
             observed_tick: Some(report.observed_tick),
             approval_ticks: vec![],
             launch_tick: Some(report.launched_tick),
+            acknowledged_tick: None,
             impact_tick: Some(report.resolved_tick),
             report_received_tick: received_tick,
             hit: Some(report.hit),

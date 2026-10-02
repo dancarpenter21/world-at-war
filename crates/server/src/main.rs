@@ -1,6 +1,7 @@
 mod ai_orders;
 mod airport_catalog;
 mod credential_cookie;
+mod execution_acks;
 mod impact_reports;
 mod intents;
 #[cfg(test)]
@@ -99,6 +100,7 @@ struct Game {
     ai_planner: ai_orders::AiPlannerState,
     sensor_reports: sensor_reports::SensorReportState,
     impact_reports: impact_reports::ImpactReportState,
+    execution_acks: execution_acks::ExecutionAckState,
     intent_submissions: BTreeMap<Uuid, intents::IntentSubmission>,
     network_projection_sequence: u64,
     network_event_path: Option<PathBuf>,
@@ -808,6 +810,7 @@ async fn create_game(
             scenario.reporting_window_ticks,
         ),
         intent_submissions: BTreeMap::new(),
+        execution_acks: execution_acks::ExecutionAckState::default(),
         network_projection_sequence: 0,
         network_event_path: Some(network_event_path),
         network_event_sequence: 0,
@@ -1967,6 +1970,11 @@ async fn get_network_message(
 }
 
 fn network_message_visible(record: &NetworkMessageRecord, role: &Role) -> bool {
+    if record.message.profile_id == execution_acks::ACK_PROFILE {
+        return record.message.header.origin_entity_id == role.location_unit_id
+            || (record.message.header.recipient_entity_id == role.location_unit_id
+                && record.state == MessageState::Delivered);
+    }
     record.message.header.origin_role_id == role.id
         || (record.message.header.recipient_entity_id == role.location_unit_id
             && ((record.message.profile_id != sensor_reports::TRACK_REPORT_PROFILE
@@ -2711,10 +2719,13 @@ fn advance_game_tick(game: &mut Game) {
         game.simulation.advance_reporting_clock();
         game.network_projection_sequence = game.network_projection_sequence.saturating_add(1);
         process_network_messages(game);
+        execution_acks::send_pending(game);
         impact_reports::send_reports(game);
         process_network_messages(game);
         game.impact_reports.remaining_ticks = game.impact_reports.remaining_ticks.saturating_sub(1);
-        if game.impact_reports.remaining_ticks == 0 || impact_reports::reports_settled(game) {
+        if game.impact_reports.remaining_ticks == 0
+            || (impact_reports::reports_settled(game) && execution_acks::settled(game))
+        {
             transport::finish_reporting(game);
             game.status = GameStatus::Paused;
         }
@@ -2730,13 +2741,23 @@ fn advance_game_tick(game: &mut Game) {
         return;
     }
     game.simulation.step();
+    if !game.intent_submissions.is_empty() {
+        intents::record_execution_results(game);
+    }
     game.network_projection_sequence = game.network_projection_sequence.saturating_add(1);
     process_network_messages(game);
+    execution_acks::send_pending(game);
+    if game.status != GameStatus::Running {
+        return;
+    }
     impact_reports::send_reports(game);
     process_network_messages(game);
     if game.simulation.mission_complete() {
         game.impact_reports.remaining_ticks = game.impact_reports.window_ticks;
-        if game.impact_reports.remaining_ticks == 0 || impact_reports::reports_settled(game) {
+        if game.impact_reports.remaining_ticks == 0
+            || (impact_reports::reports_settled(game) && execution_acks::settled(game))
+        {
+            transport::finish_reporting(game);
             game.status = GameStatus::Paused;
         }
         return;
@@ -2906,6 +2927,7 @@ mod authority_tests {
                 scenario.reporting_window_ticks,
             ),
             intent_submissions: BTreeMap::new(),
+            execution_acks: execution_acks::ExecutionAckState::default(),
             network_projection_sequence: 0,
             network_event_path: None,
             network_event_sequence: 0,

@@ -87,7 +87,8 @@ async function openSession(page: Page, guest = false, projection = sessionProjec
       if (!body) { await json({ error: "Order not found." }, 404); return; }
       if (state.receiptFailure) { await json({ error: "Receipt temporarily unavailable." }, 503); return; }
       await json({ intent: body.intent, state: state.receiptState, submitted_tick: 12,
-        executed_tick: state.receiptState === "executed" ? 14 : undefined }); return;
+        executed_tick: state.receiptState === "executed" ? 14 : undefined,
+        acknowledged_tick: state.receiptState === "executed" ? 16 : undefined }); return;
     }
     if (pathname.endsWith("/state")) {
       const query = new URL(request.url()).searchParams;
@@ -444,6 +445,23 @@ test("retains the latest order receipt during an outage and recovers its executi
   expect(state.orderBodies.length).toBe(1);
   expect(state.errors).toEqual([]);
 });
+test("keeps an unanswered order unconfirmed and accepts a later execution reply without resubmission", async ({ page }) => {
+  const state = await openSession(page);
+  state.receiptState = "awaiting_acknowledgement";
+  const orders = page.getByRole("region", { name: "Movement orders" });
+  await orders.getByRole("button", { name: "Turn north", exact: true }).click();
+  await expect(orders.getByRole("status")).toContainText("Delivered; awaiting execution confirmation");
+  await expect(orders.getByRole("status")).not.toContainText("at tick");
+  state.receiptState = "unconfirmed";
+  await expect(orders.getByRole("status")).toContainText("Execution unconfirmed");
+  await expect(orders.getByRole("status")).not.toContainText("Order rejected");
+  state.receiptState = "executed";
+  await expect(orders.getByRole("status")).toContainText("Order executed at tick 14");
+  await expect(orders.getByRole("status")).toContainText("Confirmed at radio tick 16");
+  expect(state.orderBodies).toHaveLength(1);
+  expect(state.errors).toEqual([]);
+});
+
 test("opens the lobby before downloading the map and keeps host controls usable during loading", async ({ page }, testInfo) => {
   const pendingMaps: Route[] = [];
   await page.route("**/src/Globe.tsx", (route) => { pendingMaps.push(route); });

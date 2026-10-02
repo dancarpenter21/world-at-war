@@ -6,10 +6,10 @@ import { usePollingResource } from "./usePollingResource";
 
 type RadioLeg = { profile_id: string; state: string; sent_tick: number; delivered_tick: number | null };
 type Entry = { intent_id: string; platform_id: string; submitted_tick: number | null; observed_tick: number | null; approval_ticks: number[];
-  launch_tick: number | null; impact_tick: number | null; report_received_tick: number | null; hit: boolean | null; state: string; error: string | null; radio_legs: RadioLeg[] };
+  launch_tick: number | null; acknowledged_tick: number | null; impact_tick: number | null; report_received_tick: number | null; hit: boolean | null; state: string; error: string | null; radio_legs: RadioLeg[] };
 type Debrief = { tick: number; radio_tick: number; settling_reports: boolean; mission: CombatProjection["mission"]; entries: Entry[] };
 const tick = (value: number | null) => value === null ? "—" : String(value);
-const profileName = (profile: string) => profile.includes("impact-report") ? "Impact report" : profile.includes("authority") ? "Authority request" : "Firing order";
+const profileName = (profile: string) => profile.includes("network.ack") ? "Execution acknowledgement" : profile.includes("impact-report") ? "Impact report" : profile.includes("authority") ? "Authority request" : "Firing order";
 
 export function MissionDebrief({ apiBase, gameId, playerId, role, units, onClose }: {
   apiBase: string; gameId: string; playerId: string; role: Role; units: Unit[]; onClose: () => void;
@@ -29,11 +29,11 @@ export function MissionDebrief({ apiBase, gameId, playerId, role, units, onClose
       {data.settling_reports && <p role="status">Combat is stopped. Final radio reports are still settling.</p>}
       <p className="muted">Combat clock: {data.tick} · Radio clock: {data.radio_tick}</p>
       {!data.entries.length ? <p>No engagement orders are known to this role.</p> : <div className="debrief-table-wrap"><table>
-        <caption>Engagement timeline</caption><thead><tr><th scope="col">Order</th><th scope="col">Observed</th><th scope="col">Approved</th><th scope="col">Delivered</th><th scope="col">Launched</th><th scope="col">Impact</th><th scope="col">Report received</th><th scope="col">Result</th></tr></thead>
+        <caption>Engagement timeline</caption><thead><tr><th scope="col">Order</th><th scope="col">Observed</th><th scope="col">Approved</th><th scope="col">Delivered</th><th scope="col">Launched</th><th scope="col">Confirmed</th><th scope="col">Impact</th><th scope="col">Report received</th><th scope="col">Result</th></tr></thead>
         <tbody>{data.entries.map((entry, index) => {
           const firing = entry.radio_legs.find((leg) => leg.profile_id.includes("engage-order"));
           return <tr key={entry.intent_id} data-intent-id={entry.intent_id}><th scope="row">Shot {index + 1}<small>{units.find((unit) => unit.id === entry.platform_id)?.name ?? "Firing platform"}</small></th>
-            <td>{tick(entry.observed_tick)}</td><td>{entry.approval_ticks.length ? entry.approval_ticks.join(", ") : "—"}</td><td>{tick(firing?.delivered_tick ?? null)}</td><td>{tick(entry.launch_tick)}</td><td>{tick(entry.impact_tick)}</td><td>{tick(entry.report_received_tick)}</td>
+            <td>{tick(entry.observed_tick)}</td><td>{entry.approval_ticks.length ? entry.approval_ticks.join(", ") : "—"}</td><td>{tick(firing?.delivered_tick ?? null)}</td><td>{tick(entry.launch_tick)}</td><td>{tick(entry.acknowledged_tick)}</td><td>{tick(entry.impact_tick)}</td><td>{tick(entry.report_received_tick)}</td>
             <td>{entry.hit === null ? entry.state.replaceAll("_", " ") : entry.hit ? "Hit" : "Miss"}{entry.hit === null && entry.launch_tick !== null && <small>Impact result not received</small>}{entry.error && <small>{entry.error}</small>}</td></tr>;
         })}</tbody>
       </table></div>}
