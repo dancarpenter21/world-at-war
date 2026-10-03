@@ -3,6 +3,9 @@ FROM rust:1.89-bookworm AS server-build
 WORKDIR /workspace
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
+COPY data/scenarios ./data/scenarios
+COPY data/geo ./data/geo
+COPY data/aco ./data/aco
 COPY --from=c3mesh Cargo.toml Cargo.lock README.md /c3mesh/
 COPY --from=c3mesh src /c3mesh/src
 COPY --from=c3mesh examples /c3mesh/examples
@@ -15,6 +18,8 @@ COPY web/package.json web/package-lock.json ./web/
 RUN cd web && npm ci
 COPY web ./web
 COPY data/communications ./data/communications
+COPY data/scenarios ./data/scenarios
+COPY data/aco ./data/aco
 COPY --from=server-build /workspace/target/debug/world-at-war-server ./target/debug/world-at-war-server
 WORKDIR /workspace/web
 CMD ["sh", "-lc", "npx tsc --project tsconfig.e2e.json && npx playwright test"]

@@ -1,5 +1,6 @@
 //! Small, deterministic campaign/airspace model. All distances are SI and times are ticks.
 use super::*;
+use sim_geo::{LatLon, MslAltitude, SourceGeometry};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Objective {
@@ -64,50 +65,102 @@ pub struct AirspaceVolume {
     pub name: String,
     pub kind: AirspaceKind,
     pub polygon: Vec<GeoPose>,
-    pub floor_m: f64,
-    pub ceiling_m: f64,
+    pub floor_m: MslAltitude,
+    pub ceiling_m: MslAltitude,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_geometry: Option<SourceGeometry>,
+    #[serde(default)]
+    pub active_periods: Vec<ActivationPeriod>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<AirspaceSource>,
     pub start_tick: u64,
     pub end_tick: u64,
     pub controller_role_id: Uuid,
     pub control_method: ControlMethod,
 }
 
-impl AirspaceVolume {
-    pub fn contains(&self, pose: GeoPose, tick: u64) -> bool {
-        tick >= self.start_tick
-            && tick < self.end_tick
-            && pose.altitude_m >= self.floor_m
-            && pose.altitude_m < self.ceiling_m
-            && point_in_polygon(pose, &self.polygon)
-    }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ActivationPeriod {
+    pub start_tick: u64,
+    pub end_tick: u64,
 }
-
-fn point_in_polygon(p: GeoPose, polygon: &[GeoPose]) -> bool {
-    let mut inside = false;
-    for (a, b) in polygon
-        .iter()
-        .zip(polygon.iter().cycle().skip(1))
-        .take(polygon.len())
-    {
-        if (a.latitude_deg > p.latitude_deg) != (b.latitude_deg > p.latitude_deg)
-            && p.longitude_deg
-                < (b.longitude_deg - a.longitude_deg) * (p.latitude_deg - a.latitude_deg)
-                    / (b.latitude_deg - a.latitude_deg)
-                    + a.longitude_deg
-        {
-            inside = !inside;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AirspaceSource {
+    pub order_id: String,
+    pub external_id: String,
+    pub message_hash: String,
+    pub raw: String,
+    pub resolutions: serde_json::Value,
+}
+impl AirspaceVolume {
+    pub fn ring(&self) -> Vec<LatLon> {
+        self.polygon
+            .iter()
+            .map(|p| LatLon {
+                latitude_deg: p.latitude_deg,
+                longitude_deg: p.longitude_deg,
+            })
+            .collect()
+    }
+    pub fn periods(&self) -> Vec<ActivationPeriod> {
+        if self.active_periods.is_empty() {
+            vec![ActivationPeriod {
+                start_tick: self.start_tick,
+                end_tick: self.end_tick,
+            }]
+        } else {
+            self.active_periods.clone()
         }
     }
-    inside
+    pub fn active(&self, tick: u64) -> bool {
+        self.periods()
+            .iter()
+            .any(|p| p.start_tick <= tick && tick < p.end_tick)
+    }
+    pub fn covers(&self, start: u64, end: u64) -> bool {
+        start < end
+            && self
+                .periods()
+                .iter()
+                .any(|p| p.start_tick <= start && end <= p.end_tick)
+    }
+    pub fn normalize(&mut self) -> Result<(), String> {
+        let mut ring = if let Some(g) = &self.source_geometry {
+            g.polygon()?
+        } else {
+            self.ring()
+        };
+        sim_geo::normalize_ring(&mut ring);
+        sim_geo::validate_ring(&ring)?;
+        self.polygon = ring
+            .into_iter()
+            .map(|p| GeoPose {
+                latitude_deg: p.latitude_deg,
+                longitude_deg: p.longitude_deg,
+                altitude_m: 0.0,
+            })
+            .collect();
+        if !self.active_periods.is_empty() {
+            self.active_periods.sort_by_key(|p| p.start_tick);
+            self.start_tick = self.active_periods[0].start_tick;
+            self.end_tick = self.active_periods.last().unwrap().end_tick;
+        }
+        Ok(())
+    }
+    pub fn contains(&self, pose: GeoPose, tick: u64) -> bool {
+        self.active(tick)
+            && pose.altitude_m >= self.floor_m.meters()
+            && pose.altitude_m < self.ceiling_m.meters()
+            && sim_geo::contains(
+                &self.ring(),
+                LatLon {
+                    latitude_deg: pose.latitude_deg,
+                    longitude_deg: pose.longitude_deg,
+                },
+            )
+    }
 }
 
-fn edges(polygon: &[GeoPose]) -> impl Iterator<Item = (GeoPose, GeoPose)> + '_ {
-    polygon
-        .iter()
-        .copied()
-        .zip(polygon.iter().copied().cycle().skip(1))
-        .take(polygon.len())
-}
 fn crosses(a: GeoPose, b: GeoPose, c: GeoPose, d: GeoPose) -> bool {
     let side = |p: GeoPose, q: GeoPose, r: GeoPose| {
         (q.longitude_deg - p.longitude_deg) * (r.latitude_deg - p.latitude_deg)
@@ -118,9 +171,19 @@ fn crosses(a: GeoPose, b: GeoPose, c: GeoPose, d: GeoPose) -> bool {
 fn route_intersects_volume(route: &[GeoPose], volume: &AirspaceVolume) -> bool {
     route.iter().any(|p| volume.contains(*p, volume.start_tick))
         || route.windows(2).any(|pair| {
-            pair[0].altitude_m.min(pair[1].altitude_m) < volume.ceiling_m
-                && pair[0].altitude_m.max(pair[1].altitude_m) >= volume.floor_m
-                && edges(&volume.polygon).any(|(a, b)| crosses(pair[0], pair[1], a, b))
+            pair[0].altitude_m.min(pair[1].altitude_m) < volume.ceiling_m.meters()
+                && pair[0].altitude_m.max(pair[1].altitude_m) >= volume.floor_m.meters()
+                && sim_geo::segment_intersects(
+                    &volume.ring(),
+                    LatLon {
+                        latitude_deg: pair[0].latitude_deg,
+                        longitude_deg: pair[0].longitude_deg,
+                    },
+                    LatLon {
+                        latitude_deg: pair[1].latitude_deg,
+                        longitude_deg: pair[1].longitude_deg,
+                    },
+                )
         })
 }
 fn routes_conflict(a: &[GeoPose], b: &[GeoPose]) -> bool {
@@ -315,9 +378,8 @@ impl CampaignPlan {
         for a in &self.airspaces {
             if a.polygon.len() < 3
                 || a.polygon.iter().any(|p| !geo_pose_is_finite(*p))
-                || !a.floor_m.is_finite()
-                || !a.ceiling_m.is_finite()
-                || a.floor_m < 0.0
+                || !a.floor_m.meters().is_finite()
+                || !a.ceiling_m.meters().is_finite()
                 || a.floor_m >= a.ceiling_m
                 || a.start_tick >= a.end_tick
                 || roles
@@ -326,18 +388,14 @@ impl CampaignPlan {
             {
                 return Err(format!("invalid airspace {}", a.name));
             }
-            let (west, east, south, north) = bounds(a);
-            if east - west >= 180.0 || east == west || north == south {
-                return Err("airspaces must be non-degenerate regional polygons without antimeridian crossings".into());
-            }
-            let segments: Vec<_> = edges(&a.polygon).collect();
-            if segments.iter().enumerate().any(|(i, (p, q))| {
-                segments
-                    .iter()
-                    .skip(i + 1)
-                    .any(|(r, s)| crosses(*p, *q, *r, *s))
-            }) {
-                return Err("airspace polygon intersects itself".into());
+            sim_geo::validate_ring(&a.ring())?;
+            let periods = a.periods();
+            if periods.iter().any(|p| p.start_tick >= p.end_tick)
+                || periods.windows(2).any(|p| p[0].end_tick > p[1].start_tick)
+            {
+                return Err(
+                    "airspace activation periods must be ordered, non-overlapping windows".into(),
+                );
             }
         }
         for (i, a) in self.airspaces.iter().enumerate() {
@@ -461,30 +519,14 @@ impl CampaignPlan {
     }
 }
 
-fn bounds(a: &AirspaceVolume) -> (f64, f64, f64, f64) {
-    a.polygon.iter().fold(
-        (180.0_f64, -180.0_f64, 90.0_f64, -90.0_f64),
-        |(w, e, s, n), p| {
-            (
-                w.min(p.longitude_deg),
-                e.max(p.longitude_deg),
-                s.min(p.latitude_deg),
-                n.max(p.latitude_deg),
-            )
-        },
-    )
-}
 fn overlap(a: &AirspaceVolume, b: &AirspaceVolume) -> bool {
-    let (aw, ae, as_, an) = bounds(a);
-    let (bw, be, bs, bn) = bounds(b);
-    a.start_tick < b.end_tick
-        && b.start_tick < a.end_tick
-        && a.floor_m < b.ceiling_m
+    a.periods().iter().any(|a| {
+        b.periods()
+            .iter()
+            .any(|b| a.start_tick < b.end_tick && b.start_tick < a.end_tick)
+    }) && a.floor_m < b.ceiling_m
         && b.floor_m < a.ceiling_m
-        && aw < be
-        && bw < ae
-        && as_ < bn
-        && bs < an
+        && sim_geo::polygons_overlap(&a.ring(), &b.ring())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -661,6 +703,7 @@ impl Simulation {
         ato: &AirTaskingOrder,
     ) {
         let tick = self.tick();
+        let mut tasking_changed = false;
         {
             let mut ops = self.world.resource_mut::<Operations>();
             if ops
@@ -671,16 +714,31 @@ impl Simulation {
                 return;
             }
             ops.revisions.insert((unit, ato.plan_id), ato.revision);
+            let changed: BTreeSet<_> = ops
+                .airspaces
+                .get(&unit)
+                .into_iter()
+                .flatten()
+                .filter(|old| {
+                    aco.volumes.iter().find(|v| v.id == old.id).is_none_or(|v| {
+                        serde_json::to_value(v).ok() != serde_json::to_value(old).ok()
+                    })
+                })
+                .map(|v| v.id)
+                .collect();
+            if let Some(clearances) = ops.clearances.get_mut(&unit) {
+                clearances.retain(|c| !changed.contains(&c.airspace_id));
+            }
             ops.airspaces.insert(unit, aco.volumes.clone());
             for old in ops.missions.values_mut().filter(|m| {
                 m.task.unit_id == unit
                     && m.plan_id == ato.plan_id
                     && !ato.missions.iter().any(|task| task.id == m.task.id)
             }) {
+                tasking_changed = true;
                 old.state = MissionState::Cancelled;
                 old.detail = "Superseded by received tasking revision".into();
             }
-            ops.clearances.remove(&unit);
             for task in ato.missions.iter().filter(|m| m.unit_id == unit) {
                 if ops
                     .missions
@@ -689,6 +747,13 @@ impl Simulation {
                 {
                     continue;
                 }
+                if let Some(old) = ops.missions.get_mut(&task.id) {
+                    if serde_json::to_value(&old.task).ok() == serde_json::to_value(task).ok() {
+                        old.revision = ato.revision;
+                        continue;
+                    }
+                }
+                tasking_changed = true;
                 let fired = ops.missions.get(&task.id).is_some_and(|m| m.fired);
                 ops.missions.insert(
                     task.id,
@@ -725,6 +790,9 @@ impl Simulation {
                     });
                 }
             }
+        }
+        if !tasking_changed {
+            return;
         }
         let mut query = self.world.query::<(
             &SimEntityId,

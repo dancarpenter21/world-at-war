@@ -259,3 +259,59 @@ fn exhausted_aircraft_stops_instead_of_coasting_after_mission_failure() {
         serde_json::to_value(stopped).unwrap()
     );
 }
+
+#[test]
+fn message_retry_recomputes_routes_after_receiver_leaves_jamming() {
+    let scenario = sim_scenario::jammed_flight_scenario();
+    let receiver = scenario.units[0].id;
+    let sender = scenario.units[1].id;
+    let mut simulation = scenario.spawn().unwrap();
+    for _ in 0..10 {
+        simulation.step();
+        simulation.drain_deliveries();
+    }
+    assert!(
+        simulation
+            .projection_for(receiver, Side::Blue)
+            .own_units
+            .iter()
+            .find(|unit| unit.id == receiver)
+            .unwrap()
+            .receiver_jammed
+    );
+    let message = id(99001);
+    simulation
+        .send_message(
+            message,
+            sender,
+            receiver,
+            b"retry after outage".to_vec(),
+            50,
+        )
+        .unwrap();
+    simulation.step();
+    assert!(!simulation
+        .drain_deliveries()
+        .iter()
+        .any(|event| event.id == message));
+    let mut delivered = 0;
+    let mut acknowledged = 0;
+    for _ in 0..20 {
+        simulation.step();
+        for event in simulation
+            .drain_deliveries()
+            .into_iter()
+            .filter(|event| event.id == message)
+        {
+            if event.state == DeliveryState::Delivered {
+                assert_eq!(event.payload, b"retry after outage");
+                delivered += 1;
+            }
+            if event.state == DeliveryState::Acknowledged {
+                acknowledged += 1;
+            }
+        }
+    }
+    assert_eq!(delivered, 1);
+    assert_eq!(acknowledged, 1);
+}

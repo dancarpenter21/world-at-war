@@ -1,5 +1,8 @@
 mod airport_catalog;
+mod airspace_import;
+mod benchmark;
 mod credential_cookie;
+mod diagnostics;
 mod planning;
 mod space_assets;
 mod space_catalog;
@@ -38,7 +41,7 @@ use sim_catalog::{
 use sim_comms::{C2Message, CommunicationsCatalog, MessageHeader, MessageState};
 use sim_core::{
     AuthorityDefinition, AuthorityPolicy, AuthorityRoleKind, AuthorizationRecord, AuthorizedIntent,
-    DeliveryState, PlayerIntent, RoleProjection, Side, Simulation,
+    DeliveryState, PlayerIntent, Side, Simulation,
 };
 use sim_scenario::{
     global_crisis_scenario, jammed_flight_scenario, regional_campaign_scenario, Scenario,
@@ -75,6 +78,7 @@ struct Game {
     host: Uuid,
     status: GameStatus,
     simulation: Simulation,
+    diagnostics: diagnostics::Diagnostics,
     roles: BTreeMap<Uuid, Role>,
     authority: AuthorityDefinition,
     authority_requests: BTreeMap<Uuid, AuthorityRequest>,
@@ -453,6 +457,10 @@ type CookieApiResult<T> = Result<(HeaderMap, Json<T>), (StatusCode, Json<ErrorRe
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().is_some_and(|arg| arg == "--benchmark") {
+        return benchmark::run(&args[1..]);
+    }
     let scenarios = [
         regional_campaign_scenario(),
         global_crisis_scenario(),
@@ -492,8 +500,13 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(async move {
         airport_catalog.refresh_if_stale().await;
     });
+    sim_geo::geoid::validate().map_err(anyhow::Error::msg)?;
     let app = Router::new()
         .route("/health", get(health))
+        .route("/v1/geoid/egm96", get(|| async { ([(axum::http::header::CONTENT_TYPE,"application/octet-stream"),(axum::http::header::CACHE_CONTROL,"public, max-age=86400")],sim_geo::geoid::GRID) }))
+        .route("/v1/geoid/manifest", get(|| async { Json(serde_json::json!({"sha256":sim_geo::geoid::SHA256,"rows":721,"columns":1441,"spacing_degrees":0.25,"model":"EGM96"})) }))
+        .route("/v1/games/{game_id}/roles/{role_id}/planning/aco/preview", post(airspace_import::preview))
+        .route("/v1/games/{game_id}/roles/{role_id}/planning/aco/apply", post(airspace_import::apply))
         .route("/v1/airport-catalog/status", get(airport_catalog_status))
         .route("/v1/airports", get(list_airports))
         .route("/v1/airports/{airport_id}", get(get_airport))
@@ -542,6 +555,7 @@ async fn main() -> anyhow::Result<()> {
             post(submit_intent),
         )
         .route("/v1/games/{game_id}/state", get(get_projection))
+        .route("/v1/games/{game_id}/diagnostics", get(diagnostics::get_diagnostics))
         .route("/v1/games/{game_id}/network", get(get_network_projection))
         .route(
             "/v1/games/{game_id}/network/events",
@@ -748,6 +762,7 @@ async fn create_game(
         host: request.host_player_id,
         status: GameStatus::Lobby,
         simulation,
+        diagnostics: diagnostics::Diagnostics::default(),
         roles,
         authority,
         authority_requests: BTreeMap::new(),
@@ -2038,16 +2053,24 @@ async fn get_projection(
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
     Query(query): Query<ProjectionQuery>,
-) -> ApiResult<RoleProjection> {
+) -> Result<axum::response::Response, (StatusCode, Json<ErrorResponse>)> {
     let mut games = state.games.write().await;
     let game = games
         .get_mut(&game_id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
-    let role = authorized_role(game, &query)?;
-    Ok(Json(
-        game.simulation
-            .projection_for(role.location_unit_id, role.side),
-    ))
+    let role = authorized_role(game, &query)?.clone();
+    let bytes = diagnostics::projection_bytes(game, &role).map_err(|error| {
+        api_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "projection_encoding",
+            error.to_string(),
+        )
+    })?;
+    Ok((
+        [(axum::http::header::CONTENT_TYPE, "application/json")],
+        bytes,
+    )
+        .into_response())
 }
 
 async fn get_network_projection(
@@ -2890,12 +2913,14 @@ async fn stream_socket(
 async fn run_simulation_loop(state: AppState) {
     let mut interval = tokio::time::interval(Duration::from_secs(1));
     loop {
-        interval.tick().await;
+        let scheduled = interval.tick().await;
         let mut games = state.games.write().await;
         for game in games
             .values_mut()
             .filter(|game| game.status == GameStatus::Running)
         {
+            let tick_started = std::time::Instant::now();
+            let schedule_delay_ms = scheduled.elapsed().as_secs_f64() * 1000.0;
             let ai_roles: Vec<Role> = game
                 .roles
                 .values()
@@ -2922,6 +2947,10 @@ async fn run_simulation_loop(state: AppState) {
             game.simulation.step();
             process_message_deliveries(game);
             planning::report_tick(game);
+            game.diagnostics.record_tick(
+                tick_started.elapsed().as_secs_f64() * 1000.0,
+                schedule_delay_ms,
+            );
         }
     }
 }
@@ -3026,6 +3055,7 @@ mod authority_tests {
             host: Uuid::from_u128(901),
             status: GameStatus::Running,
             simulation: scenario.spawn().unwrap(),
+            diagnostics: diagnostics::Diagnostics::default(),
             roles,
             authority,
             authority_requests: BTreeMap::new(),

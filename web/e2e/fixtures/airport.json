@@ -1,0 +1,8 @@
+{
+  "id": "TEST", "name": "Offline training airfield", "kind": "small_airport", "status": "open",
+  "latitude_deg": 38, "longitude_deg": -77, "elevation_m": 0,
+  "country_code": "US", "region_code": "US-VA", "municipality": null,
+  "identifiers": { "ourairports_ident": "TEST" }, "ownership_type": null, "facility_use": null,
+  "military_use": "unknown", "joint_use": null, "military_landing_rights": null,
+  "source_ids": ["e2e-fixture"], "runways": []
+}

@@ -8,7 +8,7 @@ export class OperationsLayer {
   constructor(private readonly entities: EntityCollection) {}
   update(view: PlanningView) {
     const plan = view.received;
-    const active = plan?.airspaces.filter(a => a.start_tick <= view.tick && view.tick < a.end_tick) ?? [];
+    const active = plan?.airspaces.filter(a => (a.active_periods?.length ? a.active_periods : [a]).some(period => period.start_tick <= view.tick && view.tick < period.end_tick)) ?? [];
     const key = `${plan?.id}:${plan?.revision}:${active.map(a => a.id).join()}`;
     if (key === this.revision) return;
     this.clear(); this.revision = key;

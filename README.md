@@ -10,7 +10,7 @@ The broader target architecture, planned simulation fidelity, and acceptance cri
 
 - A deterministic Rust ECS simulation with one-second ticks, platform movement, server-side projections, and simple Red patrol AI.
 - Mandatory per-entity c3mesh network endpoints, bounded packet queues, deterministic loss and weighted scheduling, cyclic flight paths, geographic receiver-jamming regions, and directional link status.
-- A lobby that creates and joins games, role claiming, game start/pause controls, and REST/WebSocket state delivery.
+- A polling multiplayer lobby, role claiming, game start/pause controls, and REST/WebSocket state delivery. Reload restores the selected game and held role without renewing its lease; temporary connection failures retry, and missing games or lost ownership return to the lobby.
 - A Cesium operational map that keeps authored owned units and uncertain tracks visually separate from the public orbital catalog, reconciling entities in place so movement ticks do not recreate or flicker MIL-STD-2525D icons.
 - A lazy full-screen space-asset workspace with worker-based bulk propagation, point-primitive rendering, UTC playback, search/facets, sourced payload cards, and authority-routed satellite requests.
 - A versioned authority definition: roles, operational/support/advisory/transmit relationships, policies, direct grants, approval sequences, vacant-role resolution, and human approval or denial of requests.
@@ -20,15 +20,17 @@ The broader target architecture, planned simulation fidelity, and acceptance cri
 - A versioned public-safe communications catalog, per-game seed/policy/checksum pinning, append-only message events, and role-filtered map and full-screen network views.
 - Tick-driven application transport with 512-byte fragments, reassembly, three attempts spaced five ticks apart, independent return-path acknowledgements, expiry, and duplicate suppression. Orders execute after delivery; recipients cannot inspect undelivered command messages.
 - A joint planning workspace for editing campaign intent, objectives, phases, component support, missions and airspaces; comparing courses; proposing amendments; and publishing versioned tasking over communications.
+- An ACO text/file importer with UTC-to-tick anchoring, per-record preview and resolutions, explicit exclusion, revision-checked draft application, and source provenance. Operational airspaces follow each delivered activation period.
 - Delivered clearances, controller handoffs, lost-communications procedures, mission reports, and map overlays. Training combat models abstract fuel/ammunition, seeded weapon outcomes and binary damage; effect assessments use the receiving role's observed tracks.
+- Bounded role-authorized runtime diagnostics for tick/projection costs, state-request freshness, map processing and visible queues; an offline release benchmark with repeat and baseline projection-hash checks.
 - Earth-horizon sensing, scan intervals and field of regard, aging tracks, and delayed friendly-position/contact reports instead of global friendly truth.
 
-Current limitations: controller ground-truth privileges, durable packet-level history, crash recovery, and full replay remain planned. The message log records server C2 lifecycle events; internal knowledge reports and individual fragments are not a complete durable packet audit. Sensor, airspace and combat behavior uses simplified training estimates: airspaces are regional polygons without antimeridian crossings, overlap checks are conservative, and unapproved entry is reported as a violation. The broader terrain, logistics, cyber, multi-domain platform and multi-source catalog systems remain planned work. Global Crisis performance has not been certified against the roadmap budgets.
+Current limitations: controller ground-truth privileges, durable packet-level history, crash recovery, and full replay remain planned. The message log records server C2 lifecycle events; internal knowledge reports and individual fragments are not a complete durable packet audit. Sensor, airspace and combat behavior uses simplified training estimates: airspaces use shared spherical geometry and explicit MSL bounds, while the Cesium altitude rendering remains approximate; unapproved entry is reported as a violation. The broader terrain, logistics, cyber, multi-domain platform and multi-source catalog systems remain planned work. The measured 64-entity Global Crisis core tick p95 is 52–58 ms on the documented development hardware; full server/client load and roadmap-scale budgets remain uncertified. See [performance measurements and reproduction commands](docs/performance/README.md).
 
 ## Prerequisites
 
 - Rust toolchain compatible with the Rust 2021 workspace.
-- The pre-publish `c3mesh` checkout in a sibling directory, so this repository and the crate resolve as `world-at-war/` and `c3mesh/` under the same parent.
+- The `c3mesh` v0.2.0 checkout (tag `v0.2.0`) in a sibling directory, so this repository and the crate resolve as `world-at-war/` and `c3mesh/` under the same parent.
 - Node.js 22+ and npm for frontend development.
 - Docker Compose v2 for the container workflows.
 - A Space-Track account only when creating a scenario that requires the public orbital catalog.
@@ -95,7 +97,7 @@ From the setup panel, enter Space-Track credentials and choose whether to rememb
 
 The service loads a valid cached GP snapshot on startup, labels objects for map rendering, and pins its checksum to each game. An explicit Space-Track sign-in attempts to download and atomically save a replacement snapshot. If that refresh fails, the existing cache remains playable and the UI marks it as cached while showing the refresh error. A snapshot becomes marked stale after one week, but staleness does not prevent a game from using it. The synchronization cooldown is one hour **after a successful persisted download only**. Failed authentication, authorization, network, rate-limit, or catalog parsing attempts can be corrected and retried without triggering that local cooldown.
 
-The browser integration test drives the rendered setup form, follows the Rust session-cookie flow, downloads a two-object GP fixture from an in-process Space-Track-compatible server, and verifies the checksum snapshot written under an isolated temporary directory. Run it in the dedicated test container, which pins the browser image to the project's Playwright version and includes Chromium without adding browser dependencies to the production images:
+The browser suite uses isolated Rust servers, separate player contexts, an offline airport fixture, and a local Space-Track-compatible provider. It covers campaign delivery and role-scoped visibility, reload and WebSocket recovery, ACO imports, runtime diagnostics, clearances, controller handoffs and mission cancellation. The setup-form test also checks the encrypted credential-cookie flow and persisted two-object GP snapshot. Run the suite in the dedicated test container, which pins Chromium to the project's Playwright version:
 
 ```sh
 docker compose --profile test run --rm --build e2e
@@ -139,6 +141,10 @@ Create **Regional Joint Campaign**, claim **Joint Force Commander**, start the s
 
 In another browser session, claim a pilot or sector-controller role to receive the plan, request/grant clearances, offer/accept handoffs, and inspect delayed mission reports. An accepted handoff takes effect when its message reaches the aircraft. Map airspaces and routes come from the received plan, never the unpublished draft. Remote friendly positions and tracks may be stale during interference.
 
+Open **Import airspace order** in the planning workspace to paste an ACO or select a text file. Enter an explicit UTC anchor, corresponding simulation tick, year, and UTC horizon. Preview the order, map controllers and airspace kinds, resolve unsupported vertical bounds to metres MSL and activation windows to tick ranges, or explicitly exclude invalid records. Geometry errors require correcting the source or excluding the record. Preview again after changes, then apply to the saved draft. Application does not publish the order. Imported boundaries and activation periods are amended through the source import; normal campaign saves preserve their geometry and provenance.
+
+ACO endpoints are `POST /v1/games/{id}/roles/{role_id}/planning/aco/preview` and `/apply`. Both accept `player_id`, `lease_generation`, `expected_revision`, `source`, and `options` (`anchor_utc`, `anchor_tick`, `year`, `horizon_end_utc`, and per-external-ID `resolutions`). Apply rejects invalid or stale requests without modifying the draft. Reimporting an unchanged message preserves IDs and the draft revision. The supported dialect is fixture-defined in `data/aco/labelled.aco`; this is not a universal ACO parser.
+
 The planning API is `GET /v1/games/{id}/planning?player_id=...&role_id=...` and `POST /v1/games/{id}/roles/{role_id}/planning`. Mutations require `player_id`, `lease_generation`, and a tagged `action`: `save`, `propose`, `adopt_proposal`, `publish`, `request_clearance`, `grant_clearance`, `offer_handoff`, `accept_handoff`, or `cancel`. Saves and publication use `expected_revision`; published revisions are immutable. Fixture plans, defensive tasking and explicitly estimated combat parameters live in `data/scenarios/`.
 
 ## Communications catalog and network APIs
@@ -178,7 +184,25 @@ npm run build
 npm run test:e2e
 ```
 
-Browser tests require Playwright Chromium. The planning browser test uses API fixtures and writes `web/test-results/joint-planning.png`; Rust tests separately exercise publication, delivery, authority, handoffs and mission execution. The Space-Track browser test uses a local mock unless both live-provider test variables are explicitly set.
+Browser tests require Playwright Chromium. The seven campaign integration tests use real application APIs and simulation delivery; they only replace external map imagery and deliberately interrupt requests/streams for recovery checks. The smaller planning contract test retains API fixtures. Host runs write planning/import screenshots and failure traces under `web/test-results/`; view a failure trace with `npx playwright show-trace <trace.zip>`. The Space-Track test uses a local mock unless both live-provider test variables are explicitly set. Tests never read or modify the development stack's catalog cache.
+
+To retain artifacts from a container run, omit `--rm`, name the test container, and copy its results afterward:
+
+```sh
+docker compose --profile test run --name world-at-war-browser-tests --build e2e
+docker cp world-at-war-browser-tests:/workspace/web/test-results/. web/test-results/
+docker rm world-at-war-browser-tests
+```
+
+For an interactive Windows Chrome debug session from WSL, use PowerShell to start the installed Windows executable with a dedicated profile (after starting the development stack):
+
+```powershell
+$chrome = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+$profilePath = Join-Path $env:LOCALAPPDATA "WorldAtWarChromeDebug"
+Start-Process -FilePath $chrome -ArgumentList @("--remote-debugging-port=9222", "--user-data-dir=`"$profilePath`"", "--no-first-run", "http://localhost:8080")
+```
+
+Chrome exposes CDP at `http://localhost:9222` on Windows. Access it through Windows tooling when WSL cannot reach Windows loopback. `PLAYWRIGHT_WS_ENDPOINT` remains a Playwright-protocol endpoint, not a Chrome CDP URL. The dedicated profile starts without your normal browser's remembered Space-Track cookie; use the original browser profile to restore previously saved credentials, or configure the ignored root `.env` for Compose. Role recovery likewise uses browser-local identity and an in-memory server; it does not implement authenticated resume tokens or recovery after a server restart.
 
 For Compose-only validation:
 

@@ -1,21 +1,25 @@
 # World At War Implementation Plan
 
-## Implementation checkpoint — 2026-09-27
+## Implementation checkpoint — 2026-10-03
 
 The sections below remain the target architecture, not a declaration of completed release phases. The communications checkpoint is recorded in `plans/fdffd4709ad9bdb1717bb4035a45af51ed346695.md` (implementation commit `fdffd47`). The current increment adds an offline Regional Joint Campaign: versioned collaborative plans, two courses of action, delivered air tasking/airspace orders, clearances and handoffs, basic mission execution/combat, role-owned reports, and a Cesium planning workspace/overlays.
 
+The browser increment adds a real-server multiplayer suite, selected-game/role restoration across reloads, network reconnect validation, and an ACO preview/resolution/apply interface. Imported airspaces retain source geometry/provenance and separate activation periods through draft saves; only delivered plans feed operational overlays. Docker builds now include the required scenario and geography inputs.
+
 Communications now include tick-driven fragmentation/reassembly, bounded retries, expiry, independent acknowledgements and duplicate suppression. Remote friendly positions and contacts arrive through reports; application orders wait for delivery. This advances Phases 1–2 and a limited air/combat portion of Phase 3; it does not complete any phase's full exit criteria.
+
+The performance increment adds bounded, role-authorized runtime diagnostics and an offline release benchmark for Regional Joint Campaign and Global Crisis. Indexed link lookup, per-tick usable routes, shared report serialization and role-filtered telemetry reduce Global Crisis core tick p95 from 1,010–1,022 ms to 51.5–57.8 ms on the documented WSL hardware. All role-projection hashes match the pre-optimization baseline across both scenarios and repeated runs. See [measurements, workload limits and regression command](docs/performance/README.md). Full server AI/authority/audit time is measured by runtime diagnostics; the offline benchmark does not include it.
 
 Next work remains:
 
-- Certify multiplayer/reconnect and hidden-information behavior with multiple real browser sessions; the planning browser test currently uses API fixtures, with delivery behavior covered separately in Rust.
-- Complete controller/monitor visibility, durable packet audit and information-management policy fidelity. Measure Global Crisis tick performance before accepting the performance budgets; full-mesh report dissemination is a likely optimization target.
+- Extend browser coverage to monitor privileges and authenticated identity/lease handling. Separate real browser contexts now cover role exclusion, unpublished and undelivered plans, hidden truth IDs, reload recovery and stream resynchronization. A four-player workflow verifies clearance request/approval, controller handoff acceptance and aircraft receipt, delayed cancellation reports, duplicate handoff rejection and controller authority boundaries. Server restart recovery remains unimplemented.
+- Complete controller/monitor visibility, durable packet audit and information-management policy fidelity. Extend the measured core benchmark to full-server concurrent-client load and long-running soaks before accepting the roadmap performance budgets.
 - Add terrain-aware sensing, richer fusion/SIGINT, remaining multi-domain simulation/logistics and goal-directed Red AI.
 - Add database-backed persistence, deterministic recovery/replay, and the hardening/soak milestones.
 
 See README for the implemented workflow, API entry points and explicit fidelity limits. Campaign state remains memory-resident, and the combat fixtures are labeled gameplay estimates rather than sourced platform performance.
 
-Checkpoint validation: the Rust workspace suite and added message-visibility regression pass (56 tests total), as do formatting, Clippy with warnings denied, 17 frontend tests, the production build, and both Playwright tests using mock APIs/providers. The planning screenshot is generated at `web/test-results/joint-planning.png`. Docker Compose validation could not run because Docker is unavailable in the WSL environment. The build retains its large-bundle warning. The 65-tick Global Crisis authority regression takes roughly 110 seconds in a debug test run; this is evidence that performance needs investigation, not a release-mode benchmark.
+Checkpoint validation: the Rust workspace suite passes (69 tests), as do formatting, Clippy with warnings denied, 20 frontend tests, E2E TypeScript checking, and the production build. All nine browser cases passed across the full run and targeted reruns; the suite includes diagnostics authorization, visible-queue accounting, pause/resume display and recovery after failed state requests alongside campaign/planning/reload tests. Screenshots and failure traces are written under `web/test-results/`. The build retains its large-bundle warning. The active development game is preserved on the previous image; its source watcher is stopped to avoid resetting in-memory state. The diagnostics and optimization code takes effect on the next server/frontend restart.
 
 ## 1. Product Contract
 

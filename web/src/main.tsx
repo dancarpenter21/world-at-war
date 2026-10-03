@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Cartesian3, Color, EllipsoidTerrainProvider,
@@ -14,6 +14,7 @@ import { attachMapKeyboardControls, type AttachedMapKeyboardControls } from "./m
 import { MapFilterDialog, type MapFilters } from "./MapFilterDialog";
 import { SpaceAssetLayer } from "./spaceAssetLayer";
 import { OperationsLayer } from "./OperationsLayer";
+import { DiagnosticsPanel, type ClientDiagnostics } from "./DiagnosticsPanel";
 import type { PlanningView } from "./PlanningWorkspace";
 const PlanningWorkspace = lazy(() => import("./PlanningWorkspace").then(m => ({ default: m.PlanningWorkspace })));
 
@@ -21,6 +22,8 @@ const AuthorityWorkspace = lazy(() => import("./AuthorityWorkspace").then((modul
 const NetworkWorkspace = lazy(() => import("./NetworkWorkspace").then((module) => ({ default: module.NetworkWorkspace })));
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+const SESSION_KEY = "world-at-war-session";
+class ApiError extends Error { constructor(message: string, readonly status: number) { super(message); } }
 const SAVED_PASSWORD_MASK = "••••••••••••";
 type Scenario = { id: string; title: string; description: string; version: number; authored_entity_count: number; role_count: number; requires_space_catalog: boolean };
 type Game = { id: string; title: string; status: "lobby" | "running" | "paused"; host_player_id: string; player_roles_available: number; space_catalog_enabled: boolean };
@@ -31,7 +34,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, { ...init, credentials: "include", headers: { "content-type": "application/json", ...init?.headers } });
   if (!response.ok) {
     const body = await response.json().catch(() => ({ error: response.statusText }));
-    throw new Error(body.error ?? response.statusText);
+    throw new ApiError(body.error ?? response.statusText, response.status);
   }
   return response.json() as Promise<T>;
 }
@@ -93,7 +96,7 @@ function symbolCanvas(sidc: string, size = 32) {
   return canvas;
 }
 
-function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnabled, keyboardEnabled }: {
+function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnabled, keyboardEnabled, onMapUpdate }: {
   projection: Projection;
   filters: MapFilters;
   gameId: string;
@@ -101,6 +104,7 @@ function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnab
   roleId: string;
   spaceCatalogEnabled: boolean;
   keyboardEnabled: boolean;
+  onMapUpdate: (elapsedMs: number) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Viewer | null>(null);
@@ -222,6 +226,7 @@ function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnab
   }, [keyboardEnabled]);
 
   useEffect(() => {
+    const started = performance.now();
     reconcilerRef.current?.reconcile({
       ...projection,
       communication_links: filters.network.visible ? projection.communication_links : []
@@ -233,7 +238,8 @@ function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnab
         void viewerRef.current.flyTo(entities, { duration: 0 });
       }
     }
-  }, [projection, filters.network.visible]);
+    onMapUpdate(performance.now() - started);
+  }, [projection, filters.network.visible, onMapUpdate]);
 
   useEffect(() => {
     if (spaceCatalogEnabled && (filters.spaceAssets.showAll || filters.spaceAssets.showStarlink)) {
@@ -280,6 +286,9 @@ function App() {
   const [nowUnix, setNowUnix] = useState(() => Math.floor(Date.now() / 1000));
   const [showAuthority, setShowAuthority] = useState(false);
   const [showNetwork, setShowNetwork] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [clientDiagnostics, setClientDiagnostics] = useState<ClientDiagnostics>({ lastReceivedAt: null, requestMs: null, mapUpdateMs: null, failed: false });
+  const recordMapUpdate = useCallback((elapsedMs: number) => setClientDiagnostics(previous => ({ ...previous, mapUpdateMs: elapsedMs })), []);
   const [showPlanning, setShowPlanning] = useState(false);
   const [showMapFilters, setShowMapFilters] = useState(false);
   const [mapFilters, setMapFilters] = useState<MapFilters>({
@@ -290,6 +299,7 @@ function App() {
   const [authority, setAuthority] = useState<AuthorityDefinition | null>(null);
   const [authorityRequests, setAuthorityRequests] = useState<AuthorityRequest[]>([]);
   const restoreAttempted = useRef(false);
+  const sessionRecovery = useRef(true);
   const playerId = useMemo(() => localStorage.getItem("world-at-war-player") ?? crypto.randomUUID(), []);
   const playable = game?.status === "running" && role !== null;
   const refreshWaitSeconds = Math.max(0, (spaceStatus?.next_sync_unix ?? 0) - nowUnix);
@@ -317,12 +327,55 @@ function App() {
     setGame((current) => current
       ? loadedGames.find((candidate) => candidate.id === current.id) ?? current
       : null);
+    return loadedGames;
   }
 
   useEffect(() => {
     localStorage.setItem("world-at-war-player", playerId);
-    void refreshLobby().then(() => setMessage("Create a scenario or join a running game")).catch((error: Error) => setMessage(error.message));
+    let cancelled = false;
+    let timer: number | undefined;
+    async function restoreSession() {
+      try {
+        const loadedGames = await refreshLobby();
+        if (cancelled || !sessionRecovery.current) return;
+        const raw = localStorage.getItem(SESSION_KEY);
+        if (!raw) { sessionRecovery.current = false; setMessage("Create a scenario or join a running game"); return; }
+        let saved: { player_id: string; game_id: string; role_id: string | null };
+        try { saved = JSON.parse(raw); } catch { localStorage.removeItem(SESSION_KEY); return; }
+        const selected = loadedGames.find(item => item.id === saved?.game_id);
+        if (!selected || saved.player_id !== playerId) {
+          localStorage.removeItem(SESSION_KEY); sessionRecovery.current = false;
+          setMessage("Previous scenario is unavailable. Choose a scenario."); return;
+        }
+        const loadedRoles = await request<Role[]>(`/v1/games/${selected.id}/roles`);
+        const heldRole = loadedRoles.find(item => item.id === saved.role_id) ?? null;
+        let restoredProjection: Projection | null = null;
+        if (saved.role_id) {
+          if (!heldRole) throw new ApiError("Previous role is unavailable.", 404);
+          restoredProjection = await request<Projection>(`/v1/games/${selected.id}/state?player_id=${playerId}&role_id=${heldRole.id}`);
+        }
+        if (cancelled || !sessionRecovery.current) return;
+        sessionRecovery.current = false;
+        setGame(selected); setRoles(loadedRoles); setRole(heldRole); setProjection(restoredProjection);
+        setMessage(heldRole ? `${heldRole.name} restored.` : "Choose an available role.");
+      } catch (error) {
+        if (cancelled || !sessionRecovery.current) return;
+        if (error instanceof ApiError && [403, 404].includes(error.status)) {
+          localStorage.removeItem(SESSION_KEY); sessionRecovery.current = false;
+          setMessage("Previous role is unavailable. Choose a scenario.");
+        } else {
+          setMessage("Connection unavailable; retrying session recovery…");
+          timer = window.setTimeout(() => void restoreSession(), 2000);
+        }
+      }
+    }
+    void restoreSession();
+    return () => { cancelled = true; window.clearTimeout(timer); };
   }, [playerId]);
+
+  useEffect(() => {
+    if (game) localStorage.setItem(SESSION_KEY, JSON.stringify({ player_id: playerId, game_id: game.id, role_id: role?.id ?? null }));
+  }, [game?.id, role?.id, playerId]);
 
   useEffect(() => {
     const nextSyncUnix = spaceStatus?.next_sync_unix;
@@ -345,18 +398,37 @@ function App() {
   }, [spaceStatus?.remembered_credentials, spaceStatus?.remembered_username]);
 
   useEffect(() => {
-    if (!game || game.status === "running") return;
-    const timer = window.setInterval(() => void refreshLobby(), 2000);
+    if (game?.status === "running") return;
+    const timer = window.setInterval(() => void refreshLobby().catch(() => setMessage("Connection unavailable; retrying…")), 2000);
     return () => window.clearInterval(timer);
   }, [game]);
 
   useEffect(() => {
     if (!playable || !game || !role) return;
     const query = `player_id=${playerId}&role_id=${role.id}`;
-    const update = () => request<Projection>(`/v1/games/${game.id}/state?${query}`).then(setProjection).catch((error: Error) => setMessage(error.message));
-    update();
-    const timer = window.setInterval(update, 1000);
-    return () => window.clearInterval(timer);
+    let active = true;
+    let timer: number | undefined;
+    let controller: AbortController | undefined;
+    setClientDiagnostics({ lastReceivedAt: null, requestMs: null, mapUpdateMs: null, failed: false });
+    const update = async () => {
+      const started = performance.now();
+      controller = new AbortController();
+      const timeout = window.setTimeout(() => controller?.abort(), 8000);
+      try {
+        const next = await request<Projection>(`/v1/games/${game.id}/state?${query}`, { signal: controller.signal });
+        if (active) {
+          setProjection(next);
+          setClientDiagnostics(previous => ({ ...previous, lastReceivedAt: performance.now(), requestMs: performance.now() - started, failed: false }));
+        }
+      } catch (error) {
+        if (active) { setMessage((error as Error).message); setClientDiagnostics(previous => ({ ...previous, failed: true })); }
+      } finally {
+        window.clearTimeout(timeout);
+        if (active) timer = window.setTimeout(() => void update(), Math.max(0, 1000 - (performance.now() - started)));
+      }
+    };
+    void update();
+    return () => { active = false; controller?.abort(); window.clearTimeout(timer); };
   }, [playable, game?.id, role?.id, playerId]);
 
   useEffect(() => {
@@ -420,14 +492,16 @@ function App() {
   }
 
   async function createGame() {
+    sessionRecovery.current = false;
     const scenario = selectedScenario; if (!scenario) return;
     try {
       const created = await request<{ game: Game }>("/v1/games", { method: "POST", body: JSON.stringify({ scenario_id: scenario.id, title: gameTitle, host_player_id: playerId }) });
-      setGame(created.game); setRoles(await request<Role[]>(`/v1/games/${created.game.id}/roles`)); setMessage("Claim a role, then start the scenario.");
+      setRole(null); setProjection(null); setGame(created.game); setRoles(await request<Role[]>(`/v1/games/${created.game.id}/roles`)); setMessage("Claim a role, then start the scenario.");
     } catch (error) { setMessage((error as Error).message); }
   }
 
   async function selectGame(selected: Game) {
+    sessionRecovery.current = false;
     try {
       await request(`/v1/games/${selected.id}/join`, { method: "POST", body: JSON.stringify({ display_name: displayName }) });
       setGame(selected); setRole(null); setRoles(await request<Role[]>(`/v1/games/${selected.id}/roles`)); setMessage("Choose an available role.");
@@ -474,7 +548,7 @@ function App() {
     catch (error) { setMessage((error as Error).message); }
   }
 
-  function leave() { setGame(null); setRole(null); setProjection(null); setMessage("Create a scenario or join a running game"); void refreshLobby(); }
+  function leave() { sessionRecovery.current = false; localStorage.removeItem(SESSION_KEY); setShowPlanning(false); setShowNetwork(false); setShowDiagnostics(false); setShowAuthority(false); setGame(null); setRole(null); setProjection(null); setMessage("Create a scenario or join a running game"); void refreshLobby(); }
 
   return <main className="app-shell">
     <header><span className="brand">WORLD AT WAR</span><span className="status-dot" /><span>{game?.status ?? "scenario lobby"}</span><span className="tick">{projection ? `TICK ${projection.tick}` : ""}</span></header>
@@ -513,16 +587,17 @@ function App() {
       {game && <div className="modal-body"><h2>{game.title}</h2><p className="muted">Claim a command role. The operational map remains offline until the scenario starts.</p><div className="role-grid">{roles.map((item) => <button key={item.id} className={`role ${role?.id === item.id ? "selected" : ""}`} disabled={item.ai_controlled || (item.held && role?.id !== item.id)} onClick={() => void claim(item)}><span>{item.name}</span><small>{item.ai_controlled ? "AI" : item.held ? "held" : item.kind.replaceAll("_", " ")}</small></button>)}</div><div className="modal-actions"><button className="secondary" onClick={leave}>Back</button>{game.host_player_id === playerId && <button className="secondary" onClick={() => setShowAuthority(true)}>Configure authorities</button>}{game.host_player_id === playerId && <button className="command" disabled={!role} onClick={() => void start()}>Start scenario</button>}{game.host_player_id !== playerId && <span className="muted">Waiting for host to start</span>}</div></div>}
     </section></div>}
     {playable && projection && <section className="workspace">
-      <aside className="sidebar"><h1>{role.name}</h1><p className="message">{game.title}</p><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command network-launch" onClick={() => setShowNetwork(true)}>Network</button><button className="command map-filter-launch" onClick={() => setShowMapFilters((value) => !value)}>Map filters</button><h2>Catalog</h2><p className="muted">{game.space_catalog_enabled ? spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status" : "No orbital catalog in this scenario"}</p><button className="secondary" onClick={leave}>Leave scenario</button></aside>
+      <aside className="sidebar"><h1>{role.name}</h1><p className="message">{game.title}</p><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command network-launch" onClick={() => setShowNetwork(true)}>Network</button><button className="command" onClick={() => setShowDiagnostics(value => !value)}>Diagnostics</button><button className="command map-filter-launch" onClick={() => setShowMapFilters((value) => !value)}>Map filters</button><h2>Catalog</h2><p className="muted">{game.space_catalog_enabled ? spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status" : "No orbital catalog in this scenario"}</p><button className="secondary" onClick={leave}>Leave scenario</button></aside>
       <section className="map-region">
         <button className="planning-launch" onClick={() => setShowPlanning(true)}>Joint planning</button>
-        <Globe projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} keyboardEnabled={!showAuthority && !showPlanning && !showNetwork} />
+        <Globe projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} onMapUpdate={recordMapUpdate} keyboardEnabled={!showAuthority && !showPlanning && !showNetwork && !showDiagnostics} />
         {showMapFilters && <MapFilterDialog filters={mapFilters} spaceAssetsAvailable={game.space_catalog_enabled} onChange={setMapFilters} onClose={() => setShowMapFilters(false)} />}
         <div className="map-caption">{role.name} · {role.side} · operational picture</div>
       </section>
       <aside className="inspector"><h2>Operational picture</h2><div className="metric"><span>Own units</span><strong>{projection.own_units.length}</strong></div><div className="metric"><span>Tracks</span><strong>{projection.tracks.length}</strong></div><h2>Actions</h2><button className="command" disabled={!role.command_units.length} onClick={() => void turnNorth()}>Turn north</button><h2>Communications</h2>{projection.communication_links.length ? projection.communication_links.map((link) => { const from = projection.own_units.find((unit) => unit.id === link.from_entity_id)?.name ?? link.from_entity_id; const to = projection.own_units.find((unit) => unit.id === link.to_entity_id)?.name ?? link.to_entity_id; return <div className={`communication-status ${link.available ? "available" : "blocked"}`} key={link.id}><span>{from} → {to}</span><small>{link.available ? `${((link.effective_bit_rate_bps ?? 0) / 1_000_000).toFixed(1)} Mbit/s` : `Jammed ${Math.round(link.jammed * 100)}%`}</small></div>; }) : <p className="muted">No monitored links.</p>}<h2>Tracks</h2>{projection.tracks.length ? projection.tracks.map((track) => <div className="track" key={track.track_id}><span>Uncertain {track.target_side} contact</span><small>{Math.round(track.identity_confidence * 100)}% identity</small></div>) : <p className="muted">No reports received.</p>}</aside>
     </section>}
     {showAuthority && authority && game && <Suspense fallback={<div className="authority-loading">Loading authority graph…</div>}><AuthorityWorkspace definition={authority} runtimeRoles={roles} units={authorityUnits} requests={authorityRequests} currentRole={role} isHost={game.host_player_id === playerId} tick={projection?.tick ?? 0} onClose={() => setShowAuthority(false)} onSave={saveAuthority} onCreateRequest={createAuthorityRequest} onDecision={decideAuthorityRequest} /></Suspense>}
+    {showDiagnostics && game && role && <DiagnosticsPanel apiBase={API_BASE} gameId={game.id} playerId={playerId} roleId={role.id} client={clientDiagnostics} onClose={() => setShowDiagnostics(false)} />}
     {showNetwork && game && role && <Suspense fallback={<div className="authority-loading">Loading C2 network…</div>}><NetworkWorkspace apiBase={API_BASE} gameId={game.id} playerId={playerId} roleId={role.id} onClose={() => setShowNetwork(false)} /></Suspense>}
     {showPlanning && game && role && <Suspense fallback={<div className="authority-loading">Loading joint planning…</div>}><PlanningWorkspace apiBase={API_BASE} gameId={game.id} playerId={playerId} role={role} roles={roles} onClose={() => setShowPlanning(false)} /></Suspense>}
   </main>;

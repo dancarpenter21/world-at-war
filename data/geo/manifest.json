@@ -1,0 +1,13 @@
+{
+  "model": "EGM96",
+  "rows": 721,
+  "columns": 1441,
+  "spacing_degrees": 0.25,
+  "format": "float32 little endian, north to south, longitude 0 to 360 inclusive",
+  "sha256": "5c720c5f1b5a247414c59d9d22f79183ab4431c699a18a6e904edc193bf63ed4",
+  "source": "https://earth-info.nga.mil/php/download.php?file=egm-96interpolation",
+  "archive_sha256": "f051316cdf794a87e8291bcb7aee82d0e49a99c35301b6b82462fbe5078b7216",
+  "retrieved_on": "2026-09-27",
+  "interpolation": "bilinear",
+  "license": "US Government NGA/NASA public geoid grid"
+}

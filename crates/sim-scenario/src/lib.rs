@@ -518,6 +518,7 @@ fn global_communications(
                         discipline: QueueDiscipline::Fifo,
                     },
                     shared_medium,
+                    ..Default::default()
                 },
             );
             links.push(CommunicationLinkDefinition {
@@ -1219,6 +1220,7 @@ pub fn jammed_flight_scenario() -> Scenario {
                             discipline: QueueDiscipline::Fifo,
                         },
                         shared_medium: Some("jammed-flight-link16".into()),
+                        ..Default::default()
                     },
                 ),
                 (
@@ -1231,6 +1233,7 @@ pub fn jammed_flight_scenario() -> Scenario {
                             discipline: QueueDiscipline::Fifo,
                         },
                         shared_medium: Some("jammed-flight-link16".into()),
+                        ..Default::default()
                     },
                 ),
             ]),

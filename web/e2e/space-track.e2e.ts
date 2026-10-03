@@ -1,44 +1,19 @@
 import { expect, test } from "@playwright/test";
-import { spawn, type ChildProcess } from "node:child_process";
 import { createServer, type Server } from "node:http";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { startBackend, backendUrl, type Backend } from "./support/server";
 
-const browserHost = process.env.E2E_BROWSER_HOST ?? "127.0.0.1";
-const backendUrl = `http://${browserHost}:18101`;
-const backendHealthUrl = "http://127.0.0.1:18101";
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const serverBinary = path.join(repoRoot, "target/debug/world-at-war-server");
 const liveUsername = process.env.SPACETRACK_E2E_USERNAME;
 const livePassword = process.env.SPACETRACK_E2E_PASSWORD;
 const useLiveProvider = Boolean(liveUsername && livePassword);
 const savedPasswordMask = "••••••••••••";
 
-let backend: ChildProcess;
+let backend: Backend;
 let mockProvider: Server | undefined;
 let runDirectory: string;
-let backendOutput = "";
 let mockLoginReceived = false;
 let mockCatalogDownloaded = false;
-
-async function waitForBackend() {
-  const deadline = Date.now() + 30_000;
-  while (Date.now() < deadline) {
-    if (backend.exitCode !== null) {
-      throw new Error(`backend exited before becoming healthy:\n${backendOutput}`);
-    }
-    try {
-      const response = await fetch(`${backendHealthUrl}/health`);
-      if (response.ok) return;
-    } catch {
-      // The server is still starting.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  throw new Error(`backend did not become healthy:\n${backendOutput}`);
-}
 
 async function startMockProvider(): Promise<number> {
   mockProvider = createServer((request, response) => {
@@ -94,40 +69,20 @@ test.beforeAll(async () => {
     throw new Error("set both SPACETRACK_E2E_USERNAME and SPACETRACK_E2E_PASSWORD");
   }
 
-  runDirectory = await mkdtemp(path.join(tmpdir(), "world-at-war-space-track-e2e-"));
-  const providerEnvironment: Record<string, string> = {};
+  const providerEnvironment: Record<string, string> = useLiveProvider ? { SPACETRACK_LOGIN_URL: "https://www.space-track.org/ajaxauth/login", SPACETRACK_GP_URL: "https://www.space-track.org/basicspacedata/query/class/gp/decay_date/null-val/epoch/%3Enow-10/orderby/norad_cat_id/format/json" } : {};
   if (!useLiveProvider) {
     const providerPort = await startMockProvider();
     providerEnvironment.SPACETRACK_LOGIN_URL = `http://127.0.0.1:${providerPort}/ajaxauth/login`;
     providerEnvironment.SPACETRACK_GP_URL = `http://127.0.0.1:${providerPort}/basicspacedata/query/class/gp/decay_date/null-val/epoch/%3Enow-10/orderby/norad_cat_id/format/json`;
   }
 
-  backend = spawn(serverBinary, [], {
-    cwd: runDirectory,
-    env: {
-      ...process.env,
-      ...providerEnvironment,
-      BIND_ADDR: "0.0.0.0:18101",
-      ADMIN_SETUP_TOKEN: "",
-      COMMUNICATIONS_CATALOG_PATH: path.join(repoRoot, "data/communications/catalog.yaml")
-    },
-    stdio: ["ignore", "pipe", "pipe"]
-  });
-  backend.stdout?.on("data", (chunk) => { backendOutput += chunk.toString(); });
-  backend.stderr?.on("data", (chunk) => { backendOutput += chunk.toString(); });
-  await waitForBackend();
+  backend = await startBackend(providerEnvironment);
+  runDirectory = backend.directory;
 });
 
 test.afterAll(async () => {
-  if (backend && backend.exitCode === null) {
-    backend.kill("SIGTERM");
-    await new Promise<void>((resolve) => {
-      backend.once("exit", () => resolve());
-      setTimeout(resolve, 2_000);
-    });
-  }
+  await backend?.stop();
   if (mockProvider) await new Promise<void>((resolve) => mockProvider!.close(() => resolve()));
-  if (runDirectory) await rm(runDirectory, { recursive: true, force: true });
 });
 
 test("downloads and persists a Space-Track catalog through the login form", async ({ page }) => {

@@ -383,3 +383,5 @@ mod tests {
         assert!(matches!(catalog.validate(), Err(CatalogError::Invalid(_))));
     }
 }
+
+pub mod aco;

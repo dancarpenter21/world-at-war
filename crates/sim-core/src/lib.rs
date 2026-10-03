@@ -1,6 +1,7 @@
 //! Deterministic, server-authoritative primitives for World At War.
 
 pub mod operations;
+pub mod performance;
 mod transport;
 pub use transport::{DeliveryEvent, DeliveryState};
 
@@ -573,6 +574,10 @@ struct CommunicationsRuntime {
     entity_devices: BTreeMap<Uuid, Vec<DeviceId>>,
     baseline_interference: BTreeMap<DeviceId, Vec<ReceiverInterference>>,
     links: Vec<CommunicationLinkDefinition>,
+    outgoing_links: BTreeMap<Uuid, Vec<usize>>,
+    incoming_links: BTreeMap<Uuid, Vec<usize>>,
+    receiver_links: BTreeMap<DeviceId, Vec<usize>>,
+    first_link: BTreeMap<(Uuid, Uuid), usize>,
     jamming_regions: Vec<JammingRegion>,
     radio_channels: BTreeMap<ChannelId, FrequencyBand>,
 }
@@ -582,6 +587,7 @@ pub struct Simulation {
     schedule: Schedule,
     communications: CommunicationsRuntime,
     transport: transport::Transport,
+    last_step_timings: performance::StepTimings,
 }
 
 impl Simulation {
@@ -773,6 +779,28 @@ impl Simulation {
                     .map(|radio| (channel.id.clone(), radio.band))
             })
             .collect();
+        // Immutable topology indexes retain fixture order, including first-link selection.
+        let mut outgoing_links: BTreeMap<Uuid, Vec<usize>> = BTreeMap::new();
+        let mut incoming_links: BTreeMap<Uuid, Vec<usize>> = BTreeMap::new();
+        let mut receiver_links: BTreeMap<DeviceId, Vec<usize>> = BTreeMap::new();
+        let mut first_link = BTreeMap::new();
+        for (index, link) in communications.links.iter().enumerate() {
+            outgoing_links
+                .entry(link.from_entity_id)
+                .or_default()
+                .push(index);
+            incoming_links
+                .entry(link.to_entity_id)
+                .or_default()
+                .push(index);
+            receiver_links
+                .entry(link.destination_device_id.clone())
+                .or_default()
+                .push(index);
+            first_link
+                .entry((link.from_entity_id, link.to_entity_id))
+                .or_insert(index);
+        }
         let seed = communications.simulator_options.seed;
         let simulator = NetworkSimulator::new_with_options(
             communications.network,
@@ -801,11 +829,16 @@ impl Simulation {
             world,
             schedule,
             transport: transport::Transport::default(),
+            last_step_timings: performance::StepTimings::default(),
             communications: CommunicationsRuntime {
                 simulator,
                 entity_devices,
                 baseline_interference,
                 links: communications.links,
+                outgoing_links,
+                incoming_links,
+                receiver_links,
+                first_link,
                 jamming_regions: communications.jamming_regions,
                 radio_channels,
             },
@@ -851,11 +884,27 @@ impl Simulation {
     }
 
     pub fn step(&mut self) {
+        // Wall-clock observations stay outside ECS resources and never affect simulation decisions.
+        let started = std::time::Instant::now();
         self.schedule.run(&mut self.world);
+        let ecs = started.elapsed();
         self.sync_network_interference()
             .expect("validated network must accept tick interference");
-        self.advance_messages();
+        let interference = started.elapsed();
+        let (transmission_ms, network_advance_ms, reassembly_ms) = self.advance_messages();
+        let transport = started.elapsed();
         self.update_reports();
+        let total = started.elapsed();
+        self.last_step_timings = performance::StepTimings {
+            ecs_ms: ecs.as_secs_f64() * 1000.0,
+            interference_ms: (interference - ecs).as_secs_f64() * 1000.0,
+            transport_ms: (transport - interference).as_secs_f64() * 1000.0,
+            transmission_ms,
+            network_advance_ms,
+            reassembly_ms,
+            reports_ms: (total - transport).as_secs_f64() * 1000.0,
+            total_ms: total.as_secs_f64() * 1000.0,
+        };
     }
 
     pub fn tick(&self) -> u64 {
@@ -967,6 +1016,7 @@ impl Simulation {
             })
             .collect();
         let links = self.communications.links.clone();
+        let mut payloads: BTreeMap<Uuid, Vec<u8>> = BTreeMap::new();
         for link in links {
             let (Some((side, unit)), Some((other_side, _))) = (
                 units.get(&link.from_entity_id),
@@ -977,41 +1027,48 @@ impl Simulation {
             if side != other_side {
                 continue;
             }
-            let report_knowledge = self.world.resource::<ReportKnowledge>();
-            let mut friendly: Vec<_> = report_knowledge
-                .friendly
-                .get(&link.from_entity_id)
-                .map(|v| {
-                    v.values()
-                        .filter(|u| u.id != unit.id && tick.saturating_sub(u.observed_tick) < 120)
-                        .cloned()
-                        .collect()
-                })
-                .unwrap_or_default();
-            friendly.push(unit.clone());
-            let contacts = self
-                .world
-                .resource::<KnowledgeBases>()
-                .0
-                .get(&link.from_entity_id)
-                .map(|tracks| {
-                    tracks
-                        .iter()
-                        .filter(|t| tick.saturating_sub(t.observed_tick) < 120)
-                        .filter_map(|track| {
-                            report_knowledge
-                                .targets
-                                .iter()
-                                .find(|((owner, _), id)| {
-                                    *owner == link.from_entity_id && **id == track.track_id
+            let payload = payloads
+                .entry(link.from_entity_id)
+                .or_insert_with(|| {
+                    let report_knowledge = self.world.resource::<ReportKnowledge>();
+                    let mut friendly: Vec<_> = report_knowledge
+                        .friendly
+                        .get(&link.from_entity_id)
+                        .map(|v| {
+                            v.values()
+                                .filter(|u| {
+                                    u.id != unit.id && tick.saturating_sub(u.observed_tick) < 120
                                 })
-                                .map(|((_, target), _)| (*target, track.clone()))
+                                .cloned()
+                                .collect()
                         })
-                        .collect()
+                        .unwrap_or_default();
+                    friendly.push(unit.clone());
+                    let contacts = self
+                        .world
+                        .resource::<KnowledgeBases>()
+                        .0
+                        .get(&link.from_entity_id)
+                        .map(|tracks| {
+                            tracks
+                                .iter()
+                                .filter(|t| tick.saturating_sub(t.observed_tick) < 120)
+                                .filter_map(|track| {
+                                    report_knowledge
+                                        .targets
+                                        .iter()
+                                        .find(|((owner, _), id)| {
+                                            *owner == link.from_entity_id && **id == track.track_id
+                                        })
+                                        .map(|((_, target), _)| (*target, track.clone()))
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    serde_json::to_vec(&KnowledgeReport { friendly, contacts })
+                        .expect("finite observations")
                 })
-                .unwrap_or_default();
-            let payload = serde_json::to_vec(&KnowledgeReport { friendly, contacts })
-                .expect("finite observations");
+                .clone();
             let mut reports = self.world.resource_mut::<ReportKnowledge>();
             reports.sequence += 1;
             let id = Uuid::from_u128((1u128 << 127) | reports.sequence);
@@ -1038,9 +1095,9 @@ impl Simulation {
     ) -> Result<CommunicationOutcome, CommunicationError> {
         let link = self
             .communications
-            .links
-            .iter()
-            .find(|link| link.from_entity_id == from_entity_id && link.to_entity_id == to_entity_id)
+            .first_link
+            .get(&(from_entity_id, to_entity_id))
+            .map(|index| &self.communications.links[*index])
             .cloned()
             .ok_or(CommunicationError::NoLink {
                 from: from_entity_id,
@@ -1083,9 +1140,9 @@ impl Simulation {
     ) -> Result<PacketId, CommunicationError> {
         let link = self
             .communications
-            .links
-            .iter()
-            .find(|link| link.from_entity_id == from_entity_id && link.to_entity_id == to_entity_id)
+            .first_link
+            .get(&(from_entity_id, to_entity_id))
+            .map(|index| &self.communications.links[*index])
             .ok_or(CommunicationError::NoLink {
                 from: from_entity_id,
                 to: to_entity_id,
@@ -1121,19 +1178,7 @@ impl Simulation {
             track.identity_confidence *= (1.0 - age as f32 / 120.0).max(0.0);
         }
         tracks.retain(|track| self.tick().saturating_sub(track.observed_tick) <= 120);
-        let link_statuses = self.communication_link_statuses();
         let network_time = self.network_time();
-        let receiver_jammed: BTreeMap<_, _> = self
-            .communications
-            .entity_devices
-            .keys()
-            .map(|entity_id| {
-                (
-                    *entity_id,
-                    self.entity_receiver_jammed(*entity_id, network_time),
-                )
-            })
-            .collect();
         let mut own_units: Vec<_> = self
             .world
             .resource::<ReportKnowledge>()
@@ -1159,19 +1204,14 @@ impl Simulation {
                     domain: domain.0,
                     position: *pose,
                     sidc: sidc.0.clone(),
-                    receiver_jammed: receiver_jammed.get(&id.0).copied().unwrap_or(false),
+                    receiver_jammed: self.entity_receiver_jammed(id.0, network_time),
                     observed_tick: tick,
                     received_tick: tick,
                 });
             }
         }
         let visible_ids: BTreeSet<_> = own_units.iter().map(|unit| unit.id).collect();
-        let link_statuses = link_statuses
-            .into_iter()
-            .filter(|link| {
-                link.to_entity_id == knowledge_owner && visible_ids.contains(&link.from_entity_id)
-            })
-            .collect();
+        let link_statuses = self.communication_link_statuses(knowledge_owner, &visible_ids);
         RoleProjection {
             tick: self.tick(),
             own_units,
@@ -1217,9 +1257,11 @@ impl Simulation {
                 }
                 for link in self
                     .communications
-                    .links
-                    .iter()
-                    .filter(|link| &link.destination_device_id == device_id)
+                    .receiver_links
+                    .get(device_id)
+                    .into_iter()
+                    .flatten()
+                    .map(|index| &self.communications.links[*index])
                 {
                     if let (Some(band), Some(source)) = (
                         self.communications.radio_channels.get(&link.channel_id),
@@ -1257,11 +1299,19 @@ impl Simulation {
             })
     }
 
-    fn communication_link_statuses(&self) -> Vec<CommunicationLinkStatus> {
+    fn communication_link_statuses(
+        &self,
+        knowledge_owner: Uuid,
+        visible_ids: &BTreeSet<Uuid>,
+    ) -> Vec<CommunicationLinkStatus> {
         let at = self.network_time();
         self.communications
-            .links
-            .iter()
+            .incoming_links
+            .get(&knowledge_owner)
+            .into_iter()
+            .flatten()
+            .map(|index| &self.communications.links[*index])
+            .filter(|link| visible_ids.contains(&link.from_entity_id))
             .map(|link| {
                 let metrics = self
                     .communications
@@ -1272,6 +1322,11 @@ impl Simulation {
                         at,
                     )
                     .expect("validated monitored link must remain queryable");
+                let queue = self
+                    .communications
+                    .simulator
+                    .channel_queue_metrics(link.channel_id.clone())
+                    .expect("validated monitored link queue must remain queryable");
                 CommunicationLinkStatus {
                     id: link.id.clone(),
                     from_entity_id: link.from_entity_id,
@@ -1283,22 +1338,8 @@ impl Simulation {
                         metrics.jammed
                     },
                     effective_bit_rate_bps: metrics.effective_bit_rate_bps,
-                    queued_packets: {
-                        let queue = self
-                            .communications
-                            .simulator
-                            .channel_queue_metrics(link.channel_id.clone())
-                            .expect("validated monitored link queue must remain queryable");
-                        queue.packets_0_to_1 + queue.packets_1_to_0
-                    },
-                    queued_bytes: {
-                        let queue = self
-                            .communications
-                            .simulator
-                            .channel_queue_metrics(link.channel_id.clone())
-                            .expect("validated monitored link queue must remain queryable");
-                        queue.bytes_0_to_1 + queue.bytes_1_to_0
-                    },
+                    queued_packets: queue.packets_0_to_1 + queue.packets_1_to_0,
+                    queued_bytes: queue.bytes_0_to_1 + queue.bytes_1_to_0,
                 }
             })
             .collect()

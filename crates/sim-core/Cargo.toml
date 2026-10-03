@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+sim-geo = { path = "../sim-geo" }
 bevy_ecs.workspace = true
 c3mesh.workspace = true
 serde.workspace = true

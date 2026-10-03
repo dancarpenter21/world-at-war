@@ -4,7 +4,7 @@ use sim_core::operations::*;
 #[derive(Default)]
 pub(super) struct PlanningState {
     template: Option<CampaignPlan>,
-    drafts: BTreeMap<Uuid, CampaignPlan>,
+    pub(super) drafts: BTreeMap<Uuid, CampaignPlan>,
     published: Vec<CampaignPlan>,
     received: BTreeMap<Uuid, CampaignPlan>,
     reports: BTreeMap<Uuid, BTreeMap<Uuid, MissionReport>>,
@@ -129,7 +129,7 @@ fn failure(message: impl Into<String>) -> (StatusCode, Json<ErrorResponse>) {
     )
 }
 
-fn view(game: &mut Game, role: &Role) -> PlanningView {
+pub(super) fn view(game: &mut Game, role: &Role) -> PlanningView {
     let draft = game.planning.drafts.get(&role.id).cloned().or_else(|| {
         game.planning
             .template
@@ -268,7 +268,7 @@ fn send(
     .ok_or_else(|| "no communication route to recipient".into())
     .map(|_| ())
 }
-fn draft(game: &Game, role: Uuid) -> Result<CampaignPlan, String> {
+pub(super) fn draft(game: &Game, role: Uuid) -> Result<CampaignPlan, String> {
     game.planning
         .drafts
         .get(&role)
@@ -296,9 +296,7 @@ fn clearance_valid(game: &Game, role: Uuid, clearance: &Clearance) -> Result<(),
         .find(|a| a.id == clearance.airspace_id)
         .ok_or("unknown airspace")?;
     if volume.controller_role_id != clearance.controller_role_id
-        || clearance.start_tick < volume.start_tick
-        || clearance.end_tick > volume.end_tick
-        || clearance.start_tick >= clearance.end_tick
+        || !volume.covers(clearance.start_tick, clearance.end_tick)
     {
         return Err("clearance exceeds controller scope or time window".into());
     }
@@ -356,6 +354,9 @@ fn apply(game: &mut Game, role: &Role, action: PlanningAction) -> Result<(), Str
                     | AuthorityRoleKind::ComponentCommander
             ) {
                 return Err("role is not a planning participant".into());
+            }
+            for volume in &mut plan.airspaces {
+                volume.normalize()?;
             }
             plan.revision = expected_revision + 1;
             plan.published_tick = None;

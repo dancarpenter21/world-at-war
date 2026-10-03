@@ -53,7 +53,7 @@ pub(super) struct Transport {
 
 impl Simulation {
     pub fn has_message_route(&self, from: Uuid, to: Uuid) -> bool {
-        self.message_route(from, to, false).is_some()
+        self.message_route(from, to).is_some()
     }
     /// Acceptance means queued, never delivered. IDs are idempotency keys.
     pub fn send_message(
@@ -73,7 +73,7 @@ impl Simulation {
         if expires <= self.tick() {
             return Err("message already expired".into());
         }
-        if self.message_route(from, to, false).is_none() {
+        if self.message_route(from, to).is_none() {
             return Err("no configured communication route".into());
         }
         self.transport.messages.insert(
@@ -96,7 +96,7 @@ impl Simulation {
         std::mem::take(&mut self.transport.events)
     }
 
-    fn message_route(&self, from: Uuid, to: Uuid, usable_only: bool) -> Option<Vec<Uuid>> {
+    fn message_route(&self, from: Uuid, to: Uuid) -> Option<Vec<Uuid>> {
         let mut queue = VecDeque::from([vec![from]]);
         let mut visited = BTreeSet::from([from]);
         while let Some(path) = queue.pop_front() {
@@ -106,21 +106,11 @@ impl Simulation {
             }
             let mut neighbors: Vec<_> = self
                 .communications
-                .links
-                .iter()
-                .filter(|link| link.from_entity_id == last)
-                .filter(|link| {
-                    !usable_only
-                        || self
-                            .communications
-                            .simulator
-                            .transmission_metrics_at(
-                                link.channel_id.clone(),
-                                link.source_device_id.clone(),
-                                self.network_time(),
-                            )
-                            .is_ok_and(|metrics| metrics.available)
-                })
+                .outgoing_links
+                .get(&last)
+                .into_iter()
+                .flatten()
+                .map(|index| &self.communications.links[*index])
                 .map(|link| link.to_entity_id)
                 .collect();
             neighbors.sort();
@@ -128,11 +118,55 @@ impl Simulation {
                 if visited.insert(next) {
                     let mut p = path.clone();
                     p.push(next);
+                    if next == to {
+                        return Some(p);
+                    }
                     queue.push_back(p);
                 }
             }
         }
         None
+    }
+
+    /// Link availability depends on geometry/interference at a virtual time, not queue occupancy.
+    /// Snapshot it once for this tick's transport pass; never cache it across interference updates.
+    fn usable_routes(&self) -> BTreeMap<(Uuid, Uuid), Vec<Uuid>> {
+        let mut neighbors: BTreeMap<Uuid, Vec<Uuid>> = BTreeMap::new();
+        let at = self.network_time();
+        for link in &self.communications.links {
+            if self
+                .communications
+                .simulator
+                .transmission_metrics_at(link.channel_id.clone(), link.source_device_id.clone(), at)
+                .is_ok_and(|metrics| metrics.available)
+            {
+                neighbors
+                    .entry(link.from_entity_id)
+                    .or_default()
+                    .push(link.to_entity_id);
+            }
+        }
+        for adjacent in neighbors.values_mut() {
+            adjacent.sort();
+            adjacent.dedup();
+        }
+        let mut routes = BTreeMap::new();
+        for from in self.communications.entity_devices.keys().copied() {
+            let mut queue = VecDeque::from([vec![from]]);
+            let mut visited = BTreeSet::from([from]);
+            while let Some(path) = queue.pop_front() {
+                let last = *path.last().unwrap();
+                for next in neighbors.get(&last).into_iter().flatten().copied() {
+                    if visited.insert(next) {
+                        let mut next_path = path.clone();
+                        next_path.push(next);
+                        queue.push_back(next_path);
+                    }
+                }
+                routes.insert((from, last), path);
+            }
+        }
+        routes
     }
 
     fn send_fragment(&mut self, fragment: Fragment) {
@@ -154,7 +188,14 @@ impl Simulation {
         }
     }
 
-    pub(super) fn advance_messages(&mut self) {
+    pub(super) fn advance_messages(&mut self) -> (f64, f64, f64) {
+        let started = std::time::Instant::now();
+        let mut retired = false;
+        let routes = if self.transport.messages.is_empty() {
+            BTreeMap::new()
+        } else {
+            self.usable_routes()
+        };
         let tick = self.tick();
         let ids: Vec<_> = self.transport.messages.keys().copied().collect();
         for id in ids {
@@ -174,7 +215,7 @@ impl Simulation {
                     payload: Vec::new(),
                 });
                 self.transport.finished.insert(id);
-                self.transport.packets.retain(|_, p| p.message != id);
+                retired = true;
                 continue;
             }
             if tick < m.next_attempt {
@@ -203,7 +244,7 @@ impl Simulation {
                 });
                 self.transport.finished.insert(id);
             } else if delivered {
-                if let Some(route) = self.message_route(to, from, true) {
+                if let Some(route) = routes.get(&(to, from)).cloned() {
                     self.send_fragment(Fragment {
                         message: id,
                         index: 0,
@@ -212,7 +253,7 @@ impl Simulation {
                         ack: true,
                     });
                 }
-            } else if let Some(route) = self.message_route(from, to, true) {
+            } else if let Some(route) = routes.get(&(from, to)).cloned() {
                 for index in 0..fragments {
                     if self.transport.messages[&id].received.contains(&index) {
                         continue;
@@ -227,9 +268,11 @@ impl Simulation {
                 }
             }
         }
+        let sent = started.elapsed();
         let events = self
             .advance_network()
             .expect("validated network must advance");
+        let advanced = started.elapsed();
         for event in events {
             let (packet_id, delivered) = match event {
                 NetworkEvent::PacketDelivered { packet, .. } => (packet.id().get(), true),
@@ -256,7 +299,7 @@ impl Simulation {
                     payload: Vec::new(),
                 });
                 self.transport.finished.insert(f.message);
-                self.transport.packets.retain(|_, p| p.message != f.message);
+                retired = true;
             } else {
                 let m = self.transport.messages.get_mut(&f.message).unwrap();
                 m.received.insert(f.index);
@@ -271,7 +314,7 @@ impl Simulation {
                         payload: m.payload.clone(),
                     });
                     let (from, to) = (m.from, m.to);
-                    if let Some(route) = self.message_route(to, from, true) {
+                    if let Some(route) = routes.get(&(to, from)).cloned() {
                         self.send_fragment(Fragment {
                             message: f.message,
                             index: 0,
@@ -283,5 +326,18 @@ impl Simulation {
                 }
             }
         }
+        // Retired fragments have no observable effects: both send and receipt paths check message
+        // liveness. Remove them once per tick, not once for every completed message (quadratic).
+        if retired {
+            self.transport
+                .packets
+                .retain(|_, fragment| self.transport.messages.contains_key(&fragment.message));
+        }
+        let finished = started.elapsed();
+        (
+            sent.as_secs_f64() * 1000.0,
+            (advanced - sent).as_secs_f64() * 1000.0,
+            (finished - advanced).as_secs_f64() * 1000.0,
+        )
     }
 }

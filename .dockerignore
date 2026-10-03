@@ -2,6 +2,8 @@
 target/
 web/node_modules/
 web/dist/
+web/test-results/
+web/playwright-report/
 data/cache/
 data/raw/
 data/downloads/

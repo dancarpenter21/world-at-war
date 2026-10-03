@@ -16,6 +16,13 @@ describe("delivered operational overlays", () => {
     const entity = entities.values[0]; layer.update(view(11,plan)); expect(entities.values[0]).toBe(entity);
     layer.update(view(20,plan)); expect(entities.values).toHaveLength(0);
   });
+  it("uses separate activation windows and their exclusive end ticks", () => {
+    const entities = new EntityCollection(); const layer = new OperationsLayer(entities);
+    const received = { ...plan, airspaces: [{ ...plan.airspaces[0], active_periods: [{ start_tick: 10, end_tick: 12 }, { start_tick: 18, end_tick: 20 }] }] };
+    for (const [tick, count] of [[9, 0], [10, 1], [12, 0], [17, 0], [18, 1], [20, 0]]) {
+      layer.update(view(tick, received)); expect(entities.values).toHaveLength(count);
+    }
+  });
   it("removes obsolete airspace geometry when a new revision is delivered", () => {
     const entities = new EntityCollection(); const layer = new OperationsLayer(entities);
     layer.update(view(12,plan)); layer.update(view(12,{...plan,revision:2,airspaces:[]}));

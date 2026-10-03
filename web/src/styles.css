@@ -132,3 +132,11 @@ select, textarea { width: 100%; padding: 9px; color: #eef7fa; background: #0e171
 .planning-error { color: #ffb4a3; }
 .planning-launch { position: absolute; top: 12px; left: 12px; z-index: 4; padding: 12px; background: #17323c; color: #e8f5f6; border: 1px solid #568e96; }
 @media (max-width: 760px) { .network-body { grid-template-columns: 1fr; }.network-inspector { position: absolute; right: 0; top: 54px; bottom: 0; width: 300px; box-shadow: -10px 0 25px #0008; } }
+
+.diagnostics-panel { position: fixed; top: 60px; right: 20px; z-index: 60; width: min(440px, calc(100vw - 40px)); max-height: calc(100vh - 80px); overflow: auto; padding: 18px; border: 1px solid #48616d; border-radius: 6px; background: #101c24; color: #dfebef; box-shadow: 0 8px 32px #0008; }
+.diagnostics-panel header { display: flex; justify-content: space-between; gap: 16px; align-items: center; height: auto; padding: 0; }
+.diagnostics-panel h2 { margin: 0; }
+.diagnostics-panel dl { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.diagnostics-panel dt { color: #a9c0ca; }
+.diagnostics-panel dd { margin: 0; }
+.diagnostics-panel small { color: #a9c0ca; }
