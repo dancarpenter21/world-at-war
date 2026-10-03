@@ -118,6 +118,8 @@ fn lost_acknowledgement_does_not_redeliver_the_order() {
         .communication_links
         .retain(|link| link.to_entity_id != id(1) || link.from_entity_id == id(11));
     scenario.jamming_regions.push(sim_core::JammingRegion {
+        active_from_tick: 0,
+        active_until_tick: None,
         id: "ack-outage".into(),
         name: "Acknowledgement outage".into(),
         center: scenario
@@ -312,6 +314,57 @@ fn message_retry_recomputes_routes_after_receiver_leaves_jamming() {
             }
         }
     }
+    assert_eq!(delivered, 1);
+    assert_eq!(acknowledged, 1);
+}
+
+#[test]
+fn campaign_fragments_and_server_packets_share_the_network_without_losing_events() {
+    let mut scenario = regional_campaign_scenario();
+    // Force campaign traffic through an intermediate terminal in both directions.
+    scenario.communication_links.retain(|link| {
+        ![(id(1), id(11)), (id(11), id(1))].contains(&(link.from_entity_id, link.to_entity_id))
+    });
+    let mut simulation = scenario.spawn().unwrap();
+    let payload = vec![42; 2048];
+    simulation
+        .send_message(id(990), id(1), id(11), payload.clone(), 100)
+        .unwrap();
+    let packet = simulation
+        .queue_transmission(id(1), id(2), vec![7; 32])
+        .unwrap();
+    let mut raw_delivered = 0;
+    let mut delivered = 0;
+    let mut acknowledged = 0;
+    for _ in 0..30 {
+        for event in simulation.advance_network().unwrap() {
+            if matches!(event, sim_core::NetworkEvent::PacketDelivered { packet: ref received, .. } if received.id() == packet)
+            {
+                raw_delivered += 1;
+            }
+        }
+        simulation.step();
+        for event in simulation.advance_network().unwrap() {
+            if matches!(event, sim_core::NetworkEvent::PacketDelivered { packet: ref received, .. } if received.id() == packet)
+            {
+                raw_delivered += 1;
+            }
+        }
+        for event in simulation
+            .drain_deliveries()
+            .into_iter()
+            .filter(|event| event.id == id(990))
+        {
+            if event.state == DeliveryState::Delivered {
+                assert_eq!(event.payload, payload);
+                delivered += 1;
+            }
+            if event.state == DeliveryState::Acknowledged {
+                acknowledged += 1;
+            }
+        }
+    }
+    assert_eq!(raw_delivered, 1);
     assert_eq!(delivered, 1);
     assert_eq!(acknowledged, 1);
 }

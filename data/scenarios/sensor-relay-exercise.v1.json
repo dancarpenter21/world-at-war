@@ -1,0 +1,280 @@
+{
+  "id": "sensor-relay-exercise.v1",
+  "title": "Sensor Relay Exercise",
+  "description": "Detect a fictional contact from CAP Alpha 1 and report it to the commander over a slow shared training net. Local detection and received knowledge have different timestamps.",
+  "version": 1,
+  "provenance": "Fictional training positions, target path, sensor ranges, and radio parameters. Existing public-safe catalog names identify generic simulation platforms, not real capabilities.",
+  "units": [
+    {
+      "id": "00000000-0000-0000-0000-000000000005",
+      "name": "Andersen Air Force Base",
+      "side": "Blue",
+      "domain": "Land",
+      "sidc": "100310000012110000000000000000",
+      "position": {
+        "latitude_deg": 13.584,
+        "longitude_deg": 144.93,
+        "altitude_m": 180
+      },
+      "velocity": {
+        "north_mps": 0,
+        "east_mps": 0,
+        "climb_mps": 0
+      },
+      "sensor": null,
+      "network_device_ids": [],
+      "flight_path": null
+    },
+    {
+      "id": "00000000-0000-0000-0000-00000000000b",
+      "name": "F-35A CAP Alpha 1",
+      "side": "Blue",
+      "domain": "Air",
+      "sidc": "100301000011010000000000000000",
+      "position": {
+        "latitude_deg": 13.7,
+        "longitude_deg": 145.05,
+        "altitude_m": 8000
+      },
+      "velocity": {
+        "north_mps": 0,
+        "east_mps": 0,
+        "climb_mps": 0
+      },
+      "sensor": {
+        "range_m": 20000,
+        "identification_range_m": 8000
+      },
+      "network_device_ids": [],
+      "flight_path": null
+    },
+    {
+      "id": "00000000-0000-0000-0000-00000000000c",
+      "name": "F-35A CAP Alpha 2",
+      "side": "Blue",
+      "domain": "Air",
+      "sidc": "100301000011010000000000000000",
+      "position": {
+        "latitude_deg": 13.75,
+        "longitude_deg": 145.1,
+        "altitude_m": 8000
+      },
+      "velocity": {
+        "north_mps": 0,
+        "east_mps": 0,
+        "climb_mps": 0
+      },
+      "sensor": null,
+      "network_device_ids": [],
+      "flight_path": null
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000033",
+      "name": "Red Fighter Flight 1",
+      "side": "Red",
+      "domain": "Air",
+      "sidc": "100601000011010000000000000000",
+      "position": {
+        "latitude_deg": 13.72,
+        "longitude_deg": 145.07,
+        "altitude_m": 8000
+      },
+      "velocity": {
+        "north_mps": 0,
+        "east_mps": 0,
+        "climb_mps": 0
+      },
+      "sensor": null,
+      "network_device_ids": [],
+      "flight_path": {
+        "period_ticks": 60,
+        "waypoints": [
+          {
+            "at_tick": 0,
+            "position": {
+              "latitude_deg": 13.72,
+              "longitude_deg": 145.07,
+              "altitude_m": 8000
+            }
+          },
+          {
+            "at_tick": 20,
+            "position": {
+              "latitude_deg": 13.73,
+              "longitude_deg": 145.09,
+              "altitude_m": 8000
+            }
+          },
+          {
+            "at_tick": 30,
+            "position": {
+              "latitude_deg": 13.73,
+              "longitude_deg": 145.7,
+              "altitude_m": 8000
+            }
+          },
+          {
+            "at_tick": 50,
+            "position": {
+              "latitude_deg": 13.73,
+              "longitude_deg": 145.7,
+              "altitude_m": 8000
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "radio": {
+    "bit_rate_bps": 2400,
+    "propagation_delay_ns": 5000000,
+    "mtu_bytes": 1200,
+    "overhead_bytes": 24,
+    "max_queue_packets": 4,
+    "max_queue_bytes": 4096,
+    "shared_medium": "sensor-relay-training-net",
+    "seed": 42
+  },
+  "authority": {
+    "version": 1,
+    "roles": [
+      {
+        "id": "00000000-0000-0000-0000-000000004e85",
+        "name": "Exercise National Authority",
+        "side": "Blue",
+        "kind": "national_command",
+        "location_unit_id": "00000000-0000-0000-0000-000000000005",
+        "claimable": false,
+        "ai_controlled": false
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004e86",
+        "name": "Exercise Commander",
+        "side": "Blue",
+        "kind": "component_commander",
+        "location_unit_id": "00000000-0000-0000-0000-000000000005",
+        "claimable": true,
+        "ai_controlled": false
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004e87",
+        "name": "Pilot, CAP Alpha 1",
+        "side": "Blue",
+        "kind": "pilot",
+        "location_unit_id": "00000000-0000-0000-0000-00000000000b",
+        "claimable": true,
+        "ai_controlled": false
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004e88",
+        "name": "Pilot, CAP Alpha 2",
+        "side": "Blue",
+        "kind": "pilot",
+        "location_unit_id": "00000000-0000-0000-0000-00000000000c",
+        "claimable": true,
+        "ai_controlled": false
+      },
+      {
+        "id": "00000000-0000-0000-0000-00000000526d",
+        "name": "Red exercise authority",
+        "side": "Red",
+        "kind": "national_command",
+        "location_unit_id": "00000000-0000-0000-0000-000000000033",
+        "claimable": false,
+        "ai_controlled": false
+      }
+    ],
+    "relationships": [
+      {
+        "id": "00000000-0000-0000-0000-000000004ee9",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e85",
+        "subordinate_role_id": "00000000-0000-0000-0000-000000004e86",
+        "subordinate_unit_id": null,
+        "kind": "national_command"
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004eea",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e86",
+        "subordinate_role_id": "00000000-0000-0000-0000-000000004e87",
+        "subordinate_unit_id": null,
+        "kind": "tacon"
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004eeb",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e86",
+        "subordinate_role_id": "00000000-0000-0000-0000-000000004e88",
+        "subordinate_unit_id": null,
+        "kind": "tacon"
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004eec",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e85",
+        "subordinate_role_id": null,
+        "subordinate_unit_id": "00000000-0000-0000-0000-000000000005",
+        "kind": "national_command"
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004eed",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e87",
+        "subordinate_role_id": null,
+        "subordinate_unit_id": "00000000-0000-0000-0000-00000000000b",
+        "kind": "tacon"
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004eee",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e88",
+        "subordinate_role_id": null,
+        "subordinate_unit_id": "00000000-0000-0000-0000-00000000000c",
+        "kind": "tacon"
+      },
+      {
+        "id": "00000000-0000-0000-0000-0000000052d1",
+        "superior_role_id": "00000000-0000-0000-0000-00000000526d",
+        "subordinate_role_id": null,
+        "subordinate_unit_id": "00000000-0000-0000-0000-000000000033",
+        "kind": "national_command"
+      }
+    ],
+    "policies": [
+      {
+        "id": "00000000-0000-0000-0000-000000004f4d",
+        "name": "CAP Alpha 1 movement authority",
+        "action": "move",
+        "target_unit_ids": [
+          "00000000-0000-0000-0000-00000000000b"
+        ],
+        "direct_role_ids": [
+          "00000000-0000-0000-0000-000000004e86",
+          "00000000-0000-0000-0000-000000004e87"
+        ],
+        "request_role_ids": [],
+        "decision_steps": [],
+        "notify_role_ids": [],
+        "executable": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004f4e",
+        "name": "CAP Alpha 2 movement authority",
+        "action": "move",
+        "target_unit_ids": [
+          "00000000-0000-0000-0000-00000000000c"
+        ],
+        "direct_role_ids": [
+          "00000000-0000-0000-0000-000000004e86",
+          "00000000-0000-0000-0000-000000004e88"
+        ],
+        "request_role_ids": [],
+        "decision_steps": [],
+        "notify_role_ids": [],
+        "executable": true
+      }
+    ]
+  },
+  "sensor_report_routes": [
+    {
+      "origin_role_id": "00000000-0000-0000-0000-000000004e87",
+      "recipient_unit_id": "00000000-0000-0000-0000-000000000005",
+      "interval_ticks": 10
+    }
+  ]
+}

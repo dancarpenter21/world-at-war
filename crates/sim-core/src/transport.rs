@@ -52,6 +52,17 @@ pub(super) struct Transport {
 }
 
 impl Simulation {
+    pub(super) fn is_fragment_event(&self, event: &NetworkEvent) -> bool {
+        match event {
+            NetworkEvent::TransmissionStarted { packet, .. }
+            | NetworkEvent::PacketDelivered { packet, .. }
+            | NetworkEvent::PacketDropped { packet, .. } => {
+                self.transport.packets.contains_key(&packet.id().get())
+            }
+            NetworkEvent::DataReceived { .. } => false,
+        }
+    }
+
     pub fn has_message_route(&self, from: Uuid, to: Uuid) -> bool {
         self.message_route(from, to).is_some()
     }
@@ -269,11 +280,17 @@ impl Simulation {
             }
         }
         let sent = started.elapsed();
-        let events = self
+        let mut events = self
             .advance_network()
             .expect("validated network must advance");
+        events.extend(std::mem::take(&mut self.pending_fragment_events));
         let advanced = started.elapsed();
         for event in events {
+            let owned = self.is_fragment_event(&event);
+            if !owned {
+                self.pending_network_events.push(event);
+                continue;
+            }
             let (packet_id, delivered) = match event {
                 NetworkEvent::PacketDelivered { packet, .. } => (packet.id().get(), true),
                 NetworkEvent::PacketDropped { packet, .. } => (packet.id().get(), false),

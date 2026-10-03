@@ -41,7 +41,7 @@ test("commander compares, edits and publishes a campaign through the planning wo
   await expect(page.getByRole("heading",{name:"Compare courses of action"})).toBeVisible();
   await page.getByLabel("Commander intent",{exact:true}).fill("Protect the joint force and preserve safe transit.");
   await page.getByRole("button",{name:"Save draft",exact:true}).click();
-  await expect(page.getByRole("status")).toContainText("Draft saved");
+  await expect(page.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Draft saved");
   await page.getByRole("button",{name:"Approve and publish selected course",exact:true}).click();
   await expect(page.getByText("Received revision 2",{exact:false})).toBeVisible();
   expect(actions).toEqual(["save","publish"]);

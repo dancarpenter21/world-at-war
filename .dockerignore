@@ -10,3 +10,12 @@ data/downloads/
 data/generated/
 .env
 *.log
+
+tmp/
+var/
+web/test-results/
+web/playwright-report/
+.codex/
+.agents/
+**/.env
+**/.env.*

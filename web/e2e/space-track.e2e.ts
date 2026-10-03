@@ -107,6 +107,7 @@ test("downloads and persists a Space-Track catalog through the login form", asyn
   await expect(page.getByLabel("Space-Track username")).toBeVisible({ timeout: 15_000 });
   await page.getByLabel("Space-Track username").fill(liveUsername ?? "integration-user");
   await page.getByLabel("Space-Track password").fill(livePassword ?? "integration-password");
+  await expect(page.getByRole("button", { name: "Connect and synchronize", exact: true })).toBeEnabled();
 
   const connectResponse = page.waitForResponse((response) =>
     response.url() === `${backendUrl}/v1/admin/space-track/connect`

@@ -43,13 +43,13 @@ async function create(page: Page, title: string) {
   await page.getByLabel("Game title").fill(title);
   await page.getByRole("button", { name: "Create game", exact: true }).click();
   await page.getByRole("button", { name: /Joint Force Commander/ }).click();
-  await expect.poll(async () => (await session(page)).role_id).toBe(commanderRole);
+  await expect.poll(async () => (await session(page))?.role_id).toBe(commanderRole);
 }
 async function join(page: Page, title: string, role: string) {
   await page.getByRole("button", { name: "Join game", exact: true }).click();
   await page.getByRole("button", { name: new RegExp(title) }).click();
   await page.getByRole("button", { name: new RegExp(role) }).click();
-  await expect.poll(async () => (await session(page)).role_id).not.toBeNull();
+  await expect.poll(async () => ((await session(page))?.role_id ?? "")).toMatch(/^[0-9a-f-]{36}$/);
 }
 async function openPlanning(page: Page) {
   await page.getByRole("button", { name: "Joint planning", exact: true }).click();
@@ -75,13 +75,13 @@ test("real players receive published plans only after delivery and cannot read a
   await control(commander, "pause");
   await commander.getByLabel("Commander intent", { exact: true }).fill("PRIVATE-DRAFT: protect the browser campaign.");
   await commander.getByRole("button", { name: "Save draft", exact: true }).click();
-  await expect(commander.getByRole("status")).toContainText("Draft saved");
+  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Draft saved");
   await expect(pilot.getByText("No planning product has reached this role.", { exact: false })).toBeVisible();
   for (const page of [pilot, controller]) {
     expect(JSON.stringify(await planning(page))).not.toContain("PRIVATE-DRAFT");
   }
   await commander.getByRole("button", { name: "Approve and publish selected course", exact: true }).click();
-  await expect(commander.getByRole("status")).toContainText("Message queued");
+  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued");
   expect((await planning(pilot)).received).toBeNull();
   const networkPath = `/v1/games/${c.game_id}/network?player_id=${p.player_id}&role_id=${pilotRole}`;
   expect(JSON.stringify((await api(pilot, networkPath)).body)).not.toContain("PRIVATE-DRAFT");
@@ -126,7 +126,7 @@ test("reload restores the held role without changing its lease and a severed net
   await openPlanning(page);
   await page.getByLabel("Commander intent", { exact: true }).fill("Recovered commander can still save.");
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("Draft saved");
+  await expect(page.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Draft saved");
   await page.getByRole("button", { name: "Close planning", exact: true }).click();
   await page.route("**/v1/**", route => route.abort("internetdisconnected"));
   await page.reload();
@@ -184,7 +184,7 @@ test("ACO preview, resolutions, atomic apply, deduplication and publication use 
   await record.getByLabel("Resolved activation ticks").fill("0-600, 900-1200");
   await resolveImport(commander);
   await commander.getByRole("button", { name: "Apply airspaces to draft", exact: true }).click();
-  await expect(commander.getByRole("status")).toContainText("Airspaces applied to draft");
+  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Airspaces applied to draft");
   const imported = (await planning(commander)).draft!;
   expect(imported.revision).toBe(2); expect(imported.published_tick).toBeNull();
   const volume = imported.airspaces.find(volume => volume.name === "TRAINING")!;
@@ -194,16 +194,16 @@ test("ACO preview, resolutions, atomic apply, deduplication and publication use 
   await commander.getByRole("button", { name: "Preview airspace import", exact: true }).click();
   await expect(commander.getByText("TRAINING: unchanged", { exact: true })).toBeVisible();
   await commander.getByRole("button", { name: "Apply airspaces to draft", exact: true }).click();
-  await expect(commander.getByRole("status")).toContainText("Airspaces applied to draft");
+  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Airspaces applied to draft");
   expect((await planning(commander)).draft!.revision).toBe(2);
   expect((await planning(commander)).draft!.airspaces.find(item => item.name === "TRAINING")!.id).toBe(volume.id);
   // A normal save must preserve source geometry, provenance and disjoint activation periods.
   await commander.getByLabel("Commander intent", { exact: true }).fill("Publish imported training airspace.");
   await commander.getByRole("button", { name: "Save draft", exact: true }).click();
-  await expect(commander.getByRole("status").filter({ hasText: "Draft saved" })).toBeVisible();
+  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status").filter({ hasText: "Draft saved" })).toBeVisible();
   expect((await planning(commander)).draft!.airspaces.find(item => item.id === volume.id)).toEqual(volume);
   await commander.getByRole("button", { name: "Approve and publish selected course", exact: true }).click();
-  await expect(commander.getByRole("status").filter({ hasText: "Message queued" })).toBeVisible();
+  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status").filter({ hasText: "Message queued" })).toBeVisible();
   expect((await planning(pilot)).received).toBeNull(); await control(commander, "start");
   await expect.poll(async () => (await planning(pilot)).received?.revision, { timeout: 100_000 }).toBe(3);
   await expect(pilot.getByRole("cell", { name: "TRAINING", exact: true })).toBeVisible();
@@ -225,7 +225,7 @@ test("invalid imports, excluded records and stale previews cannot overwrite a ca
   await page.getByRole("button", { name: "Preview airspace import", exact: true }).click();
   await expect(page.getByText("TRAINING: excluded", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Apply airspaces to draft", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("Airspaces applied to draft");
+  await expect(page.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Airspaces applied to draft");
   expect((await planning(page)).draft!.revision).toBe(1);
   await page.getByLabel("Exclude TRAINING", { exact: true }).uncheck(); await resolveImport(page);
   const draft = (await planning(page)).draft!;
@@ -240,7 +240,7 @@ test("invalid imports, excluded records and stale previews cannot overwrite a ca
   await page.getByRole("button", { name: "Preview airspace import", exact: true }).click();
   await expect(page.getByText("Preview valid.", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Apply airspaces to draft", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("Airspaces applied to draft");
+  await expect(page.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Airspaces applied to draft");
   expect((await planning(page)).draft!.revision).toBe(3);
 });
 
@@ -304,7 +304,7 @@ test("clearances, handoffs and cancellation wait for delivery and enforce contro
   await commander.getByRole("button", { name: "Start scenario", exact: true }).click();
   await openPlanning(commander);
   await commander.getByRole("button", { name: "Approve and publish selected course", exact: true }).click();
-  await expect(commander.getByRole("status")).toContainText("Message queued");
+  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued");
   for (const page of [pilot, west, east]) {
     await expect.poll(async () => (await planning(page)).received?.revision, { timeout: 90_000 }).toBe(1);
     await openPlanning(page);
@@ -317,7 +317,7 @@ test("clearances, handoffs and cancellation wait for delivery and enforce contro
   await pilot.getByRole("combobox", { name: "Aircraft", exact: true }).selectOption(mission.unit_id);
   await pilot.getByRole("combobox", { name: "Destination airspace", exact: true }).selectOption(westSector.id);
   await pilot.getByRole("button", { name: "Request clearance", exact: true }).click();
-  await expect(pilot.getByRole("status")).toContainText("Message queued");
+  await expect(pilot.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued");
   expect((await planning(west)).clearances).toHaveLength(0);
   expect((await planning(pilot)).clearances).toHaveLength(0);
   await control(commander, "start");
@@ -327,7 +327,7 @@ test("clearances, handoffs and cancellation wait for delivery and enforce contro
   expect((await planningAction(east, { action: "grant_clearance", clearance })).status).toBe(422);
   expect((await planningAction(pilot, { action: "grant_clearance", clearance })).status).toBe(422);
   await west.getByRole("button", { name: "Approve request", exact: true }).click();
-  await expect(west.getByRole("status")).toContainText("Message queued");
+  await expect(west.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued");
   expect((await planning(pilot)).clearances).toHaveLength(0);
   await control(commander, "start");
   await expect.poll(async () => (await planning(pilot)).clearances.some(item => item.id === clearance.id), { timeout: 30_000 }).toBe(true);
@@ -337,7 +337,7 @@ test("clearances, handoffs and cancellation wait for delivery and enforce contro
   await west.getByRole("combobox", { name: "Aircraft", exact: true }).selectOption(mission.unit_id);
   await west.getByRole("combobox", { name: "Destination airspace", exact: true }).selectOption(eastSector.id);
   await west.getByRole("button", { name: "Offer handoff", exact: true }).click();
-  await expect(west.getByRole("status")).toContainText("Message queued");
+  await expect(west.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued");
   const handoff = (await planning(west)).handoffs[0];
   expect((await planning(east)).handoffs).toHaveLength(0);
   expect((await planning(pilot)).handoffs).toHaveLength(0);
@@ -360,7 +360,7 @@ test("clearances, handoffs and cancellation wait for delivery and enforce contro
   const report = commander.locator("article.planning-card").filter({ has: commander.getByRole("button", { name: "Send cancellation", exact: true }) }).filter({ hasText: mission.name });
   await expect(report).toHaveCount(1);
   await report.getByRole("button", { name: "Send cancellation", exact: true }).click();
-  await expect(commander.getByRole("status")).toContainText("Message queued");
+  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued");
   expect((await planning(pilot)).reports.find(item => item.mission_id === mission.id)?.state).not.toBe("cancelled");
   await control(commander, "start");
   await expect.poll(async () => (await planning(pilot)).reports.find(item => item.mission_id === mission.id)?.state, { timeout: 30_000 }).toBe("cancelled");

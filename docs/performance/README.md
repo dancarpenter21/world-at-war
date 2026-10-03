@@ -1,5 +1,11 @@
 # Scenario performance checkpoint — 2026-10-02
 
+These measurements and projection hashes describe the campaign branch before its
+2026-10-03 integration with upstream gameplay. The merged implementation retains
+campaign transport optimizations but also includes the upstream packet engine,
+scoped track identities, training combat, and scenario-specific visibility rules.
+Generate a new baseline before comparing performance or projection hashes on main.
+
 Release measurements on WSL Linux x86_64, AMD Ryzen 7 9800X3D, 16 logical CPUs,
 Rust 1.96.0. Each run uses seed 12787750, 30 warmup ticks, 120 measured ticks and
 two independent repeats. Raw measurements: [before](2026-10-02-before.json) and

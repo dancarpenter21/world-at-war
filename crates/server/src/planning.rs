@@ -1,5 +1,6 @@
 use super::*;
 use sim_core::operations::*;
+use sim_core::DeliveryState;
 
 #[derive(Default)]
 pub(super) struct PlanningState {
@@ -788,6 +789,113 @@ pub(super) fn report_tick(game: &mut Game) {
     }
 }
 
+fn transmit_c2_fields(
+    game: &mut Game,
+    origin_role_id: Uuid,
+    recipient_entity_id: Uuid,
+    profile_id: &str,
+    rendered_text: String,
+    fields: BTreeMap<String, serde_json::Value>,
+) -> Option<Uuid> {
+    let origin_entity_id = game
+        .roles
+        .get(&origin_role_id)
+        .map(|role| role.location_unit_id)?;
+    let message = C2Message {
+        id: Uuid::from_u128(
+            (u128::from(game.network_seed) << 64) | u128::from(game.network_event_sequence + 1),
+        ),
+        profile_id: profile_id.into(),
+        header: MessageHeader {
+            origin_role_id,
+            origin_entity_id,
+            recipient_entity_id,
+            classification: "simulation-controlled".into(),
+            priority: 230,
+            created_tick: game.simulation.tick(),
+            expires_tick: game.simulation.tick().saturating_add(300),
+        },
+        fields,
+        rendered_text,
+    };
+    let encoded_bytes = message.encoded();
+    let outcome = game.simulation.send_message(
+        message.id,
+        origin_entity_id,
+        recipient_entity_id,
+        encoded_bytes.clone(),
+        message.header.expires_tick,
+    );
+    let (state, delivered_at_ns, drop_reason, mut delivered) = match outcome {
+        Ok(()) => (MessageState::Queued, None, None, true),
+        Err(error) => (MessageState::Dropped, None, Some(error.to_string()), false),
+    };
+    game.network_event_sequence = game.network_event_sequence.saturating_add(1);
+    let mut record = NetworkMessageRecord {
+        sequence: game.network_event_sequence,
+        message,
+        encoded_bytes,
+        state,
+        delivered_at_ns,
+        packet_id: None,
+        started_at_ns: None,
+        terminal_at_ns: None,
+        drop_reason,
+    };
+    if let Some(path) = &game.network_event_path {
+        let persisted = serde_json::to_vec(&record).ok().and_then(|mut bytes| {
+            bytes.push(b'\n');
+            OpenOptions::new()
+                .append(true)
+                .open(path)
+                .and_then(|mut file| file.write_all(&bytes))
+                .ok()
+        });
+        if persisted.is_none() {
+            delivered = false;
+            record.state = MessageState::Dropped;
+            record.drop_reason = Some("network event store write failed".into());
+            game.status = GameStatus::Paused;
+            game.operational_error = Some("network event store write failed; game paused".into());
+        }
+    }
+    let message_id = record.message.id;
+    game.network_message_events.push(record.clone());
+    game.network_messages.push(record);
+    delivered.then_some(message_id)
+}
+
+pub(super) fn process_deliveries(game: &mut Game) {
+    for event in game.simulation.drain_deliveries() {
+        let Some(mut record) = game
+            .network_messages
+            .iter()
+            .find(|record| record.message.id == event.id)
+            .cloned()
+        else {
+            continue;
+        };
+        record.state = match event.state {
+            DeliveryState::Queued => MessageState::Queued,
+            DeliveryState::Delivered => MessageState::Delivered,
+            DeliveryState::Acknowledged => MessageState::Acknowledged,
+            DeliveryState::Expired => MessageState::Expired,
+            DeliveryState::Dropped => MessageState::Dropped,
+            DeliveryState::Unacknowledged => MessageState::Unacknowledged,
+        };
+        if event.state == DeliveryState::Delivered {
+            record.delivered_at_ns = Some(game.simulation.tick() * 1_000_000_000);
+        }
+        record.terminal_at_ns = Some(game.simulation.tick() * 1_000_000_000);
+        if !transport::record_transition(game, record) {
+            return;
+        }
+        if event.state == DeliveryState::Delivered {
+            receive(game, &event.payload);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -797,6 +905,7 @@ mod tests {
     fn advance(game: &mut Game, ticks: u64) {
         for _ in 0..ticks {
             game.simulation.step();
+            process_deliveries(game);
             process_vacant_authority_requests(game);
             report_tick(game);
         }

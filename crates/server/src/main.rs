@@ -1,11 +1,19 @@
+mod ai_orders;
 mod airport_catalog;
 mod airspace_import;
 mod benchmark;
 mod credential_cookie;
 mod diagnostics;
+mod execution_acks;
+mod impact_reports;
+mod intents;
 mod planning;
+#[cfg(test)]
+mod role_tests;
+mod sensor_reports;
 mod space_assets;
 mod space_catalog;
+mod transport;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -30,7 +38,6 @@ use axum::{
 };
 use credential_cookie::{CredentialCookie, RememberedCredentials};
 use serde::{Deserialize, Serialize};
-use sim_ai::choose_patrol_intent;
 use sim_catalog::{
     airport::{
         evaluate_airport, Airport, AirportKind, MilitaryUse, RunwayCompatibilityAssessment,
@@ -38,13 +45,15 @@ use sim_catalog::{
     },
     space::{SatelliteAuthorityAssignment, SatelliteAuthorityKind, SourceReference},
 };
-use sim_comms::{C2Message, CommunicationsCatalog, MessageHeader, MessageState};
+use sim_comms::{C2Message, CommunicationsCatalog, MessageHeader, MessageProfile, MessageState};
 use sim_core::{
     AuthorityDefinition, AuthorityPolicy, AuthorityRoleKind, AuthorizationRecord, AuthorizedIntent,
-    DeliveryState, PlayerIntent, Side, Simulation,
+    PlayerIntent, Side, Simulation,
 };
 use sim_scenario::{
-    global_crisis_scenario, jammed_flight_scenario, regional_campaign_scenario, Scenario,
+    combat_training_scenario, command_link_exercise_scenario, contested_combat_scenario,
+    global_crisis_scenario, jammed_flight_scenario, regional_campaign_scenario,
+    sensor_relay_exercise_scenario, Scenario,
 };
 use space_assets::{SpaceAssetDetail, SpaceAssetService, SpaceAssetsResponse};
 use space_catalog::{SpaceCatalogService, SpaceCatalogSnapshot, SpaceCatalogStatus};
@@ -53,6 +62,10 @@ use tower_http::{
     compression::CompressionLayer,
     cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer},
     trace::TraceLayer,
+};
+use transport::{
+    await_authority_delivery, await_message_delivery, process_network_messages,
+    transmit_c2_message, transmit_c2_message_with_fields, DeliveryAction,
 };
 use uuid::Uuid;
 
@@ -79,18 +92,24 @@ struct Game {
     status: GameStatus,
     simulation: Simulation,
     diagnostics: diagnostics::Diagnostics,
+    planning: planning::PlanningState,
     roles: BTreeMap<Uuid, Role>,
     authority: AuthorityDefinition,
     authority_requests: BTreeMap<Uuid, AuthorityRequest>,
-    authority_views: BTreeMap<(Uuid, Uuid), AuthorityRequest>,
-    pending_authority_views: BTreeMap<Uuid, (Uuid, AuthorityRequest)>,
     authority_events: Vec<AuthorityEvent>,
     unit_ids: BTreeSet<Uuid>,
     space_catalog_checksum: Option<String>,
     network_messages: Vec<NetworkMessageRecord>,
-    network_events: Vec<NetworkMessageRecord>,
-    pending_orders: BTreeMap<Uuid, AuthorizedIntent>,
-    planning: planning::PlanningState,
+    network_message_events: Vec<NetworkMessageRecord>,
+    message_profiles: BTreeMap<String, MessageProfile>,
+    packet_messages: BTreeMap<u64, Uuid>,
+    pending_deliveries: BTreeMap<Uuid, DeliveryAction>,
+    ai_planner: ai_orders::AiPlannerState,
+    sensor_reports: sensor_reports::SensorReportState,
+    impact_reports: impact_reports::ImpactReportState,
+    execution_acks: execution_acks::ExecutionAckState,
+    intent_submissions: BTreeMap<Uuid, intents::IntentSubmission>,
+    network_projection_sequence: u64,
     network_event_path: Option<PathBuf>,
     network_event_sequence: u64,
     scenario_id: String,
@@ -108,6 +127,9 @@ struct NetworkMessageRecord {
     message: C2Message,
     encoded_bytes: Vec<u8>,
     state: MessageState,
+    packet_id: Option<u64>,
+    started_at_ns: Option<u64>,
+    terminal_at_ns: Option<u64>,
     delivered_at_ns: Option<u64>,
     drop_reason: Option<String>,
 }
@@ -196,6 +218,8 @@ struct GameSummary {
     network_policy_id: String,
     network_seed: u64,
     operational_error: Option<String>,
+    mission_complete: bool,
+    settling_reports: bool,
 }
 #[derive(Deserialize)]
 struct AirportListQuery {
@@ -254,6 +278,8 @@ struct RoleSummary {
     location_unit_id: Uuid,
     command_units: Vec<Uuid>,
     held: bool,
+    held_by_you: bool,
+    claimable: bool,
     ai_controlled: bool,
     lease_generation: u64,
 }
@@ -280,6 +306,10 @@ struct JoinResponse {
     display_name: String,
 }
 #[derive(Deserialize)]
+struct RolesQuery {
+    player_id: Option<Uuid>,
+}
+#[derive(Deserialize)]
 struct ClaimRoleRequest {
     player_id: Uuid,
 }
@@ -293,7 +323,7 @@ struct SubmitIntentRequest {
     lease_generation: u64,
     intent: PlayerIntent,
 }
-#[derive(Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 enum SubmissionOutcome {
     Queued { intent_id: Uuid, message_id: Uuid },
@@ -309,9 +339,8 @@ struct AuthorityDecisionRecord {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
 enum AuthorityRequestStatus {
-    WaitingDelivery {
+    InTransit {
         message_id: Uuid,
-        after: Box<AuthorityRequestStatus>,
     },
     PendingHuman {
         role_id: Uuid,
@@ -447,7 +476,7 @@ struct SpaceTrackConnectRequest {
     #[serde(default)]
     remember: bool,
 }
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 struct ErrorResponse {
     code: &'static str,
     error: String,
@@ -465,6 +494,10 @@ async fn main() -> anyhow::Result<()> {
         regional_campaign_scenario(),
         global_crisis_scenario(),
         jammed_flight_scenario(),
+        command_link_exercise_scenario(),
+        sensor_relay_exercise_scenario(),
+        combat_training_scenario(),
+        contested_combat_scenario(),
     ];
     for scenario in &scenarios {
         scenario.validate()?;
@@ -500,13 +533,8 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(async move {
         airport_catalog.refresh_if_stale().await;
     });
-    sim_geo::geoid::validate().map_err(anyhow::Error::msg)?;
     let app = Router::new()
         .route("/health", get(health))
-        .route("/v1/geoid/egm96", get(|| async { ([(axum::http::header::CONTENT_TYPE,"application/octet-stream"),(axum::http::header::CACHE_CONTROL,"public, max-age=86400")],sim_geo::geoid::GRID) }))
-        .route("/v1/geoid/manifest", get(|| async { Json(serde_json::json!({"sha256":sim_geo::geoid::SHA256,"rows":721,"columns":1441,"spacing_degrees":0.25,"model":"EGM96"})) }))
-        .route("/v1/games/{game_id}/roles/{role_id}/planning/aco/preview", post(airspace_import::preview))
-        .route("/v1/games/{game_id}/roles/{role_id}/planning/aco/apply", post(airspace_import::apply))
         .route("/v1/airport-catalog/status", get(airport_catalog_status))
         .route("/v1/airports", get(list_airports))
         .route("/v1/airports/{airport_id}", get(get_airport))
@@ -526,11 +554,6 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/v1/games/{game_id}/authority",
             get(get_authority).put(update_authority),
-        )
-        .route("/v1/games/{game_id}/planning", get(planning::get_planning))
-        .route(
-            "/v1/games/{game_id}/roles/{role_id}/planning",
-            post(planning::update_planning),
         )
         .route(
             "/v1/games/{game_id}/authority/requests",
@@ -554,8 +577,32 @@ async fn main() -> anyhow::Result<()> {
             "/v1/games/{game_id}/roles/{role_id}/intent",
             post(submit_intent),
         )
+        .route(
+            "/v1/games/{game_id}/roles/{role_id}/intents/{intent_id}",
+            get(intents::get_intent_receipt),
+        )
+        .route("/v1/games/{game_id}/planning", get(planning::get_planning))
+        .route(
+            "/v1/games/{game_id}/roles/{role_id}/planning",
+            post(planning::update_planning),
+        )
+        .route(
+            "/v1/games/{game_id}/roles/{role_id}/planning/aco/preview",
+            post(airspace_import::preview),
+        )
+        .route(
+            "/v1/games/{game_id}/roles/{role_id}/planning/aco/apply",
+            post(airspace_import::apply),
+        )
+        .route(
+            "/v1/games/{game_id}/diagnostics",
+            get(diagnostics::get_diagnostics),
+        )
         .route("/v1/games/{game_id}/state", get(get_projection))
-        .route("/v1/games/{game_id}/diagnostics", get(diagnostics::get_diagnostics))
+        .route(
+            "/v1/games/{game_id}/roles/{role_id}/debrief",
+            get(intents::get_mission_debrief),
+        )
         .route("/v1/games/{game_id}/network", get(get_network_projection))
         .route(
             "/v1/games/{game_id}/network/events",
@@ -707,8 +754,13 @@ async fn create_game(
     } else {
         None
     };
+    let game_id = Uuid::new_v4();
     let simulation = scenario
-        .spawn_with_network_policy(network_seed, Some(network_policy.queue_discipline))
+        .spawn_with_knowledge_namespace(
+            network_seed,
+            Some(network_policy.queue_discipline),
+            game_id,
+        )
         .map_err(|error| {
             api_error(
                 StatusCode::UNPROCESSABLE_ENTITY,
@@ -738,7 +790,6 @@ async fn create_game(
             )
         })
         .collect();
-    let game_id = Uuid::new_v4();
     let network_event_path = state
         .network_event_dir
         .join(format!("{game_id}.network-events.jsonl"));
@@ -762,19 +813,36 @@ async fn create_game(
         host: request.host_player_id,
         status: GameStatus::Lobby,
         simulation,
-        diagnostics: diagnostics::Diagnostics::default(),
         roles,
         authority,
         authority_requests: BTreeMap::new(),
-        authority_views: BTreeMap::new(),
-        pending_authority_views: BTreeMap::new(),
         authority_events: Vec::new(),
         unit_ids: scenario.units.iter().map(|unit| unit.id).collect(),
         space_catalog_checksum: checksum,
         network_messages: Vec::new(),
-        network_events: Vec::new(),
-        pending_orders: BTreeMap::new(),
+        diagnostics: diagnostics::Diagnostics::default(),
         planning: planning::PlanningState::new(scenario.campaign.clone()),
+        network_message_events: Vec::new(),
+        message_profiles: state
+            .communications_catalog
+            .messages
+            .iter()
+            .cloned()
+            .map(|profile| (profile.id.clone(), profile))
+            .collect(),
+        packet_messages: BTreeMap::new(),
+        pending_deliveries: BTreeMap::new(),
+        ai_planner: ai_orders::AiPlannerState::default(),
+        sensor_reports: sensor_reports::SensorReportState::new(
+            scenario.sensor_report_routes.clone(),
+        ),
+        impact_reports: impact_reports::ImpactReportState::new(
+            scenario.impact_report_routes.clone(),
+            scenario.reporting_window_ticks,
+        ),
+        intent_submissions: BTreeMap::new(),
+        execution_acks: execution_acks::ExecutionAckState::default(),
+        network_projection_sequence: 0,
         network_event_path: Some(network_event_path),
         network_event_sequence: 0,
         scenario_id: scenario.id.clone(),
@@ -821,12 +889,18 @@ async fn join_game(
 async fn list_roles(
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
+    Query(query): Query<RolesQuery>,
 ) -> ApiResult<Vec<RoleSummary>> {
     let games = state.games.read().await;
     let game = games
         .get(&game_id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
-    Ok(Json(game.roles.values().map(role_summary).collect()))
+    Ok(Json(
+        game.roles
+            .values()
+            .map(|role| role_summary(role, query.player_id))
+            .collect(),
+    ))
 }
 
 async fn claim_role(
@@ -858,7 +932,7 @@ async fn claim_role(
     }
     role.owner = Some(request.player_id);
     role.lease_generation += 1;
-    Ok(Json(role_summary(role)))
+    Ok(Json(role_summary(role, Some(request.player_id))))
 }
 
 async fn start_game(
@@ -892,6 +966,13 @@ async fn set_game_status(
             "only the host can control game state",
         ));
     }
+    if status == GameStatus::Running && game.simulation.mission_complete() {
+        return Err(api_error(
+            StatusCode::CONFLICT,
+            "mission_complete",
+            "the training mission has ended; create a new game",
+        ));
+    }
     game.status = status;
     Ok(Json(game_summary(game)))
 }
@@ -905,42 +986,7 @@ async fn submit_intent(
     let game = games
         .get_mut(&game_id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
-    if game.status != GameStatus::Running {
-        return Err(api_error(
-            StatusCode::CONFLICT,
-            "game_not_running",
-            "game is not running",
-        ));
-    }
-    let role = game
-        .roles
-        .get(&role_id)
-        .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "role_not_found", "role not found"))?;
-    if role.owner != Some(request.player_id) || role.lease_generation != request.lease_generation {
-        return Err(api_error(
-            StatusCode::FORBIDDEN,
-            "invalid_role_lease",
-            "invalid role lease",
-        ));
-    }
-    if request.intent.issuer_role != role_id {
-        return Err(api_error(
-            StatusCode::FORBIDDEN,
-            "issuer_role",
-            "intent issuer does not match the held role",
-        ));
-    }
-    let action = request.intent.kind.action_key().to_string();
-    let target = request.intent.target;
-    let outcome = submit_authority_action(
-        game,
-        role_id,
-        action,
-        target,
-        String::new(),
-        Some(request.intent),
-    )?;
-    Ok(Json(outcome))
+    Ok(Json(intents::submit_player_intent(game, role_id, request)?))
 }
 
 async fn get_authority(
@@ -1059,7 +1105,22 @@ async fn list_authority_requests(
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
     require_game_participant(game, query.player_id)?;
     if game.host == query.player_id && query.role_id.is_none() {
-        return Ok(Json(game.authority_requests.values().cloned().collect()));
+        return Ok(Json(
+            game.authority_requests
+                .values()
+                .filter(|request| {
+                    !matches!(
+                        request.status,
+                        AuthorityRequestStatus::InTransit { .. }
+                            | AuthorityRequestStatus::BlockedComms
+                    ) || game.roles.values().any(|role| {
+                        role.owner == Some(query.player_id)
+                            && authority_request_known(request, role.id)
+                    })
+                })
+                .cloned()
+                .collect(),
+        ));
     }
     let role_id = query.role_id.ok_or_else(|| {
         api_error(
@@ -1080,10 +1141,10 @@ async fn list_authority_requests(
         ));
     }
     Ok(Json(
-        game.authority_views
-            .iter()
-            .filter(|((viewer, _), _)| *viewer == role_id)
-            .map(|(_, request)| request.clone())
+        game.authority_requests
+            .values()
+            .filter(|request| authority_request_known(request, role_id))
+            .cloned()
             .collect(),
     ))
 }
@@ -1126,6 +1187,13 @@ async fn decide_authority_request(
         .get_mut(&game_id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
     validate_role_lease(game, role_id, request.player_id, request.lease_generation)?;
+    if game.simulation.mission_complete() {
+        return Err(api_error(
+            StatusCode::CONFLICT,
+            "mission_complete",
+            "the training mission has ended",
+        ));
+    }
     let mut authority_request = game.authority_requests.remove(&request_id).ok_or_else(|| {
         api_error(
             StatusCode::NOT_FOUND,
@@ -1154,7 +1222,6 @@ async fn decide_authority_request(
         false,
     );
     let response = authority_request.clone();
-    send_authority_update(game, role_id, &authority_request);
     game.authority_requests
         .insert(request_id, authority_request);
     Ok(Json(response))
@@ -1310,35 +1377,35 @@ async fn create_satellite_request(
         requester_role_id: role_id,
         public_sources: detail.sources.clone(),
     };
-    let status = AuthorityRequestStatus::WaitingDelivery {
-        message_id,
-        after: Box::new(status),
+    let mut authority_request = AuthorityRequest {
+        id: request_id,
+        action: request.action,
+        target_unit_id: Uuid::nil(),
+        target: AuthorityTarget::Satellite {
+            norad_catalog_id: norad_id,
+        },
+        requester_role_id: role_id,
+        policy,
+        policy_version: game.authority.version,
+        current_step: 0,
+        created_tick: tick,
+        summary: request.summary,
+        status,
+        decisions: Vec::new(),
+        satellite_context: Some(frozen.clone()),
+        intent: None,
     };
-    game.authority_requests.insert(
-        request_id,
-        AuthorityRequest {
-            id: request_id,
-            action: request.action,
-            target_unit_id: Uuid::nil(),
-            target: AuthorityTarget::Satellite {
-                norad_catalog_id: norad_id,
-            },
-            requester_role_id: role_id,
-            policy,
-            policy_version: game.authority.version,
-            current_step: 0,
-            created_tick: tick,
-            summary: request.summary,
-            status,
-            decisions: Vec::new(),
-            satellite_context: Some(frozen.clone()),
-            intent: None,
+    await_authority_delivery(
+        game,
+        &mut authority_request,
+        message_id,
+        DeliveryAction::ActivateRequest {
+            request_id,
+            step: 0,
         },
     );
-    game.authority_views.insert(
-        (role_id, request_id),
-        game.authority_requests[&request_id].clone(),
-    );
+    game.authority_requests
+        .insert(request_id, authority_request);
     game.authority_events.push(AuthorityEvent {
         tick,
         kind: "satellite_authority_requested".into(),
@@ -1404,96 +1471,6 @@ fn validate_satellite_request(
     Ok(())
 }
 
-fn transmit_c2_message(
-    game: &mut Game,
-    origin_role_id: Uuid,
-    recipient_entity_id: Uuid,
-    profile_id: &str,
-    rendered_text: String,
-) -> Option<Uuid> {
-    transmit_c2_fields(
-        game,
-        origin_role_id,
-        recipient_entity_id,
-        profile_id,
-        rendered_text,
-        BTreeMap::new(),
-    )
-}
-
-fn transmit_c2_fields(
-    game: &mut Game,
-    origin_role_id: Uuid,
-    recipient_entity_id: Uuid,
-    profile_id: &str,
-    rendered_text: String,
-    fields: BTreeMap<String, serde_json::Value>,
-) -> Option<Uuid> {
-    let origin_entity_id = game
-        .roles
-        .get(&origin_role_id)
-        .map(|role| role.location_unit_id)?;
-    let message = C2Message {
-        id: Uuid::from_u128(
-            (u128::from(game.network_seed) << 64) | u128::from(game.network_event_sequence + 1),
-        ),
-        profile_id: profile_id.into(),
-        header: MessageHeader {
-            origin_role_id,
-            origin_entity_id,
-            recipient_entity_id,
-            classification: "simulation-controlled".into(),
-            priority: 230,
-            created_tick: game.simulation.tick(),
-            expires_tick: game.simulation.tick().saturating_add(300),
-        },
-        fields,
-        rendered_text,
-    };
-    let encoded_bytes = message.encoded();
-    let outcome = game.simulation.send_message(
-        message.id,
-        origin_entity_id,
-        recipient_entity_id,
-        encoded_bytes.clone(),
-        message.header.expires_tick,
-    );
-    let (state, delivered_at_ns, drop_reason, mut delivered) = match outcome {
-        Ok(()) => (MessageState::Queued, None, None, true),
-        Err(error) => (MessageState::Dropped, None, Some(error.to_string()), false),
-    };
-    game.network_event_sequence = game.network_event_sequence.saturating_add(1);
-    let mut record = NetworkMessageRecord {
-        sequence: game.network_event_sequence,
-        message,
-        encoded_bytes,
-        state,
-        delivered_at_ns,
-        drop_reason,
-    };
-    if let Some(path) = &game.network_event_path {
-        let persisted = serde_json::to_vec(&record).ok().and_then(|mut bytes| {
-            bytes.push(b'\n');
-            OpenOptions::new()
-                .append(true)
-                .open(path)
-                .and_then(|mut file| file.write_all(&bytes))
-                .ok()
-        });
-        if persisted.is_none() {
-            delivered = false;
-            record.state = MessageState::Dropped;
-            record.drop_reason = Some("network event store write failed".into());
-            game.status = GameStatus::Paused;
-            game.operational_error = Some("network event store write failed; game paused".into());
-        }
-    }
-    let message_id = record.message.id;
-    game.network_events.push(record.clone());
-    game.network_messages.push(record);
-    delivered.then_some(message_id)
-}
-
 fn submit_authority_action(
     game: &mut Game,
     role_id: Uuid,
@@ -1502,6 +1479,13 @@ fn submit_authority_action(
     summary: String,
     intent: Option<PlayerIntent>,
 ) -> Result<SubmissionOutcome, (StatusCode, Json<ErrorResponse>)> {
+    if game.simulation.mission_complete() {
+        return Err(api_error(
+            StatusCode::CONFLICT,
+            "mission_complete",
+            "the training mission has ended",
+        ));
+    }
     let policy = game
         .authority
         .policy_for(&action, target)
@@ -1516,7 +1500,16 @@ fn submit_authority_action(
     if policy.direct_role_ids.contains(&role_id)
         && game.authority.role_is_in_unit_chain(role_id, target)
     {
-        let Some(message_id) = transmit_c2_fields(
+        let intent = intent.ok_or_else(|| {
+            api_error(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "direct_action_requires_intent",
+                "this action is directly executable and requires an order payload",
+            )
+        })?;
+        let intent_id = intent.intent_id;
+        let fields = intents::intent_fields(&intent, &game.simulation);
+        let message_id = transmit_c2_message_with_fields(
             game,
             role_id,
             target,
@@ -1525,42 +1518,33 @@ fn submit_authority_action(
                 _ => "public-safe.jseries.move-order.v1",
             },
             format!("{action} order for unit {target}"),
-            BTreeMap::from([(
-                "intent".into(),
-                serde_json::to_value(&intent).expect("intent serializes"),
-            )]),
-        ) else {
-            return Err(api_error(
+            fields,
+        )
+        .ok_or_else(|| {
+            api_error(
                 StatusCode::CONFLICT,
                 "blocked_comms",
                 "no communications route to the target",
-            ));
-        };
-        if let Some(intent) = intent {
-            let intent_id = intent.intent_id;
-            game.pending_orders.insert(
-                message_id,
-                AuthorizedIntent {
-                    intent,
-                    authorization: AuthorizationRecord {
-                        policy_id: policy.id,
-                        policy_version: game.authority.version,
-                        requester_role_id: role_id,
-                        granting_role_id: role_id,
-                        request_id: None,
-                    },
+            )
+        })?;
+        await_message_delivery(
+            game,
+            message_id,
+            DeliveryAction::ExecuteIntent(AuthorizedIntent {
+                intent,
+                authorization: AuthorizationRecord {
+                    policy_id: policy.id,
+                    policy_version: game.authority.version,
+                    requester_role_id: role_id,
+                    granting_role_id: role_id,
+                    request_id: None,
                 },
-            );
-            return Ok(SubmissionOutcome::Queued {
-                intent_id,
-                message_id,
-            });
-        }
-        return Err(api_error(
-            StatusCode::UNPROCESSABLE_ENTITY,
-            "direct_action_requires_intent",
-            "this action is directly executable and requires an order payload",
-        ));
+            }),
+        );
+        return Ok(SubmissionOutcome::Queued {
+            intent_id,
+            message_id,
+        });
     }
     if !policy.request_role_ids.contains(&role_id) {
         return Err(api_error(
@@ -1569,74 +1553,71 @@ fn submit_authority_action(
             "role may neither issue nor request this action",
         ));
     }
-    let Some(first_step) = policy.decision_steps.first() else {
-        return Err(api_error(
+    let first_step = policy.decision_steps.first().ok_or_else(|| {
+        api_error(
             StatusCode::UNPROCESSABLE_ENTITY,
             "missing_decision_step",
             "authority policy has no decision step",
-        ));
-    };
-    let Some(first_step_entity) = game
+        )
+    })?;
+    let first_step_entity = game
         .roles
         .get(&first_step.role_id)
         .map(|role| role.location_unit_id)
-    else {
-        return Err(api_error(
-            StatusCode::UNPROCESSABLE_ENTITY,
-            "decision_role_missing",
-            "the deciding role has no communication location",
-        ));
-    };
-    let Some(message_id) = transmit_c2_fields(
+        .ok_or_else(|| {
+            api_error(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "decision_role_missing",
+                "the deciding role has no communication location",
+            )
+        })?;
+    let fields = intent
+        .as_ref()
+        .map(|intent| intents::intent_fields(intent, &game.simulation))
+        .unwrap_or_default();
+    let message_id = transmit_c2_message_with_fields(
         game,
         role_id,
         first_step_entity,
         "public-safe.usmtf.authority-request.v1",
         format!("authority request: {action} for unit {target}; {summary}"),
-        BTreeMap::from([
-            ("action".into(), serde_json::json!(action)),
-            ("target".into(), serde_json::json!(target)),
-            (
-                "intent".into(),
-                serde_json::to_value(&intent).expect("intent serializes"),
-            ),
-        ]),
-    ) else {
-        return Err(api_error(
+        fields,
+    )
+    .ok_or_else(|| {
+        api_error(
             StatusCode::CONFLICT,
             "blocked_comms",
             "no communications route to the deciding role",
-        ));
-    };
+        )
+    })?;
     let request_id = Uuid::new_v4();
     let tick = game.simulation.tick();
-    let status = AuthorityRequestStatus::WaitingDelivery {
-        message_id,
-        after: Box::new(status_for_decision_role(game, first_step, tick)),
+    let mut request = AuthorityRequest {
+        id: request_id,
+        action,
+        target_unit_id: target,
+        target: AuthorityTarget::Unit { unit_id: target },
+        requester_role_id: role_id,
+        policy,
+        policy_version: game.authority.version,
+        current_step: 0,
+        created_tick: tick,
+        summary,
+        status: AuthorityRequestStatus::InTransit { message_id },
+        decisions: Vec::new(),
+        satellite_context: None,
+        intent,
     };
-    game.authority_requests.insert(
-        request_id,
-        AuthorityRequest {
-            id: request_id,
-            action,
-            target_unit_id: target,
-            target: AuthorityTarget::Unit { unit_id: target },
-            requester_role_id: role_id,
-            policy,
-            policy_version: game.authority.version,
-            current_step: 0,
-            created_tick: tick,
-            summary,
-            status,
-            decisions: Vec::new(),
-            satellite_context: None,
-            intent,
+    await_authority_delivery(
+        game,
+        &mut request,
+        message_id,
+        DeliveryAction::ActivateRequest {
+            request_id,
+            step: 0,
         },
     );
-    game.authority_views.insert(
-        (role_id, request_id),
-        game.authority_requests[&request_id].clone(),
-    );
+    game.authority_requests.insert(request_id, request);
     game.authority_events.push(AuthorityEvent {
         tick,
         kind: "authority_requested".into(),
@@ -1686,6 +1667,25 @@ fn require_game_participant(
             "player is not participating in this game",
         ))
     }
+}
+
+fn authority_request_known(request: &AuthorityRequest, role_id: Uuid) -> bool {
+    if request.requester_role_id == role_id
+        || request
+            .decisions
+            .iter()
+            .any(|decision| decision.role_id == role_id)
+    {
+        return true;
+    }
+    if matches!(
+        request.status,
+        AuthorityRequestStatus::InTransit { .. } | AuthorityRequestStatus::BlockedComms
+    ) {
+        return false;
+    }
+    current_decision_role(request) == Some(role_id)
+        || request.policy.notify_role_ids.contains(&role_id)
 }
 
 fn current_decision_role(request: &AuthorityRequest) -> Option<Uuid> {
@@ -1740,33 +1740,44 @@ fn advance_authority_request(
     }
     request.current_step += 1;
     if let Some(step) = request.policy.decision_steps.get(request.current_step) {
-        let next_entity = game
+        let Some(entity) = game
             .roles
             .get(&step.role_id)
-            .map(|role| role.location_unit_id);
-        let message_id = next_entity.and_then(|entity| {
-            transmit_c2_message(
-                game,
-                role_id,
-                entity,
-                "public-safe.usmtf.authority-decision.v1",
-                format!("authority approval for request {}", request.id),
-            )
-        });
-        request.status = match message_id {
-            Some(message_id) => AuthorityRequestStatus::WaitingDelivery {
-                message_id,
-                after: Box::new(status_for_decision_role(game, step, tick)),
-            },
-            None => AuthorityRequestStatus::BlockedComms,
+            .map(|role| role.location_unit_id)
+        else {
+            request.status = AuthorityRequestStatus::BlockedComms;
+            return;
         };
+        let Some(message_id) = transmit_c2_message(
+            game,
+            role_id,
+            entity,
+            "public-safe.usmtf.authority-decision.v1",
+            format!("authority approval for request {}", request.id),
+        ) else {
+            request.status = AuthorityRequestStatus::BlockedComms;
+            return;
+        };
+        await_authority_delivery(
+            game,
+            request,
+            message_id,
+            DeliveryAction::ActivateRequest {
+                request_id: request.id,
+                step: request.current_step,
+            },
+        );
         return;
     }
     if !request.policy.executable || request.intent.is_none() {
         request.status = AuthorityRequestStatus::ApprovedNoExecutor;
         return;
     }
-    let Some(message_id) = transmit_c2_fields(
+    let fields = intents::intent_fields(
+        request.intent.as_ref().expect("checked above"),
+        &game.simulation,
+    );
+    let Some(message_id) = transmit_c2_message_with_fields(
         game,
         role_id,
         request.target_unit_id,
@@ -1778,175 +1789,34 @@ fn advance_authority_request(
             "approved {} order for unit {}",
             request.action, request.target_unit_id
         ),
-        BTreeMap::from([
-            (
-                "intent".into(),
-                serde_json::to_value(&request.intent).expect("intent serializes"),
-            ),
-            (
-                "authorization_request".into(),
-                serde_json::json!(request.id),
-            ),
-        ]),
+        fields,
     ) else {
         request.status = AuthorityRequestStatus::BlockedComms;
         return;
     };
     let intent = request.intent.take().expect("checked above");
-    game.pending_orders.insert(
+    let authorized = AuthorizedIntent {
+        intent,
+        authorization: AuthorizationRecord {
+            policy_id: request.policy.id,
+            policy_version: request.policy_version,
+            requester_role_id: request.requester_role_id,
+            granting_role_id: role_id,
+            request_id: Some(request.id),
+        },
+    };
+    await_authority_delivery(
+        game,
+        request,
         message_id,
-        AuthorizedIntent {
-            intent,
-            authorization: AuthorizationRecord {
-                policy_id: request.policy.id,
-                policy_version: request.policy_version,
-                requester_role_id: request.requester_role_id,
-                granting_role_id: role_id,
-                request_id: Some(request.id),
-            },
+        DeliveryAction::ExecuteRequest {
+            request_id: request.id,
+            intent: authorized,
         },
     );
-    request.status = AuthorityRequestStatus::WaitingDelivery {
-        message_id,
-        after: Box::new(AuthorityRequestStatus::Approved),
-    };
-}
-
-fn send_authority_update(game: &mut Game, origin_role: Uuid, request: &AuthorityRequest) {
-    game.authority_views
-        .insert((origin_role, request.id), request.clone());
-    let recipients: BTreeSet<_> = std::iter::once(request.requester_role_id)
-        .chain(request.policy.notify_role_ids.iter().copied())
-        .collect();
-    for role in recipients {
-        if role == origin_role {
-            continue;
-        }
-        let Some(destination) = game.roles.get(&role).map(|r| r.location_unit_id) else {
-            continue;
-        };
-        if let Some(message) = transmit_c2_fields(
-            game,
-            origin_role,
-            destination,
-            "public-safe.usmtf.authority-decision.v1",
-            format!("Authority decision report for {}", request.id),
-            BTreeMap::from([(
-                "authority_request".into(),
-                serde_json::to_value(request).expect("authority request serializes"),
-            )]),
-        ) {
-            game.pending_authority_views
-                .insert(message, (role, request.clone()));
-        }
-    }
-}
-
-fn process_message_deliveries(game: &mut Game) {
-    for event in game.simulation.drain_deliveries() {
-        let Some(index) = game
-            .network_messages
-            .iter()
-            .position(|r| r.message.id == event.id)
-        else {
-            continue;
-        };
-        game.network_event_sequence += 1;
-        let record = &mut game.network_messages[index];
-        record.sequence = game.network_event_sequence;
-        record.state = match event.state {
-            DeliveryState::Queued => MessageState::Queued,
-            DeliveryState::Delivered => MessageState::Delivered,
-            DeliveryState::Acknowledged => MessageState::Acknowledged,
-            DeliveryState::Expired => MessageState::Expired,
-            DeliveryState::Dropped => MessageState::Dropped,
-            DeliveryState::Unacknowledged => MessageState::Unacknowledged,
-        };
-        if event.state == DeliveryState::Delivered {
-            if let Some((role, request)) = game.pending_authority_views.remove(&event.id) {
-                if game
-                    .authority_views
-                    .get(&(role, request.id))
-                    .is_none_or(|old| old.decisions.len() <= request.decisions.len())
-                {
-                    game.authority_views.insert((role, request.id), request);
-                }
-            }
-            record.delivered_at_ns = Some(game.simulation.tick() * 1_000_000_000);
-        }
-        if let Some(path) = &game.network_event_path {
-            let result = serde_json::to_vec(record)
-                .map_err(std::io::Error::other)
-                .and_then(|mut bytes| {
-                    bytes.push(b'\n');
-                    OpenOptions::new()
-                        .append(true)
-                        .open(path)?
-                        .write_all(&bytes)
-                });
-            if result.is_err() {
-                game.status = GameStatus::Paused;
-                game.operational_error =
-                    Some("network event store write failed; game paused".into());
-                return;
-            }
-        }
-        game.network_events.push(record.clone());
-        if event.state == DeliveryState::Delivered {
-            planning::receive(game, &event.payload);
-            if let Some(order) = game.pending_orders.remove(&event.id) {
-                // Revalidate the grant when it reaches the executor.
-                let valid = game
-                    .authority
-                    .policy_for(order.intent.kind.action_key(), order.intent.target)
-                    .is_some_and(|p| {
-                        p.id == order.authorization.policy_id
-                            && game.authority.version == order.authorization.policy_version
-                    });
-                if valid {
-                    game.simulation.queue_authorized_intent(order);
-                }
-            }
-        } else if matches!(event.state, DeliveryState::Expired | DeliveryState::Dropped) {
-            game.pending_orders.remove(&event.id);
-            game.pending_authority_views.remove(&event.id);
-        }
-        let tick = game.simulation.tick();
-        for request in game.authority_requests.values_mut() {
-            if let AuthorityRequestStatus::WaitingDelivery { message_id, after } = &request.status {
-                if *message_id != event.id {
-                    continue;
-                }
-                if event.state == DeliveryState::Delivered {
-                    let mut next = *after.clone();
-                    match &mut next {
-                        AuthorityRequestStatus::WaitingVacant {
-                            resolves_at_tick, ..
-                        } => {
-                            *resolves_at_tick = tick
-                                + request.policy.decision_steps[request.current_step]
-                                    .vacant_delay_ticks
-                        }
-                        AuthorityRequestStatus::PendingExternal {
-                            resolves_at_tick, ..
-                        } => *resolves_at_tick = tick + EXTERNAL_OPERATOR_DELAY_TICKS,
-                        _ => {}
-                    }
-                    request.status = next;
-                    if let Some(role) = current_decision_role(request) {
-                        game.authority_views
-                            .insert((role, request.id), request.clone());
-                    }
-                } else if matches!(event.state, DeliveryState::Expired | DeliveryState::Dropped) {
-                    request.status = AuthorityRequestStatus::BlockedComms;
-                }
-            }
-        }
-    }
 }
 
 fn process_vacant_authority_requests(game: &mut Game) {
-    process_message_deliveries(game);
     let ids: Vec<_> = game.authority_requests.keys().copied().collect();
     for id in ids {
         let Some(mut request) = game.authority_requests.remove(&id) else {
@@ -1958,11 +1828,8 @@ fn process_vacant_authority_requests(game: &mut Game) {
         } = request.status.clone()
         {
             if game.simulation.tick() >= resolves_at_tick {
-                let sample = ((u128::from(game.network_seed)
-                    ^ request.requester_role_id.as_u128()
-                    ^ u128::from(request.created_tick)
-                    ^ request.policy_version as u128)
-                    % 10_000) as u16;
+                let sample =
+                    ((request.id.as_u128() ^ request.policy_version as u128) % 10_000) as u16;
                 request.decisions.push(AuthorityDecisionRecord {
                     role_id: Uuid::nil(),
                     approved: sample < EXTERNAL_OPERATOR_APPROVAL_BPS,
@@ -1981,7 +1848,6 @@ fn process_vacant_authority_requests(game: &mut Game) {
                         "request {id} resolved by deterministic external-operator actor"
                     ),
                 });
-                send_authority_update(game, request.requester_role_id, &request);
             }
             game.authority_requests.insert(id, request);
             continue;
@@ -2001,10 +1867,7 @@ fn process_vacant_authority_requests(game: &mut Game) {
             .and_then(|role| role.owner)
             .is_some();
         match request.status {
-            AuthorityRequestStatus::WaitingVacant {
-                resolves_at_tick: _,
-                ..
-            } if occupied => {
+            AuthorityRequestStatus::WaitingVacant { .. } if occupied => {
                 request.status = AuthorityRequestStatus::PendingHuman {
                     role_id: step.role_id,
                 };
@@ -2012,9 +1875,7 @@ fn process_vacant_authority_requests(game: &mut Game) {
             AuthorityRequestStatus::WaitingVacant {
                 resolves_at_tick, ..
             } if game.simulation.tick() >= resolves_at_tick => {
-                let sample = ((u128::from(game.network_seed)
-                    ^ request.requester_role_id.as_u128()
-                    ^ u128::from(request.created_tick)
+                let sample = ((request.id.as_u128()
                     ^ request.policy.id.as_u128()
                     ^ request.policy_version as u128)
                     % 10_000) as u16;
@@ -2024,7 +1885,6 @@ fn process_vacant_authority_requests(game: &mut Game) {
                     sample < step.approve_probability_bps,
                     true,
                 );
-                send_authority_update(game, step.role_id, &request);
             }
             AuthorityRequestStatus::PendingHuman { .. } if !occupied => {
                 request.status = AuthorityRequestStatus::WaitingVacant {
@@ -2036,14 +1896,6 @@ fn process_vacant_authority_requests(game: &mut Game) {
                 };
             }
             _ => {}
-        }
-        if matches!(
-            request.status,
-            AuthorityRequestStatus::PendingHuman { .. }
-                | AuthorityRequestStatus::WaitingVacant { .. }
-        ) {
-            game.authority_views
-                .insert((step.role_id, request.id), request.clone());
         }
         game.authority_requests.insert(id, request);
     }
@@ -2111,12 +1963,10 @@ async fn list_network_events(
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
     let role = authorized_role(game, &query.authorization())?;
     let limit = query.limit.unwrap_or(100).clamp(1, 500);
-    let mut matching = game.network_events.iter().filter(|record| {
+    let mut matching = game.network_message_events.iter().filter(|record| {
         record.sequence > query.cursor.unwrap_or(0)
             && network_message_visible(record, role)
-            && query
-                .state
-                .is_none_or(|state| network_record_for_role(record, role).state == state)
+            && query.state.is_none_or(|state| record.state == state)
             && query
                 .profile_id
                 .as_ref()
@@ -2151,7 +2001,7 @@ async fn get_network_message(
         .network_messages
         .iter()
         .find(|record| record.message.id == message_id && network_message_visible(record, role))
-        .map(|record| network_record_for_role(record, role))
+        .cloned()
         .ok_or_else(|| {
             api_error(
                 StatusCode::NOT_FOUND,
@@ -2159,18 +2009,32 @@ async fn get_network_message(
                 "network message not found",
             )
         })?;
-    Ok(Json(record))
+    Ok(Json(network_record_for_role(&record, role)))
 }
 
 fn network_message_visible(record: &NetworkMessageRecord, role: &Role) -> bool {
+    if record.message.profile_id == "simulation.joint-operations.v1" {
+        return record.message.header.origin_role_id == role.id
+            || (record.message.header.recipient_entity_id == role.location_unit_id
+                && record.delivered_at_ns.is_some());
+    }
+    if record.message.profile_id == execution_acks::ACK_PROFILE {
+        return record.message.header.origin_entity_id == role.location_unit_id
+            || (record.message.header.recipient_entity_id == role.location_unit_id
+                && record.state == MessageState::Delivered);
+    }
     record.message.header.origin_role_id == role.id
         || (record.message.header.recipient_entity_id == role.location_unit_id
-            && record.delivered_at_ns.is_some())
+            && ((record.message.profile_id != sensor_reports::TRACK_REPORT_PROFILE
+                && record.message.profile_id != impact_reports::IMPACT_REPORT_PROFILE
+                && !record.message.fields.contains_key("aim_point"))
+                || record.state == MessageState::Delivered))
 }
 
 fn network_record_for_role(record: &NetworkMessageRecord, role: &Role) -> NetworkMessageRecord {
     let mut visible = record.clone();
-    if record.message.header.origin_role_id == role.id
+    if record.message.profile_id == "simulation.joint-operations.v1"
+        && record.message.header.origin_role_id == role.id
         && record.message.header.recipient_entity_id != role.location_unit_id
         && record.state != MessageState::Acknowledged
     {
@@ -2857,7 +2721,7 @@ async fn stream_network_socket(
                 .filter(|record| network_message_visible(record, &role))
                 .map(|record| network_record_for_role(record, &role))
                 .collect();
-            let sequence = role_projection.tick;
+            let sequence = game.network_projection_sequence;
             if last_sequence == Some(sequence) {
                 continue;
             }
@@ -2910,6 +2774,70 @@ async fn stream_socket(
     }
 }
 
+fn advance_game_tick(game: &mut Game) {
+    if game.status != GameStatus::Running {
+        return;
+    }
+    if game.simulation.mission_complete() {
+        game.simulation.advance_reporting_clock();
+        game.network_projection_sequence = game.network_projection_sequence.saturating_add(1);
+        process_network_messages(game);
+        execution_acks::send_pending(game);
+        impact_reports::send_reports(game);
+        process_network_messages(game);
+        game.impact_reports.remaining_ticks = game.impact_reports.remaining_ticks.saturating_sub(1);
+        if game.impact_reports.remaining_ticks == 0
+            || (impact_reports::reports_settled(game) && execution_acks::settled(game))
+        {
+            transport::finish_reporting(game);
+            game.status = GameStatus::Paused;
+        }
+        return;
+    }
+    process_network_messages(game);
+    if game.status != GameStatus::Running {
+        return;
+    }
+    process_vacant_authority_requests(game);
+    process_network_messages(game);
+    if game.status != GameStatus::Running {
+        return;
+    }
+    game.simulation.step();
+    planning::process_deliveries(game);
+    planning::report_tick(game);
+    if !game.intent_submissions.is_empty() {
+        intents::record_execution_results(game);
+    }
+    game.network_projection_sequence = game.network_projection_sequence.saturating_add(1);
+    process_network_messages(game);
+    execution_acks::send_pending(game);
+    if game.status != GameStatus::Running {
+        return;
+    }
+    impact_reports::send_reports(game);
+    process_network_messages(game);
+    if game.simulation.mission_complete() {
+        game.impact_reports.remaining_ticks = game.impact_reports.window_ticks;
+        if game.impact_reports.remaining_ticks == 0
+            || (impact_reports::reports_settled(game) && execution_acks::settled(game))
+        {
+            transport::finish_reporting(game);
+            game.status = GameStatus::Paused;
+        }
+        return;
+    }
+    if game.status != GameStatus::Running {
+        return;
+    }
+    sensor_reports::send_current_reports(game);
+    process_network_messages(game);
+    if game.status != GameStatus::Running {
+        return;
+    }
+    process_vacant_authority_requests(game);
+    process_network_messages(game);
+}
 async fn run_simulation_loop(state: AppState) {
     let mut interval = tokio::time::interval(Duration::from_secs(1));
     loop {
@@ -2919,38 +2847,13 @@ async fn run_simulation_loop(state: AppState) {
             .values_mut()
             .filter(|game| game.status == GameStatus::Running)
         {
-            let tick_started = std::time::Instant::now();
-            let schedule_delay_ms = scheduled.elapsed().as_secs_f64() * 1000.0;
-            let ai_roles: Vec<Role> = game
-                .roles
-                .values()
-                .filter(|role| role.ai_controlled)
-                .cloned()
-                .collect();
-            for role in ai_roles {
-                let Some(controlled) = role.command_units.first().copied() else {
-                    continue;
-                };
-                let projection = game.simulation.projection_for(controlled, role.side);
-                if let Some(intent) = choose_patrol_intent(role.id, controlled, &projection) {
-                    let _ = submit_authority_action(
-                        game,
-                        role.id,
-                        intent.kind.action_key().into(),
-                        intent.target,
-                        "AI patrol".into(),
-                        Some(intent),
-                    );
-                }
-            }
-            process_vacant_authority_requests(game);
-            game.simulation.step();
-            process_message_deliveries(game);
-            planning::report_tick(game);
-            game.diagnostics.record_tick(
-                tick_started.elapsed().as_secs_f64() * 1000.0,
-                schedule_delay_ms,
-            );
+            let started = std::time::Instant::now();
+            let delay = scheduled.elapsed().as_secs_f64() * 1000.0;
+            ai_orders::process_ai_orders(game);
+            advance_game_tick(game);
+            intents::record_execution_results(game);
+            game.diagnostics
+                .record_tick(started.elapsed().as_secs_f64() * 1000.0, delay);
         }
     }
 }
@@ -2974,6 +2877,8 @@ fn game_summary(game: &Game) -> GameSummary {
         network_policy_id: game.network_policy_id.clone(),
         network_seed: game.network_seed,
         operational_error: game.operational_error.clone(),
+        mission_complete: game.simulation.mission_complete(),
+        settling_reports: game.simulation.mission_complete() && game.status == GameStatus::Running,
     }
 }
 
@@ -2986,7 +2891,7 @@ fn require_game_catalog(game: &Game) -> Result<String, (StatusCode, Json<ErrorRe
         )
     })
 }
-fn role_summary(role: &Role) -> RoleSummary {
+fn role_summary(role: &Role, player: Option<Uuid>) -> RoleSummary {
     RoleSummary {
         id: role.id,
         name: role.name.clone(),
@@ -2995,6 +2900,8 @@ fn role_summary(role: &Role) -> RoleSummary {
         location_unit_id: role.location_unit_id,
         command_units: role.command_units.clone(),
         held: role.owner.is_some(),
+        held_by_you: player.is_some_and(|player| role.owner == Some(player)),
+        claimable: role.claimable,
         ai_controlled: role.ai_controlled,
         lease_generation: role.lease_generation,
     }
@@ -3022,11 +2929,14 @@ mod authority_tests {
     };
     use sim_core::{OrderKind, OrderStatus, ACTION_SPACE_SUPPORT};
 
-    fn game() -> Game {
-        game_for(global_crisis_scenario())
+    pub(super) fn game() -> Game {
+        game_from_scenario(global_crisis_scenario())
     }
 
     pub(super) fn game_for(scenario: Scenario) -> Game {
+        game_from_scenario(scenario)
+    }
+    pub(super) fn game_from_scenario(scenario: Scenario) -> Game {
         let authority = scenario.authority.clone();
         let roles = authority
             .roles
@@ -3054,20 +2964,45 @@ mod authority_tests {
             title: "Test".into(),
             host: Uuid::from_u128(901),
             status: GameStatus::Running,
-            simulation: scenario.spawn().unwrap(),
-            diagnostics: diagnostics::Diagnostics::default(),
+            simulation: scenario
+                .spawn_with_knowledge_namespace(
+                    scenario.simulator_options.seed,
+                    None,
+                    Uuid::from_u128(900),
+                )
+                .unwrap(),
             roles,
             authority,
             authority_requests: BTreeMap::new(),
-            authority_views: BTreeMap::new(),
-            pending_authority_views: BTreeMap::new(),
             authority_events: Vec::new(),
             unit_ids: scenario.units.iter().map(|unit| unit.id).collect(),
             space_catalog_checksum: Some(String::new()),
             network_messages: Vec::new(),
-            network_events: Vec::new(),
-            pending_orders: BTreeMap::new(),
+            diagnostics: diagnostics::Diagnostics::default(),
             planning: planning::PlanningState::new(scenario.campaign.clone()),
+            network_message_events: Vec::new(),
+            message_profiles: CommunicationsCatalog::load(
+                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../data/communications/catalog.yaml"),
+            )
+            .unwrap()
+            .messages
+            .into_iter()
+            .map(|profile| (profile.id.clone(), profile))
+            .collect(),
+            packet_messages: BTreeMap::new(),
+            pending_deliveries: BTreeMap::new(),
+            ai_planner: ai_orders::AiPlannerState::default(),
+            sensor_reports: sensor_reports::SensorReportState::new(
+                scenario.sensor_report_routes.clone(),
+            ),
+            impact_reports: impact_reports::ImpactReportState::new(
+                scenario.impact_report_routes.clone(),
+                scenario.reporting_window_ticks,
+            ),
+            intent_submissions: BTreeMap::new(),
+            execution_acks: execution_acks::ExecutionAckState::default(),
+            network_projection_sequence: 0,
             network_event_path: None,
             network_event_sequence: 0,
             scenario_id: scenario.id,
@@ -3114,50 +3049,18 @@ mod authority_tests {
             game.network_messages[0].encoded_bytes,
             game.network_messages[0].message.encoded()
         );
-        assert_eq!(game.network_messages[0].state, MessageState::Queued);
-        assert!(game.simulation.drain_order_results().is_empty());
+        assert_eq!(game.network_messages[0].state, MessageState::Delivered);
         assert!(game.network_messages[0]
             .message
             .rendered_text
             .contains("move order"));
         game.simulation.step();
-        process_message_deliveries(&mut game);
-        game.simulation.step();
+        planning::process_deliveries(&mut game);
+        planning::report_tick(&mut game);
         assert!(matches!(
             game.simulation.drain_order_results()[0].status,
             OrderStatus::Accepted
         ));
-    }
-
-    #[test]
-    fn message_visibility_waits_for_delivery_and_sender_waits_for_acknowledgement() {
-        let mut game = game_for(regional_campaign_scenario());
-        let origin = game.roles[&Uuid::from_u128(201)].clone();
-        let recipient = game.roles[&Uuid::from_u128(211)].clone();
-        let unrelated = game.roles[&Uuid::from_u128(212)].clone();
-        transmit_c2_message(
-            &mut game,
-            origin.id,
-            recipient.location_unit_id,
-            "test",
-            "delivery visibility".into(),
-        )
-        .unwrap();
-        let mut record = game.network_messages[0].clone();
-        assert!(network_message_visible(&record, &origin));
-        assert!(!network_message_visible(&record, &recipient));
-        assert!(!network_message_visible(&record, &unrelated));
-        record.state = MessageState::Delivered;
-        record.delivered_at_ns = Some(1_000_000_000);
-        assert!(network_message_visible(&record, &recipient));
-        let sender_view = network_record_for_role(&record, &origin);
-        assert_eq!(sender_view.state, MessageState::InTransit);
-        assert!(sender_view.delivered_at_ns.is_none());
-        record.state = MessageState::Acknowledged;
-        assert_eq!(
-            network_record_for_role(&record, &origin).delivered_at_ns,
-            record.delivered_at_ns
-        );
     }
 
     #[test]
@@ -3178,8 +3081,7 @@ mod authority_tests {
             panic!("request expected")
         };
         for _ in 0..65 {
-            game.simulation.step();
-            process_vacant_authority_requests(&mut game);
+            advance_game_tick(&mut game);
         }
         assert!(
             matches!(game.authority_requests[&request_id].status, AuthorityRequestStatus::PendingHuman { role_id } if role_id == decider)
@@ -3209,10 +3111,19 @@ mod authority_tests {
         let SubmissionOutcome::PendingAuthority { request_id, .. } = outcome else {
             panic!("request expected")
         };
-        for _ in 0..10 {
-            game.simulation.step();
-            process_vacant_authority_requests(&mut game);
-        }
+        assert!(matches!(
+            game.authority_requests[&request_id].status,
+            AuthorityRequestStatus::InTransit { .. }
+        ));
+        advance_game_tick(&mut game);
+        assert!(matches!(
+            game.authority_requests[&request_id].status,
+            AuthorityRequestStatus::WaitingVacant {
+                resolves_at_tick: 2,
+                ..
+            }
+        ));
+        advance_game_tick(&mut game);
         assert!(matches!(
             game.authority_requests[&request_id].status,
             AuthorityRequestStatus::ApprovedNoExecutor
@@ -3337,8 +3248,7 @@ mod authority_tests {
                 intent: None,
             },
         );
-        game.simulation.step();
-        process_vacant_authority_requests(&mut game);
+        advance_game_tick(&mut game);
         let request = &game.authority_requests[&request_id];
         assert!(matches!(
             request.status,
