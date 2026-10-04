@@ -322,3 +322,9 @@ select, textarea { width: 100%; padding: 9px; color: #eef7fa; background: #0e171
 .diagnostics-panel dt { color: #a9c0ca; }
 .diagnostics-panel dd { margin: 0; }
 .diagnostics-panel small { color: #a9c0ca; }
+
+.iftu-panel { border-top: 1px solid #34414d; margin-top: 1rem; padding-top: .75rem; }
+.iftu-panel label { display: block; margin: .65rem 0; }
+.iftu-panel select { display: block; max-width: 100%; width: 100%; }
+.iftu-panel button { margin: .25rem .25rem .25rem 0; }
+[aria-label="Weapon update messages"] details { border-bottom: 1px solid #34414d; padding: .5rem 0; overflow-wrap: anywhere; }

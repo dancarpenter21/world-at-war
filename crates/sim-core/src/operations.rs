@@ -601,6 +601,8 @@ pub(super) struct Operations {
     airspaces: BTreeMap<Uuid, Vec<AirspaceVolume>>,
     clearances: BTreeMap<Uuid, Vec<Clearance>>,
     weapons: Vec<Weapon>,
+    pub(super) iftu_units: BTreeSet<Uuid>,
+    pub(super) launches: Vec<crate::iftu::Launch>,
     pub seed: u64,
     known_completions: BTreeMap<Uuid, BTreeSet<Uuid>>,
     revisions: BTreeMap<(Uuid, Uuid), u64>,
@@ -661,11 +663,25 @@ impl Operations {
         }
         let sample = (self.seed ^ unit.as_u128() as u64 ^ tick.wrapping_mul(0x9e3779b97f4a7c15))
             .wrapping_mul(0xbf58476d1ce4e5b9);
-        self.weapons.push(Weapon {
-            target,
-            impact_tick: tick + (distance / combat.profile.weapon_speed_mps).ceil().max(1.0) as u64,
-            hit: sample % 10000 < u64::from(combat.profile.hit_probability_bps),
-        });
+        if self.iftu_units.contains(&unit) {
+            self.launches.push(crate::iftu::Launch {
+                launcher: unit,
+                position: pose,
+                side: if track.target_side == Some(Side::Red) {
+                    Side::Blue
+                } else {
+                    Side::Red
+                },
+                track: track.clone(),
+            });
+        } else {
+            self.weapons.push(Weapon {
+                target,
+                impact_tick: tick
+                    + (distance / combat.profile.weapon_speed_mps).ceil().max(1.0) as u64,
+                hit: sample % 10000 < u64::from(combat.profile.hit_probability_bps),
+            });
+        }
         combat.profile.ammunition -= 1;
         Ok(())
     }
@@ -1047,6 +1063,9 @@ pub(super) fn advance_operations(world: &mut World) {
                             <= task.engagement.max_track_age_ticks
                 })
                 .filter_map(|t| {
+                    if ops.iftu_units.contains(&task.unit_id) {
+                        return Some((Uuid::nil(), t));
+                    }
                     targets
                         .iter()
                         .find(|((owner, _), id)| *owner == task.unit_id && **id == t.track_id)
@@ -1068,12 +1087,26 @@ pub(super) fn advance_operations(world: &mut World) {
                     sample ^= sample >> 30;
                     sample = sample.wrapping_mul(0xbf58476d1ce4e5b9);
                     sample ^= sample >> 27;
-                    ops.weapons.push(Weapon {
-                        target,
-                        impact_tick: tick
-                            + (distance / combat.profile.weapon_speed_mps).ceil().max(1.0) as u64,
-                        hit: sample % 10000 < u64::from(combat.profile.hit_probability_bps),
-                    });
+                    if ops.iftu_units.contains(&task.unit_id) {
+                        ops.launches.push(crate::iftu::Launch {
+                            launcher: task.unit_id,
+                            position: *pose,
+                            side: if track.target_side == Some(Side::Red) {
+                                Side::Blue
+                            } else {
+                                Side::Red
+                            },
+                            track: track.clone(),
+                        });
+                    } else {
+                        ops.weapons.push(Weapon {
+                            target,
+                            impact_tick: tick
+                                + (distance / combat.profile.weapon_speed_mps).ceil().max(1.0)
+                                    as u64,
+                            hit: sample % 10000 < u64::from(combat.profile.hit_probability_bps),
+                        });
+                    }
                     shots.insert(task.unit_id);
                     m.fired = true;
                     m.detail = "Weapon released; effect unconfirmed".into();

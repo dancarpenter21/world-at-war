@@ -1,0 +1,53 @@
+{
+  "equipment": [
+    {
+      "unit_id": "00000000-0000-0000-0000-000000000033",
+      "platform_fit": "Opposing training launcher"
+    },
+    {
+      "unit_id": "00000000-0000-0000-0000-00000000003e",
+      "platform_fit": "Opposing training launcher"
+    },
+    {
+      "unit_id": "00000000-0000-0000-0000-00000000000b",
+      "platform_fit": "Training launcher"
+    },
+    {
+      "unit_id": "00000000-0000-0000-0000-00000000000c",
+      "platform_fit": "Training launcher"
+    }
+  ],
+  "loadouts": [
+    {
+      "unit_id": "00000000-0000-0000-0000-000000000033",
+      "weapon_id": "training-interceptor",
+      "provider_id": "00000000-0000-0000-0000-000000000033",
+      "satellite_relay_id": null
+    },
+    {
+      "unit_id": "00000000-0000-0000-0000-00000000003e",
+      "weapon_id": "training-interceptor",
+      "provider_id": "00000000-0000-0000-0000-00000000003e",
+      "satellite_relay_id": null
+    },
+    {
+      "unit_id": "00000000-0000-0000-0000-00000000000b",
+      "weapon_id": "game-interceptor",
+      "provider_id": "00000000-0000-0000-0000-00000000000b",
+      "satellite_relay_id": null
+    },
+    {
+      "unit_id": "00000000-0000-0000-0000-00000000000c",
+      "weapon_id": "game-fixed-projectile",
+      "provider_id": "00000000-0000-0000-0000-00000000000c",
+      "satellite_relay_id": null
+    }
+  ],
+  "subscriptions": [
+    {
+      "source_id": "00000000-0000-0000-0000-000000000013",
+      "provider_id": "00000000-0000-0000-0000-00000000000b",
+      "interval_ticks": 2
+    }
+  ]
+}

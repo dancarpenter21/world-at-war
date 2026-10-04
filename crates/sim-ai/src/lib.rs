@@ -45,6 +45,7 @@ mod tests {
 
     fn projection() -> RoleProjection {
         RoleProjection {
+            iftu: Default::default(),
             tick: 10,
             own_units: vec![VisibleUnit {
                 observed_tick: 0,

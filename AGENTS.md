@@ -14,7 +14,7 @@ Keep domain data separate from executable code so simulation logic can be tested
 
 ## Build, Test, and Development Commands
 
-Run Rust commands at the repository root and npm commands from `web/`. The workspace requires Rust 1.89+ and the sibling `../c3mesh` checkout pinned by `c3mesh-revision.txt` (currently v0.2.0). Use `sh scripts/setup-c3mesh.sh` or `scripts/setup-c3mesh.ps1` for setup and their verify modes to check the pin. Commands:
+Run Rust commands at the repository root and npm commands from `web/`. The workspace requires Rust 1.89+ and the sibling `../c3mesh` checkout pinned by `c3mesh-revision.txt` (including the runtime-endpoints extension). Use `sh scripts/setup-c3mesh.sh` or `scripts/setup-c3mesh.ps1` for setup and their verify modes to check the pin. Commands:
 
 - `cargo test`: run Rust unit and integration tests.
 - `cargo check`: validate Rust compilation quickly during development.

@@ -148,6 +148,7 @@ struct CommunicationsCatalogStatus {
 
 #[derive(Serialize)]
 struct NetworkProjection {
+    iftu: sim_core::iftu::Projection,
     tick: u64,
     nodes: Vec<sim_core::VisibleUnit>,
     links: Vec<sim_core::CommunicationLinkStatus>,
@@ -492,6 +493,7 @@ async fn main() -> anyhow::Result<()> {
     }
     let scenarios = [
         regional_campaign_scenario(),
+        sim_scenario::iftu_exercise_scenario(),
         global_crisis_scenario(),
         jammed_flight_scenario(),
         command_link_exercise_scenario(),
@@ -1945,6 +1947,7 @@ async fn get_network_projection(
         .map(|record| network_record_for_role(record, &role))
         .collect();
     Ok(Json(NetworkProjection {
+        iftu: projection.iftu,
         tick: projection.tick,
         nodes: projection.own_units,
         links: projection.communication_links,
@@ -2729,6 +2732,7 @@ async fn stream_network_socket(
                 sequence,
                 resync: last_sequence.is_none_or(|previous| previous.saturating_add(1) != sequence),
                 projection: NetworkProjection {
+                    iftu: role_projection.iftu,
                     tick: role_projection.tick,
                     nodes: role_projection.own_units,
                     links: role_projection.communication_links,

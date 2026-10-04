@@ -28,6 +28,8 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Scenario {
     #[serde(default)]
+    pub iftu: Option<sim_core::iftu::Configuration>,
+    #[serde(default)]
     pub campaign: Option<sim_core::operations::CampaignPlan>,
     pub id: String,
     pub title: String,
@@ -261,6 +263,11 @@ impl Scenario {
                 .configure_combat(combat.clone())
                 .map_err(ScenarioError::InvalidSimulation)?;
         }
+        if let Some(config) = &self.iftu {
+            simulation
+                .configure_iftu(config.clone())
+                .map_err(ScenarioError::InvalidSimulation)?;
+        }
         Ok(simulation)
     }
 
@@ -440,7 +447,7 @@ pub fn regional_campaign_scenario() -> Scenario {
         }
     }
     let (network, communication_links, simulator_options) = global_communications(&mut units);
-    Scenario { sensor_report_routes: vec![], combat: None, impact_report_routes: vec![], reporting_window_ticks: 0, campaign: Some(campaign), id: "regional-campaign.v1".into(), title: "Regional Joint Campaign".into(), description: "Two delegated sectors, competing joint plans, interception and strike under communications disruption. Offline training estimates.".into(), version: 1, requires_space_catalog: false, units, network, simulator_options, communication_links, authority, jamming_regions: vec![JammingRegion { active_from_tick: 0, active_until_tick: None, id: "sector-boundary-outage".into(), name: "Receiver interference near sector boundary".into(), center: GeoPose { latitude_deg: 38.1, longitude_deg: -76.55, altitude_m: 0.0 }, radius_m: 8000.0, band: FrequencyBand::new(960_000_000,1_215_000_000), jammed: 1.0 }] }
+    Scenario { iftu: Some(campaign_iftu_configuration()), sensor_report_routes: vec![], combat: None, impact_report_routes: vec![], reporting_window_ticks: 0, campaign: Some(campaign), id: "regional-campaign.v1".into(), title: "Regional Joint Campaign".into(), description: "Two delegated sectors, competing joint plans, interception and strike under communications disruption. Offline training estimates.".into(), version: 1, requires_space_catalog: false, units, network, simulator_options, communication_links, authority, jamming_regions: vec![JammingRegion { active_from_tick: 0, active_until_tick: None, id: "sector-boundary-outage".into(), name: "Receiver interference near sector boundary".into(), center: GeoPose { latitude_deg: 38.1, longitude_deg: -76.55, altitude_m: 0.0 }, radius_m: 8000.0, band: FrequencyBand::new(960_000_000,1_215_000_000), jammed: 1.0 }] }
 }
 
 pub fn global_crisis_scenario() -> Scenario {
@@ -551,6 +558,7 @@ pub fn global_crisis_scenario() -> Scenario {
     let authority = global_crisis_authority();
     let (network, communication_links, simulator_options) = global_communications(&mut units);
     Scenario {
+        iftu: None,
         campaign: None,
         id: "global-crisis.v2".into(),
         title: "Global Crisis".into(),
@@ -1335,7 +1343,7 @@ pub fn jammed_flight_scenario() -> Scenario {
     };
 
     Scenario {
-        campaign: None,
+        iftu: None,        campaign: None,
         id: "jammed-flight.v1".into(),
         title: "Jammed Flight Test".into(),
         description:
@@ -1451,6 +1459,48 @@ fn sidc(side: Side, domain: Domain) -> &'static str {
         (Side::Blue, Domain::Land) => "100310000012110000000000000000",
         (Side::Red, Domain::Land) => "100610000012110000000000000000",
     }
+}
+
+fn campaign_iftu_configuration() -> sim_core::iftu::Configuration {
+    serde_json::from_str(include_str!("../../../data/scenarios/iftu-campaign.json"))
+        .expect("bundled fictional IFTU equipment configuration")
+}
+
+/// Uses the campaign command structure with networked weapons and an independently jammed final link.
+pub fn iftu_exercise_scenario() -> Scenario {
+    let mut scenario = regional_campaign_scenario();
+    scenario.id = "iftu-exercise.v1".into();
+    if let Some(config) = scenario.iftu.as_mut() {
+        config
+            .loadouts
+            .iter_mut()
+            .find(|l| l.unit_id == Uuid::from_u128(12))
+            .unwrap()
+            .weapon_id = "game-strike".into();
+        config.subscriptions.push(sim_core::iftu::Subscription {
+            source_id: Uuid::from_u128(19),
+            provider_id: Uuid::from_u128(12),
+            interval_ticks: 2,
+        });
+    }
+
+    scenario.title = "In-flight Target Update Exercise".into();
+    scenario.description = "Fictional equipment and game rules. Coordinate surveillance reports and weapon updates. The final weapon link is jammed during ticks 90–110; track reporting uses a separate band.".into();
+    scenario.jamming_regions.push(JammingRegion {
+        id: "weapon-link-interference".into(),
+        name: "Weapon receiver interference".into(),
+        center: GeoPose {
+            latitude_deg: 38.0,
+            longitude_deg: -76.45,
+            altitude_m: 8000.0,
+        },
+        radius_m: 25000.0,
+        band: FrequencyBand::new(8_000_000_000, 9_000_000_000),
+        jammed: 1.0,
+        active_from_tick: 90,
+        active_until_tick: Some(110),
+    });
+    scenario
 }
 
 #[cfg(test)]

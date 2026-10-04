@@ -6,6 +6,7 @@ COPY crates ./crates
 COPY data/scenarios ./data/scenarios
 COPY data/geo ./data/geo
 COPY data/aco ./data/aco
+COPY data/weapons ./data/weapons
 COPY --from=c3mesh Cargo.toml Cargo.lock README.md /c3mesh/
 COPY --from=c3mesh src /c3mesh/src
 COPY --from=c3mesh examples /c3mesh/examples
@@ -22,13 +23,14 @@ COPY crates ./crates
 COPY data/scenarios ./data/scenarios
 COPY data/geo ./data/geo
 COPY data/aco ./data/aco
+COPY data/weapons ./data/weapons
 COPY --from=c3mesh Cargo.toml Cargo.lock README.md /c3mesh/
 COPY --from=c3mesh src /c3mesh/src
 COPY --from=c3mesh examples /c3mesh/examples
 COPY data/space-cards ./data/space-cards
 EXPOSE 8000
 ENV BIND_ADDR=0.0.0.0:8000
-CMD ["cargo", "watch", "--poll", "--watch", "Cargo.toml", "--watch", "Cargo.lock", "--watch", "crates", "--watch", "data/scenarios", "--watch", "data/geo", "--watch", "data/aco", "--watch", "/c3mesh/src", "--watch", "/c3mesh/Cargo.toml", "--exec", "run --package world-at-war-server --locked"]
+CMD ["cargo", "watch", "--poll", "--watch", "Cargo.toml", "--watch", "Cargo.lock", "--watch", "crates", "--watch", "data/scenarios", "--watch", "data/geo", "--watch", "data/aco", "--watch", "data/weapons", "--watch", "/c3mesh/src", "--watch", "/c3mesh/Cargo.toml", "--exec", "run --package world-at-war-server --locked"]
 
 FROM debian:bookworm-slim
 RUN apt-get update \

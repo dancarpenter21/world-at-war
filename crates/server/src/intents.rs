@@ -329,6 +329,10 @@ pub(super) fn intent_fields(
         ),
     ]);
     match &intent.kind {
+        OrderKind::Iftu { weapon_id, command } => {
+            fields.insert("weapon_id".into(), serde_json::json!(weapon_id));
+            fields.insert("command".into(), serde_json::json!(command));
+        }
         OrderKind::Move {
             north_mps,
             east_mps,

@@ -1,6 +1,6 @@
 # World At War Implementation Plan
 
-## Implementation checkpoint — 2026-10-03
+## Implementation checkpoint — 2026-10-04
 
 The sections below remain the target architecture, not a declaration of completed release phases. The communications checkpoint is recorded in `plans/fdffd4709ad9bdb1717bb4035a45af51ed346695.md` (implementation commit `fdffd47`). The current increment adds an offline Regional Joint Campaign: versioned collaborative plans, two courses of action, delivered air tasking/airspace orders, clearances and handoffs, basic mission execution/combat, role-owned reports, and a Cesium planning workspace/overlays.
 
@@ -9,6 +9,8 @@ The browser increment adds a real-server multiplayer suite, selected-game/role r
 Campaign planning communications include tick-driven fragmentation/reassembly, bounded retries, expiry, independent acknowledgements and duplicate suppression. Campaign remote friendly positions and contacts arrive through reports; application orders wait for delivery. Upstream training scenarios retain their packet-level command delivery, execution acknowledgements, explicit sensor subscriptions and authored friendly-unit overview. This advances Phases 1–2 and a limited air/combat portion of Phase 3; it does not complete any phase's full exit criteria.
 
 The pre-merge performance increment added bounded, role-authorized runtime diagnostics and an offline release benchmark for Regional Joint Campaign and Global Crisis. Indexed link lookup, per-tick usable routes, shared report serialization and role-filtered telemetry reduce Global Crisis core tick p95 from 1,010–1,022 ms to 51.5–57.8 ms on the documented WSL hardware. All role-projection hashes matched the pre-optimization baseline across both scenarios and repeated runs on that branch. These measurements and hashes predate the upstream integration; a new baseline is required for main. See [measurements, workload limits and regression command](docs/performance/README.md). Full server AI/authority/audit time is measured by runtime diagnostics; the offline benchmark does not include it.
+
+The IFTU increment adds fictional equipment presets, temporary c3mesh endpoints, separate report/control/update/status messages, explicit provider assignments, and role-local map/network controls. Regional campaign loadouts now use these game rules. The public networking reference informs delivery semantics only; no real weapon compatibility or high-fidelity targeting model is implemented. See [IFTU scope and limitations](docs/iftu.md).
 
 Next work remains:
 

@@ -1,3 +1,5 @@
+import { withWeaponEndpoints } from "./networkModel";
+import { IftuHistory } from "./IftuPanel";
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   Background, Controls, Handle, MarkerType, MiniMap, Position, ReactFlow, useNodesState,
@@ -20,7 +22,7 @@ const TerminalNode = memo(function TerminalNode({ data, selected }: NodeProps<Ne
   </div>;
 });
 const nodeTypes = { terminal: TerminalNode };
-const emptyProjection = { tick: 0, nodes: [], links: [], messages: [] };
+const emptyProjection = { tick: 0, nodes: [], links: [], messages: [], iftu: { weapons: [], messages: [] } };
 const labelState = (state: string) => state.replaceAll("_", " ");
 const formatDuration = (nanoseconds: number) => {
   const ms = Math.max(0, nanoseconds / 1_000_000);
@@ -69,7 +71,7 @@ export function NetworkWorkspace({ apiBase, gameId, playerId, roleId, initialFoc
   const flow = useRef<ReactFlowInstance<NetworkFlowNode> | null>(null);
   const layoutFrame = useRef<number | undefined>(undefined);
   const inspector = useRef<HTMLElement | null>(null);
-  const snapshot = projection ?? emptyProjection;
+  const snapshot = useMemo(() => withWeaponEndpoints(projection ?? emptyProjection), [projection]);
   const visible = useMemo(() => filterNetwork(snapshot, filters), [snapshot, filters]);
   const domains = useMemo(() => [...new Set(snapshot.nodes.map((node) => node.domain))].sort(), [snapshot.nodes]);
   const names = useMemo(() => new Map(snapshot.nodes.map((node) => [node.id, node.name])), [snapshot.nodes]);
@@ -83,13 +85,13 @@ export function NetworkWorkspace({ apiBase, gameId, playerId, roleId, initialFoc
   ) : [], [visible.links, selectedNode]);
 
   useEffect(() => {
-    if (projection) setNodes((previous) => reconcileNetworkNodes(previous, projection));
-  }, [projection, setNodes]);
+    if (projection) setNodes((previous) => reconcileNetworkNodes(previous, snapshot));
+  }, [projection, snapshot, setNodes]);
   useEffect(() => {
     if (!projection) return;
-    setSelection((current) => current && !(current.kind === "node" ? projection.nodes : projection.links).some((item) => item.id === current.id) ? null : current);
+    setSelection((current) => current && !(current.kind === "node" ? snapshot.nodes : snapshot.links).some((item) => item.id === current.id) ? null : current);
     setFilters((current) => current.focusNodeId && !projection.nodes.some((node) => node.id === current.focusNodeId) ? { ...current, focusNodeId: null } : current);
-  }, [projection]);
+  }, [projection, snapshot]);
   useEffect(() => {
     const escape = (event: KeyboardEvent) => { if (event.key === "Escape" && !event.defaultPrevented) onClose(); };
     window.addEventListener("keydown", escape);
@@ -104,13 +106,13 @@ export function NetworkWorkspace({ apiBase, gameId, playerId, roleId, initialFoc
   const edges = useMemo<Edge[]>(() => visible.links.map((link) => {
     const highlighted = selection?.kind === "link" ? selection.id === link.id : selection?.kind === "node"
       ? link.from_entity_id === selection.id || link.to_entity_id === selection.id : false;
-    const color = !link.available ? "#ed8076" : link.queued_packets > 0 || link.jammed > 0 ? "#e0b85f" : "#59c995";
+    const color = link.availability_known === false ? "#8d9aa2" : !link.available ? "#ed8076" : link.queued_packets > 0 || link.jammed > 0 ? "#e0b85f" : "#59c995";
     return {
       id: link.id, source: link.from_entity_id, target: link.to_entity_id,
       animated: link.available && link.queued_packets > 0,
       markerEnd: { type: MarkerType.ArrowClosed, color, width: 15, height: 15 },
-      style: { stroke: color, strokeWidth: highlighted ? 3 : link.queued_packets > 0 ? 2 : 1, opacity: highlighted ? 1 : selection ? 0.16 : 0.5 },
-      ariaLabel: `${names.get(link.from_entity_id) ?? "Terminal"} to ${names.get(link.to_entity_id) ?? "terminal"}, ${link.available ? "available" : "unavailable"}`
+      style: { stroke: color, strokeDasharray: link.availability_known === false ? "5 4" : undefined, strokeWidth: highlighted ? 3 : link.queued_packets > 0 ? 2 : 1, opacity: highlighted ? 1 : selection ? 0.16 : 0.5 },
+      ariaLabel: `${names.get(link.from_entity_id) ?? "Terminal"} to ${names.get(link.to_entity_id) ?? "terminal"}, ${link.availability_known === false ? "receiver status unknown" : link.available ? "available" : "unavailable"}`
     };
   }), [visible.links, selection, names]);
 
@@ -154,7 +156,7 @@ export function NetworkWorkspace({ apiBase, gameId, playerId, roleId, initialFoc
       </div>
       <div className="network-summary" aria-label="Visible network summary">
         <span><strong>{visible.nodes.length}</strong> / {snapshot.nodes.length} terminals</span><span><strong>{visible.links.length}</strong> directional links</span>
-        <span className="healthy"><strong>{availableCount}</strong> available</span><span className="degraded"><strong>{visible.links.length - availableCount}</strong> unavailable</span>
+        <span className="healthy"><strong>{availableCount}</strong> available</span><span className="degraded"><strong>{visible.links.filter(link => link.availability_known !== false && !link.available).length}</strong> unavailable</span>
         <span><strong>{queuedPackets.toLocaleString()}</strong> queued packets</span>
         {filters.focusNodeId && <span className="network-focus">Connections of {name(filters.focusNodeId)}</span>}
       </div>
@@ -171,7 +173,7 @@ export function NetworkWorkspace({ apiBase, gameId, playerId, roleId, initialFoc
         {!projection ? <div className="network-empty"><strong>Connecting to the network</strong><p>Your role's topology will appear here.</p></div>
           : visible.nodes.length === 0 ? <div className="network-empty"><strong>{snapshot.nodes.length ? "No terminals match your filters" : "No terminals visible to this role"}</strong>{filterActive && <button className="secondary" onClick={() => setFilters(DEFAULT_NETWORK_FILTERS)}>Reset filters</button>}</div>
           : visible.links.length === 0 && filterActive ? <div className="network-empty network-empty-links"><p>No links match your filters. Terminals remain visible.</p></div> : null}
-        <div className="network-legend" aria-label="Link color legend"><span className="healthy">Available</span><span className="queued">Queued / interference</span><span className="degraded">Unavailable</span></div>
+        <div className="network-legend" aria-label="Link color legend"><span className="healthy">Available</span><span className="queued">Queued / interference</span><span className="degraded">Unavailable</span><span>Dashed: unconfirmed weapon link</span></div>
       </div>
       <aside ref={inspector} className="network-inspector">
         <div className="network-inspector-tabs" role="tablist" aria-label="Network inspector">
@@ -181,19 +183,19 @@ export function NetworkWorkspace({ apiBase, gameId, playerId, roleId, initialFoc
         {selection && <button className="text-command network-clear-selection" onClick={() => setSelection(null)}>Clear selection · show all messages</button>}
         {tab === "topology" ? <div role="tabpanel" id="network-topology-panel" aria-labelledby="network-topology-tab">
           {selectedNode ? <section aria-label="Terminal details">
-            <h2>Terminal details</h2><h3>{selectedNode.name}</h3><span className={`network-state ${selectedNode.receiver_jammed ? "dropped" : "delivered"}`}>{selectedNode.receiver_jammed ? "Receiver jammed" : "Receiver clear"}</span>
+            <h2>Terminal details</h2><h3>{selectedNode.name}</h3><span className={`network-state ${selectedNode.receiver_jammed ? "dropped" : "delivered"}`}>{selectedNode.receiver_status_known === false ? "Receiver status unknown" : selectedNode.receiver_jammed ? "Receiver jammed" : "Receiver clear"}</span>
             <dl><div><dt>Domain</dt><dd>{selectedNode.domain}</dd></div><div><dt>Visible inbound</dt><dd>{scopedLinks.filter((link) => link.to_entity_id === selectedNode.id).length}</dd></div><div><dt>Visible outbound</dt><dd>{scopedLinks.filter((link) => link.from_entity_id === selectedNode.id).length}</dd></div><div><dt>Visible queue</dt><dd>{scopedLinks.filter((link) => link.from_entity_id === selectedNode.id).reduce((total, link) => total + link.queued_packets, 0)} packets</dd></div></dl>
             <div className="network-inspector-actions"><button className="secondary" onClick={() => setFilters({ ...DEFAULT_NETWORK_FILTERS, focusNodeId: selectedNode.id })}>Focus connections</button><button className="secondary" onClick={() => setTab("messages")}>View messages</button></div>
-            <h2>Directional connections</h2><div className="network-link-list">{scopedLinks.length ? scopedLinks.map((link) => <button key={link.id} onClick={() => setSelection({ kind: "link", id: link.id })}><span>{name(link.from_entity_id)} → {name(link.to_entity_id)}</span><small className={link.available ? "healthy" : "degraded"}>{link.available ? formatBitRate(link.effective_bit_rate_bps) : "Unavailable"}</small></button>) : <p className="muted">No connections in the current view.</p>}</div>
+            <h2>Directional connections</h2><div className="network-link-list">{scopedLinks.length ? scopedLinks.map((link) => <button key={link.id} onClick={() => setSelection({ kind: "link", id: link.id })}><span>{name(link.from_entity_id)} → {name(link.to_entity_id)}</span><small className={link.available ? "healthy" : "degraded"}>{link.availability_known === false ? "Unconfirmed" : link.available ? formatBitRate(link.effective_bit_rate_bps) : "Unavailable"}</small></button>) : <p className="muted">No connections in the current view.</p>}</div>
           </section> : selectedLink ? <section aria-label="Link details">
             <h2>Link telemetry</h2><h3>{name(selectedLink.from_entity_id)} → {name(selectedLink.to_entity_id)}</h3>
-            <span className={`network-state ${selectedLink.available ? "delivered" : "dropped"}`}>{selectedLink.available ? "Available" : "Unavailable"}</span>
-            <dl><div><dt>Effective rate</dt><dd>{formatBitRate(selectedLink.effective_bit_rate_bps)}</dd></div><div><dt>Queue</dt><dd>{selectedLink.queued_packets} packets / {selectedLink.queued_bytes.toLocaleString()} bytes</dd></div><div><dt>Interference</dt><dd>{Math.round(selectedLink.jammed * 100)}%</dd></div></dl>
+            <span className={`network-state ${selectedLink.available ? "delivered" : "dropped"}`}>{selectedLink.availability_known === false ? "Receiver status unknown" : selectedLink.available ? "Available" : "Unavailable"}</span>
+            <dl><div><dt>Effective rate</dt><dd>{formatBitRate(selectedLink.effective_bit_rate_bps)}</dd></div><div><dt>Queue</dt><dd>{selectedLink.queued_packets} packets / {selectedLink.queued_bytes.toLocaleString()} bytes</dd></div><div><dt>Interference</dt><dd>{selectedLink.availability_known === false ? "Unknown" : `${Math.round(selectedLink.jammed * 100)}%`}</dd></div></dl>
             <button className="secondary" onClick={() => setTab("messages")}>View messages on this link</button>
           </section> : <div className="network-inspector-hint"><h2>Inspect the network</h2><p>Select a terminal or directional link to inspect its status, queues, and authorized messages.</p></div>}
           <h2>Visible terminals ({visible.nodes.length})</h2><div className="network-terminal-list">{visible.nodes.map((node) => <button key={node.id} aria-label={`Inspect ${node.name}`} className={selection?.kind === "node" && selection.id === node.id ? "selected" : ""} onClick={() => locate(node.id)}><span>{node.name}</span><small>{node.domain}{node.receiver_jammed ? " · jammed" : ""}</small></button>)}</div>
         </div> : <div role="tabpanel" id="network-messages-panel" aria-labelledby="network-messages-tab">
-          <h2>Authorized message history</h2><p className="muted">{selectedNode ? `To or from ${selectedNode.name}` : selectedLink ? `${name(selectedLink.from_entity_id)} → ${name(selectedLink.to_entity_id)}` : "Messages your role is allowed to read."}</p>
+          <IftuHistory messages={snapshot.iftu?.messages ?? []} /><h2>Authorized message history</h2><p className="muted">{selectedNode ? `To or from ${selectedNode.name}` : selectedLink ? `${name(selectedLink.from_entity_id)} → ${name(selectedLink.to_entity_id)}` : "Messages your role is allowed to read."}</p>
           <div className="network-message-filters"><label>Search messages<input type="search" value={messageQuery} placeholder="Content, sender, or profile" onChange={(event) => setMessageQuery(event.target.value)} /></label><label>Message state<select value={messageState} onChange={(event) => setMessageState(event.target.value as "all" | MessageState)}><option value="all">All states</option>{MESSAGE_STATES.map((state) => <option key={state} value={state}>{labelState(state)}</option>)}</select></label></div>
           {message && <MessageDetails record={message} name={name} />}
           <div className="network-message-list">{messages.length ? messages.slice(0, messageLimit).map((record) => <button key={record.message.id} aria-label={`Inspect message: ${record.message.rendered_text || record.message.profile_id}`} className={selectedMessage === record.message.id ? "selected" : ""} onClick={() => setSelectedMessage(record.message.id)}><div><small>{record.message.profile_id}</small><span className={`network-state ${record.state}`}>{labelState(record.state)}</span></div><p>{record.message.rendered_text || "No rendered content"}</p><small>{name(record.message.header.origin_entity_id)} → {name(record.message.header.recipient_entity_id)} · tick {record.message.header.created_tick}</small></button>) : <p className="muted">{snapshot.messages.length ? "No messages match the current selection and filters." : "No messages visible to this role yet."}</p>}</div>

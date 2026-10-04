@@ -6,6 +6,7 @@ mod transport;
 pub use transport::{DeliveryEvent, DeliveryState};
 pub mod combat;
 pub mod geodesy;
+pub mod iftu;
 
 #[cfg(test)]
 mod sensor_tests;
@@ -497,6 +498,8 @@ struct ReportKnowledge {
 
 #[derive(Serialize, Deserialize)]
 struct KnowledgeReport {
+    #[serde(default)]
+    origins: BTreeMap<Uuid, (Uuid, Uuid)>,
     friendly: Vec<VisibleUnit>,
     contacts: Vec<(Uuid, Track)>,
 }
@@ -511,15 +514,24 @@ fn scoped_track_id(namespace: Uuid, observer: Uuid, subject: Uuid) -> Uuid {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum OrderKind {
-    Move { north_mps: f64, east_mps: f64 },
-    Engage { track_id: Uuid },
+    Move {
+        north_mps: f64,
+        east_mps: f64,
+    },
+    Engage {
+        track_id: Uuid,
+    },
+    Iftu {
+        weapon_id: Uuid,
+        command: iftu::Command,
+    },
 }
 
 impl OrderKind {
     pub fn action_key(&self) -> &'static str {
         match self {
             Self::Move { .. } => ACTION_MOVE,
-            Self::Engage { .. } => ACTION_ENGAGE,
+            Self::Engage { .. } | Self::Iftu { .. } => ACTION_ENGAGE,
         }
     }
 }
@@ -905,6 +917,7 @@ impl Simulation {
         world.insert_resource(operations::Operations::new(seed));
         world.insert_resource(KnowledgeNamespace(knowledge_namespace));
         world.insert_resource(CombatState::default());
+        world.insert_resource(iftu::WeaponSystem::default());
 
         let mut schedule = Schedule::default();
         schedule.add_systems((
@@ -1023,13 +1036,38 @@ impl Simulation {
             .cloned()
             .ok_or("this contact is not known to your command terminal")?;
         let tick = self.tick();
+        if self
+            .world
+            .resource::<iftu::WeaponSystem>()
+            .enabled(attacker)
+        {
+            if track.target_side.is_none_or(|s| s == side)
+                || track.observed_tick > tick
+                || tick - track.observed_tick > 15
+                || track.identity_confidence < 0.8
+            {
+                return Err("ineligible target observation".into());
+            }
+            self.world
+                .resource_mut::<iftu::WeaponSystem>()
+                .designate(intent_id, attacker, terminal, track);
+            return Ok(());
+        }
         self.world
             .resource_mut::<CombatState>()
             .designate(intent_id, attacker, side, track, tick)
     }
 
     pub fn engagement_designation(&self, intent_id: Uuid) -> Option<&Track> {
-        self.world.resource::<CombatState>().designation(intent_id)
+        self.world
+            .resource::<CombatState>()
+            .designation(intent_id)
+            .or_else(|| {
+                self.world
+                    .resource::<iftu::WeaponSystem>()
+                    .designations
+                    .get(&intent_id)
+            })
     }
 
     pub fn mission_complete(&self) -> bool {
@@ -1045,6 +1083,7 @@ impl Simulation {
     pub fn step(&mut self) {
         // Wall-clock observations stay outside ECS resources and never affect simulation decisions.
         let started = std::time::Instant::now();
+        self.capture_iftu_positions();
         self.schedule.run(&mut self.world);
         let ecs = started.elapsed();
         self.sync_network_interference()
@@ -1146,6 +1185,7 @@ impl Simulation {
                 }
             }
             for (target, mut track) in report.contacts {
+                let origin = report.origins.get(&track.track_id).copied();
                 let mut reports = self.world.resource_mut::<ReportKnowledge>();
                 let next = Uuid::from_u128(
                     (1u128 << 126)
@@ -1161,6 +1201,12 @@ impl Simulation {
                     .entry((event.recipient, target))
                     .or_insert(next);
                 track.received_tick = tick;
+                if let Some(origin) = origin {
+                    self.world
+                        .resource_mut::<iftu::WeaponSystem>()
+                        .provenance
+                        .insert((event.recipient, track.track_id), origin);
+                }
                 let mut knowledge = self.world.resource_mut::<KnowledgeBases>();
                 let tracks = knowledge.0.entry(event.recipient).or_default();
                 if let Some(old) = tracks.iter_mut().find(|old| old.track_id == track.track_id) {
@@ -1239,7 +1285,7 @@ impl Simulation {
                         })
                         .unwrap_or_default();
                     friendly.push(unit.clone());
-                    let contacts = self
+                    let contacts: Vec<(Uuid, Track)> = self
                         .world
                         .resource::<KnowledgeBases>()
                         .0
@@ -1260,8 +1306,26 @@ impl Simulation {
                                 .collect()
                         })
                         .unwrap_or_default();
-                    serde_json::to_vec(&KnowledgeReport { friendly, contacts })
-                        .expect("finite observations")
+                    let origins = contacts
+                        .iter()
+                        .map(|(_, t)| {
+                            (
+                                t.track_id,
+                                self.world
+                                    .resource::<iftu::WeaponSystem>()
+                                    .provenance
+                                    .get(&(unit.id, t.track_id))
+                                    .copied()
+                                    .unwrap_or((unit.id, t.track_id)),
+                            )
+                        })
+                        .collect();
+                    serde_json::to_vec(&KnowledgeReport {
+                        origins,
+                        friendly,
+                        contacts,
+                    })
+                    .expect("finite observations")
                 })
                 .clone();
             let mut reports = self.world.resource_mut::<ReportKnowledge>();
@@ -1439,11 +1503,7 @@ impl Simulation {
     /// Advances pending network traffic to the current ECS tick boundary.
     pub fn advance_network(&mut self) -> Result<Vec<NetworkEvent>, c3mesh::SimulationError> {
         let mut external = std::mem::take(&mut self.pending_network_events);
-        for event in self
-            .communications
-            .simulator
-            .advance_to(self.network_time())?
-        {
+        for event in self.advance_iftu_network(self.network_time())? {
             if self.is_fragment_event(&event) {
                 self.pending_fragment_events.push(event);
             } else {
@@ -1488,8 +1548,9 @@ impl Simulation {
             &PlatformSidc,
             &Velocity,
             Option<&CyclicFlightPathState>,
+            &operations::CombatState,
         )>();
-        for (id, name, ownership, domain, pose, sidc, velocity, flight_path) in
+        for (id, name, ownership, domain, pose, sidc, velocity, flight_path, weapon_state) in
             query.iter(&self.world)
         {
             if ownership.0 == side && (id.0 == knowledge_owner || !self.campaign_mode) {
@@ -1502,7 +1563,20 @@ impl Simulation {
                     following_flight_path: flight_path.is_some_and(|path| path.active),
                     sidc: sidc.0.clone(),
                     receiver_jammed: self.entity_receiver_jammed(id.0, network_time),
-                    weapon: self.world.resource::<CombatState>().weapon_status(id.0),
+                    weapon: self
+                        .world
+                        .resource::<CombatState>()
+                        .weapon_status(id.0)
+                        .or_else(|| {
+                            if !self.world.resource::<iftu::WeaponSystem>().enabled(id.0) {
+                                return None;
+                            }
+                            Some(combat::WeaponStatus {
+                                ammunition: weapon_state.profile.ammunition,
+                                range_m: weapon_state.profile.weapon_range_m,
+                                max_track_age_ticks: 15,
+                            })
+                        }),
                     hit_points: self.world.resource::<CombatState>().hit_points(id.0),
                     observed_tick: tick,
                     received_tick: tick,
@@ -1512,6 +1586,7 @@ impl Simulation {
         let visible_ids: BTreeSet<_> = own_units.iter().map(|unit| unit.id).collect();
         let link_statuses = self.communication_link_statuses(knowledge_owner, &visible_ids);
         RoleProjection {
+            iftu: self.iftu_projection(knowledge_owner),
             tick: self.tick(),
             own_units,
             tracks,
@@ -1693,6 +1768,8 @@ pub struct VisibleUnit {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoleProjection {
+    #[serde(default)]
+    pub iftu: iftu::Projection,
     pub tick: u64,
     pub own_units: Vec<VisibleUnit>,
     pub tracks: Vec<Track>,
@@ -1712,6 +1789,7 @@ fn apply_orders(
     mut pending: ResMut<PendingIntents>,
     mut results: ResMut<OrderResults>,
     mut operations: ResMut<operations::Operations>,
+    mut weapon_system: ResMut<iftu::WeaponSystem>,
     knowledge: Res<KnowledgeBases>,
     reports: Res<ReportKnowledge>,
     mut applied: ResMut<AppliedIntents>,
@@ -1766,6 +1844,22 @@ fn apply_orders(
             continue;
         }
         match intent.kind {
+            OrderKind::Iftu { weapon_id, command } => {
+                let status = weapon_system
+                    .validate_command(intent.target, weapon_id, &command)
+                    .map(|()| {
+                        weapon_system
+                            .commands
+                            .push((intent.target, weapon_id, command));
+                        OrderStatus::Accepted
+                    })
+                    .unwrap_or_else(OrderStatus::Rejected);
+                applied.0.insert(intent.intent_id, status.clone());
+                results.0.push(OrderResult {
+                    intent_id: intent.intent_id,
+                    status,
+                });
+            }
             OrderKind::Move {
                 north_mps,
                 east_mps,
@@ -1809,19 +1903,24 @@ fn apply_orders(
                     });
                     continue;
                 }
-                let contact = knowledge
-                    .0
-                    .get(&intent.target)
-                    .into_iter()
-                    .flatten()
-                    .find(|t| {
-                        t.track_id == track_id && t.target_side.is_some_and(|other| other != side.0)
-                    });
+                let designated = weapon_system.designations.remove(&intent.intent_id);
+                let contact = designated.as_ref().or_else(|| {
+                    knowledge
+                        .0
+                        .get(&intent.target)
+                        .into_iter()
+                        .flatten()
+                        .find(|t| {
+                            t.track_id == track_id
+                                && t.target_side.is_some_and(|other| other != side.0)
+                        })
+                });
                 let target = reports
                     .targets
                     .iter()
                     .find(|((owner, _), id)| *owner == intent.target && **id == track_id)
-                    .map(|((_, target), _)| *target);
+                    .map(|((_, target), _)| *target)
+                    .or_else(|| weapon_system.enabled(intent.target).then_some(Uuid::nil()));
                 let result = match (contact, target) {
                     (Some(track), Some(target)) => operations.engage(
                         intent.target,

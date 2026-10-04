@@ -12,6 +12,7 @@ The broader target architecture, planned simulation fidelity, and acceptance cri
 - Configured training weapons with finite ammunition, frozen reported aim points, deterministic flight delays, accumulated damage, and terminal mission success or failure.
 - A deterministic Rust ECS simulation with one-second ticks, platform movement, server-side projections, and Red patrol AI that plans each aircraft once, waits for delivery, and limits retries over failed links.
 - Local geometric sensor detections with spherical Earth occlusion and slant range, game/terminal-scoped track identities, and delivery-gated sensor reports. Lost contacts retain their last observed position and timestamps; the map and inspector display their age and report delay.
+- Fictional in-flight weapon updates over c3mesh, with explicit training transmitter/receiver fits, independent report/update delivery, authored interference, provider assignments and returned status. See [game rules, research scope and controls](docs/iftu.md).
 - Mandatory per-entity c3mesh network endpoints, bounded packet queues, deterministic loss and weighted scheduling, cyclic flight paths, geographic receiver-jamming regions, and directional link status.
 - A polling multiplayer lobby, role claiming, game start/pause controls, and REST/WebSocket state delivery. Reload restores the selected game and held role without renewing its lease; temporary connection failures retry, and missing games or lost ownership return to the lobby.
 
@@ -37,7 +38,7 @@ Current limitations: controller ground-truth privileges, durable packet-level hi
 ## Prerequisites
 
 - Rust 1.89 or newer for the Rust 2021 workspace and its locked dependencies.
-- GitHub read access to [c3mesh](https://github.com/dancarpenter21/c3mesh), checked out as the sibling `../c3mesh` at the v0.2.0 release commit in [c3mesh-revision.txt](c3mesh-revision.txt). The setup scripts clone the dependency when missing and select the pinned revision when its working tree is clean.
+- GitHub read access to [c3mesh](https://github.com/dancarpenter21/c3mesh), checked out as the sibling `../c3mesh` at the runtime-endpoints commit pinned in [c3mesh-revision.txt](c3mesh-revision.txt). The setup scripts clone the dependency when missing and select the pinned revision when its working tree is clean.
 - Node.js 22+ and npm for frontend development.
 - Docker Compose v2 for the container workflows.
 - A Space-Track account only when creating a scenario that requires the public orbital catalog.

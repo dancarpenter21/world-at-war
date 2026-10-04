@@ -1,0 +1,10 @@
+<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>IFTU controls</title></head><body><main id="root"></main><script type="module">
+import React from "react";
+import {createRoot} from "react-dom/client";
+import {IftuPanel,IftuHistory} from "/src/IftuPanel.tsx";
+import "/src/styles.css";
+const position={latitude_deg:38,longitude_deg:-77,altitude_m:5000};
+const role={id:"pilot",name:"Pilot",side:"Blue",kind:"pilot",location_unit_id:"launcher",command_units:["launcher"],held:true,ai_controlled:false,lease_generation:3};
+const projection={tick:10,own_units:[{id:"launcher",name:"Launcher",position,domain:"Air",sidc:"",receiver_jammed:false},{id:"backup",name:"Backup provider",position,domain:"Air",sidc:"",receiver_jammed:false},{id:"sensor",name:"Surveillance aircraft",position,domain:"Air",sidc:"",receiver_jammed:false}],tracks:[{track_id:"track-a",target_side:"Red",position,identity_confidence:0.9,observed_tick:9,received_tick:10,observed_sidc:""}],jamming_regions:[],communication_links:[],iftu:{weapons:[{id:"weapon-a",launcher_id:"launcher",weapon_name:"Synthetic networked weapon",provider_id:"launcher",position,observed_at_ns:8000000000,phase:"flight unconfirmed",update_confirmation:"Unconfirmed; no received weapon status",retarget_capable:true,handoff_capable:true,compatible_providers:["launcher","backup"]}],messages:[{id:1,at_ns:9500000000,from:"sensor",to:"launcher",kind:"track_report",state:"accepted",detail:"Source observation retained at tick 9"},{id:2,at_ns:10000000000,from:"launcher",to:"weapon-a",kind:"weapon_target_update",state:"queued",detail:"Hop 1 of 1"}]}};
+createRoot(document.getElementById("root")).render(React.createElement("div",{style:{maxWidth:"650px",padding:"24px"}},React.createElement(IftuPanel,{apiBase:"",gameId:"iftu-test",playerId:"player",role,projection,canIssueOrders:true}),React.createElement(IftuHistory,{messages:projection.iftu.messages})));
+</script></body></html>
