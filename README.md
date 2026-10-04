@@ -38,7 +38,7 @@ Current limitations: controller ground-truth privileges, durable packet-level hi
 ## Prerequisites
 
 - Rust 1.89 or newer for the Rust 2021 workspace and its locked dependencies.
-- GitHub read access to [c3mesh](https://github.com/dancarpenter21/c3mesh), checked out as the sibling `../c3mesh` at the runtime-endpoints commit pinned in [c3mesh-revision.txt](c3mesh-revision.txt). The setup scripts clone the dependency when missing and select the pinned revision when its working tree is clean.
+- GitHub read access to [c3mesh](https://github.com/dancarpenter21/c3mesh), checked out as the sibling `../c3mesh` at the v0.3.0 release commit pinned in [c3mesh-revision.txt](c3mesh-revision.txt). The setup scripts clone the dependency when missing and select the pinned revision when its working tree is clean.
 - Node.js 22+ and npm for frontend development.
 - Docker Compose v2 for the container workflows.
 - A Space-Track account only when creating a scenario that requires the public orbital catalog.
