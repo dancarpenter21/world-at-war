@@ -1,3 +1,4 @@
+import type { IftuProjection } from "./IftuPanel";
 import {
   Cartesian2,
   Cartesian3,
@@ -22,7 +23,7 @@ export type CombatProjection = {
   mission: { title: string; status: "active" | "succeeded" | "failed"; deadline_tick: number; finished_tick: number | null; reason: string | null } | null;
   local_shots_in_flight: number; local_impacts: ImpactReport[]; received_impacts?: { report: ImpactReport; received_tick: number }[];
 };
-export type Projection = { combat?: CombatProjection; tick: number; own_units: Unit[]; tracks: Track[]; jamming_regions: JammingRegion[]; communication_links: CommunicationLink[] };
+export type Projection = { iftu?: IftuProjection; combat?: CombatProjection; tick: number; own_units: Unit[]; tracks: Track[]; jamming_regions: JammingRegion[]; communication_links: CommunicationLink[] };
 
 type SymbolImage = string | HTMLImageElement | HTMLCanvasElement;
 type EntityKind = "unit" | "track";
@@ -41,6 +42,7 @@ type RegionRecord = { entity: Entity; position: ConstantPositionProperty; radius
 type LinkRecord = { entity: Entity; positions: ConstantProperty; color: ConstantProperty };
 
 export class GlobeEntityReconciler {
+  private readonly weaponMarkers = new Map<string, { entity: Entity; position: ConstantPositionProperty; label: ConstantProperty }>();
   private readonly records = new Map<string, EntityRecord>();
   private readonly regions = new Map<string, RegionRecord>();
   private readonly links = new Map<string, LinkRecord>();
@@ -120,6 +122,22 @@ export class GlobeEntityReconciler {
         this.entities.remove(record.entity);
         this.records.delete(id);
       }
+      const weaponIds = new Set<string>();
+      for (const flight of projection.iftu?.weapons ?? []) {
+        weaponIds.add(flight.id);
+        const p = flight.position;
+        const position = Cartesian3.fromDegrees(p.longitude_deg, p.latitude_deg, p.altitude_m);
+        const text = `${flight.weapon_name} · last report ${(flight.observed_at_ns / 1e9).toFixed(1)} s`;
+        let marker = this.weaponMarkers.get(flight.id);
+        if (!marker) {
+          const positionProperty = new ConstantPositionProperty(position);
+          const label = new ConstantProperty(text);
+          const entity = this.entities.add({ id: `weapon:${flight.id}`, name: flight.weapon_name, position: positionProperty,
+            point: { pixelSize: 7, color: Color.ORANGE }, label: { text: label, font: "11px system-ui", pixelOffset: new Cartesian2(0, 18) } });
+          marker = { entity, position: positionProperty, label }; this.weaponMarkers.set(flight.id, marker);
+        } else { marker.position.setValue(position); marker.label.setValue(text); }
+      }
+      for (const [id, marker] of this.weaponMarkers) { if (!weaponIds.has(id)) { this.entities.remove(marker.entity); this.weaponMarkers.delete(id); } }
       this.reconcileRegions(projection.jamming_regions);
       this.reconcileLinks(projection);
     } finally {

@@ -1,0 +1,188 @@
+{
+  "version": 1,
+  "as_of": "2026-10-04",
+  "sources": [
+    {
+      "id": "udp-datagrams",
+      "url": "https://www.rfc-editor.org/rfc/rfc768",
+      "retrieved_on": "2026-10-04",
+      "confidence": "official"
+    }
+  ],
+  "links": [
+    {
+      "id": "game-direct",
+      "band": {
+        "lower_hz": 8000000000,
+        "upper_hz": 9000000000
+      },
+      "bit_rate_bps": 64000,
+      "range_m": 350000,
+      "satellite": false,
+      "estimate_rationale": "Fictional game preset. Values and compatibility are scenario rules, not measurements or claims about real equipment. Frequency numbers are only abstract interference-group labels for c3mesh."
+    },
+    {
+      "id": "game-relay",
+      "band": {
+        "lower_hz": 2000000000,
+        "upper_hz": 3000000000
+      },
+      "bit_rate_bps": 64000,
+      "range_m": 45000000,
+      "satellite": true,
+      "estimate_rationale": "Fictional game preset. Values and compatibility are scenario rules, not measurements or claims about real equipment. Frequency numbers are only abstract interference-group labels for c3mesh."
+    },
+    {
+      "id": "game-opposing",
+      "band": {
+        "lower_hz": 100000000,
+        "upper_hz": 450000000
+      },
+      "bit_rate_bps": 64000,
+      "range_m": 350000,
+      "satellite": false,
+      "estimate_rationale": "Fictional game preset. Values and compatibility are scenario rules, not measurements or claims about real equipment. Frequency numbers are only abstract interference-group labels for c3mesh."
+    }
+  ],
+  "weapons": [
+    {
+      "id": "game-interceptor",
+      "name": "Training interceptor",
+      "receiver_links": [
+        "game-direct"
+      ],
+      "sources": [],
+      "retarget": false,
+      "handoff": false,
+      "telemetry": false,
+      "seeker": "local",
+      "speed_mps": 800,
+      "lifetime_seconds": 180,
+      "acquisition_m": 5000,
+      "effect_radius_m": 150,
+      "update_interval_ticks": 2,
+      "max_observation_age_ticks": 15,
+      "estimate_rationale": "Fictional game preset. Values and compatibility are scenario rules, not measurements or claims about real equipment."
+    },
+    {
+      "id": "game-strike",
+      "name": "Training updateable projectile",
+      "receiver_links": [
+        "game-direct"
+      ],
+      "sources": [],
+      "retarget": true,
+      "handoff": true,
+      "telemetry": true,
+      "seeker": "local",
+      "speed_mps": 250,
+      "lifetime_seconds": 600,
+      "acquisition_m": 5000,
+      "effect_radius_m": 150,
+      "update_interval_ticks": 2,
+      "max_observation_age_ticks": 15,
+      "estimate_rationale": "Fictional game preset. Values and compatibility are scenario rules, not measurements or claims about real equipment."
+    },
+    {
+      "id": "game-relay-projectile",
+      "name": "Training relayed projectile",
+      "receiver_links": [
+        "game-relay"
+      ],
+      "sources": [],
+      "retarget": true,
+      "handoff": true,
+      "telemetry": true,
+      "seeker": "none",
+      "speed_mps": 250,
+      "lifetime_seconds": 600,
+      "acquisition_m": 0,
+      "effect_radius_m": 150,
+      "update_interval_ticks": 2,
+      "max_observation_age_ticks": 15,
+      "estimate_rationale": "Fictional game preset. Values and compatibility are scenario rules, not measurements or claims about real equipment."
+    },
+    {
+      "id": "game-fixed-projectile",
+      "name": "Training fixed-destination projectile",
+      "receiver_links": [],
+      "sources": [],
+      "retarget": false,
+      "handoff": false,
+      "telemetry": false,
+      "seeker": "none",
+      "speed_mps": 250,
+      "lifetime_seconds": 600,
+      "acquisition_m": 0,
+      "effect_radius_m": 150,
+      "update_interval_ticks": 2,
+      "max_observation_age_ticks": 15,
+      "estimate_rationale": "Fictional game preset. Values and compatibility are scenario rules, not measurements or claims about real equipment."
+    },
+    {
+      "id": "training-interceptor",
+      "name": "Opposing training interceptor",
+      "receiver_links": [
+        "game-opposing"
+      ],
+      "sources": [],
+      "retarget": false,
+      "handoff": false,
+      "telemetry": false,
+      "seeker": "local",
+      "speed_mps": 800,
+      "lifetime_seconds": 180,
+      "acquisition_m": 5000,
+      "effect_radius_m": 150,
+      "update_interval_ticks": 2,
+      "max_observation_age_ticks": 15,
+      "estimate_rationale": "Fictional game preset. Values and compatibility are scenario rules, not measurements or claims about real equipment."
+    }
+  ],
+  "fits": [
+    {
+      "platform": "Training launcher",
+      "weapons": [
+        "game-interceptor",
+        "game-strike",
+        "game-fixed-projectile"
+      ],
+      "transmitter_links": [
+        "game-direct"
+      ],
+      "evidence": "Fictional game preset. Values and compatibility are scenario rules, not measurements or claims about real equipment.",
+      "sources": []
+    },
+    {
+      "platform": "Training relay launcher",
+      "weapons": [
+        "game-relay-projectile"
+      ],
+      "transmitter_links": [
+        "game-relay"
+      ],
+      "evidence": "Fictional game preset. Values and compatibility are scenario rules, not measurements or claims about real equipment.",
+      "sources": []
+    },
+    {
+      "platform": "Training relay controller",
+      "weapons": [],
+      "transmitter_links": [
+        "game-relay"
+      ],
+      "evidence": "Fictional game preset. Values and compatibility are scenario rules, not measurements or claims about real equipment.",
+      "sources": []
+    },
+    {
+      "platform": "Opposing training launcher",
+      "weapons": [
+        "training-interceptor"
+      ],
+      "transmitter_links": [
+        "game-opposing"
+      ],
+      "evidence": "Fictional game preset. Values and compatibility are scenario rules, not measurements or claims about real equipment.",
+      "sources": []
+    }
+  ]
+}

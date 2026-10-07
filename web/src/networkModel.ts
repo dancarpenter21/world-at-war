@@ -1,8 +1,9 @@
+import type { IftuProjection } from "./IftuPanel";
 import type { Node } from "@xyflow/react";
 
-export type NetworkNode = { id: string; name: string; domain: string; receiver_jammed: boolean };
+export type NetworkNode = { id: string; name: string; domain: string; receiver_jammed: boolean; receiver_status_known?: boolean };
 export type NetworkLink = {
-  id: string; from_entity_id: string; to_entity_id: string; available: boolean; jammed: number;
+  id: string; from_entity_id: string; to_entity_id: string; available: boolean; jammed: number; availability_known?: boolean;
   effective_bit_rate_bps?: number | null; queued_packets: number; queued_bytes: number;
 };
 export const MESSAGE_STATES = ["queued", "in_transit", "delivered", "acknowledged", "retrying", "dropped", "expired"] as const;
@@ -18,7 +19,7 @@ export type MessageRecord = {
     };
   };
 };
-export type NetworkProjection = { tick: number; nodes: NetworkNode[]; links: NetworkLink[]; messages: MessageRecord[] };
+export type NetworkProjection = { iftu?: IftuProjection; tick: number; nodes: NetworkNode[]; links: NetworkLink[]; messages: MessageRecord[] };
 export type NetworkStreamFrame = { sequence: number; resync: boolean; projection: NetworkProjection };
 export type LinkFilter = "all" | "available" | "unavailable" | "jammed" | "queued";
 export type NetworkFilters = { query: string; domain: string; linkState: LinkFilter; focusNodeId: string | null };
@@ -60,7 +61,7 @@ export function reconcileNetworkNodes(previous: NetworkFlowNode[], projection: N
 export function linkMatchesFilter(link: NetworkLink, filter: LinkFilter): boolean {
   switch (filter) {
     case "available": return link.available;
-    case "unavailable": return !link.available;
+    case "unavailable": return link.availability_known !== false && !link.available;
     case "jammed": return link.jammed > 0;
     case "queued": return link.queued_packets > 0;
     default: return true;
@@ -161,4 +162,14 @@ export function decodeNetworkFrame(raw: string): NetworkStreamFrame | null {
   } catch {
     return null;
   }
+}
+
+/** Weapon terminals and their configured links are known; live receiver conditions need telemetry. */
+export function withWeaponEndpoints(projection: NetworkProjection): NetworkProjection {
+  const nodes = [...projection.nodes]; const links = [...projection.links]; const ids = new Set(nodes.map(n => n.id));
+  for (const flight of projection.iftu?.weapons ?? []) {
+    if (!ids.has(flight.id)) {nodes.push({id: flight.id, name: flight.weapon_name, domain: "Weapon", receiver_jammed: false, receiver_status_known: false}); ids.add(flight.id);}
+    if (ids.has(flight.provider_id)) links.push({id: `weapon-link:${flight.id}`, from_entity_id: flight.provider_id, to_entity_id: flight.id, available: false, availability_known: false, jammed: 0, queued_packets: 0, queued_bytes: 0});
+  }
+  return {...projection, nodes, links};
 }

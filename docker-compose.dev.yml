@@ -66,6 +66,10 @@ services:
           target: /workspace/data/geo
           initial_sync: true
         - action: sync
+          path: ./data/weapons
+          target: /workspace/data/weapons
+          initial_sync: true
+        - action: sync
           path: ./data/aco
           target: /workspace/data/aco
           initial_sync: true
