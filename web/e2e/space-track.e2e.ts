@@ -4,8 +4,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { startBackend, backendUrl, type Backend } from "./support/server";
 
-const liveUsername = process.env.SPACETRACK_E2E_USERNAME;
-const livePassword = process.env.SPACETRACK_E2E_PASSWORD;
+const liveUsername = process.env.SPACETRACK_E2E_USERNAME || undefined;
+const livePassword = process.env.SPACETRACK_E2E_PASSWORD || undefined;
 const useLiveProvider = Boolean(liveUsername && livePassword);
 const savedPasswordMask = "••••••••••••";
 
