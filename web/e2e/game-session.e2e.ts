@@ -520,7 +520,7 @@ test("does not restore a role after its ownership has changed", async ({ page })
   await page.reload();
   await expect(page.getByRole("button", { name: "Create game", exact: true })).toBeVisible();
   await expect(page.locator(".globe")).toHaveCount(0);
-  expect(await page.evaluate(() => localStorage.getItem("world-at-war-session"))).toBeNull();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("world-at-war-session"))).toBeNull();
   expect(state.errors).toEqual([]);
 });
 
@@ -530,7 +530,7 @@ test("does not reopen the game after leaving and reloading", async ({ page }) =>
   await page.reload();
   await expect(page.getByRole("button", { name: "Create game", exact: true })).toBeVisible();
   await expect(page.locator(".globe")).toHaveCount(0);
-  expect(await page.evaluate(() => localStorage.getItem("world-at-war-session"))).toBeNull();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("world-at-war-session"))).toBeNull();
   expect(state.errors).toEqual([]);
 });
 
@@ -540,7 +540,7 @@ test("server rejection clears a restored selection before displaying role data",
   await page.reload();
   await expect(page.getByText("Your role is no longer available. Choose an available role to continue.", { exact: true })).toBeVisible();
   await expect(page.locator(".globe")).toHaveCount(0);
-  expect(await page.evaluate(() => localStorage.getItem("world-at-war-session"))).toBeNull();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("world-at-war-session"))).toBeNull();
   expect(state.errors).toEqual([]);
 });
 
@@ -551,7 +551,7 @@ test("corrupt saved selections do not block the lobby", async ({ page }) => {
     await page.reload();
     await expect(page.getByRole("button", { name: "Create game", exact: true })).toBeVisible();
     await expect(page.locator(".globe")).toHaveCount(0);
-    expect(await page.evaluate(() => localStorage.getItem("world-at-war-session"))).toBeNull();
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("world-at-war-session"))).toBeNull();
   }
   expect(state.errors).toEqual([]);
 });

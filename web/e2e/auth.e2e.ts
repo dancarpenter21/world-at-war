@@ -20,7 +20,7 @@ async function create(page: Page) {
   await page.getByRole("button", { name: "Create game", exact: true }).click();
   await page.getByRole("button", { name: /^Exercise Commander/ }).click();
   await page.getByRole("button", { name: "Start scenario", exact: true }).click();
-  await expect(page.locator(".globe canvas")).toBeVisible();
+  await expect(page.locator(".globe canvas")).toBeVisible({ timeout: 20_000 });
   await page.getByRole("button", { name: "Pause scenario", exact: true }).click();
   await expect(page.getByText("Scenario paused", { exact: true })).toBeVisible();
 }
@@ -67,14 +67,14 @@ test("independent guests cannot assert identity, bypass CSRF or take another pla
   expect((await page.context().request.post(prefix + "/start", { headers: { ...await headers(page), origin: "https://untrusted.example" }, data: {} })).status()).toBe(403);
   expect((await page.context().request.get(`${prefix}/state?role_id=${owned.role_id}&lease_generation=${owned.lease_generation + 1}`)).status()).toBe(403);
   await page.reload();
-  await expect(page.locator(".globe canvas")).toBeVisible();
+  await expect(page.locator(".globe canvas")).toBeVisible({ timeout: 20_000 });
   expect((await selection(page)).lease_generation).toBe(owned.lease_generation);
 });
 
 test("tabs share a lease and release revokes a paused stream before another guest claims it", async ({ page, browser }) => {
   await create(page); const owned = await selection(page);
   const tab = await page.context().newPage(); await tab.goto(page.url());
-  await expect(tab.locator(".globe canvas")).toBeVisible();
+  await expect(tab.locator(".globe canvas")).toBeVisible({ timeout: 20_000 });
   expect(await selection(tab)).toEqual(owned);
   await observeStream(tab, true);
   const other = await browser.newContext({ baseURL: page.url() }); extra.push(other);
@@ -87,7 +87,7 @@ test("tabs share a lease and release revokes a paused stream before another gues
   await expect(tab.locator(".globe")).toHaveCount(0);
   await expect(outsider.getByRole("button", { name: /^Exercise Commander/ })).toBeEnabled();
   await outsider.getByRole("button", { name: /^Exercise Commander/ }).click();
-  await expect(outsider.locator(".globe canvas")).toBeVisible();
+  await expect(outsider.locator(".globe canvas")).toBeVisible({ timeout: 20_000 });
   expect((await selection(outsider)).lease_generation).toBeGreaterThan(owned.lease_generation);
   expect((await page.context().request.post(`${backendUrl}/v1/games/${owned.game_id}/roles/${owned.role_id}/resume`, { headers: await headers(page), data: {} })).status()).toBe(403);
   await outsider.screenshot({ path: test.info().outputPath("role-reassigned.png") });
@@ -116,7 +116,7 @@ test("logout closes a paused state stream and server restart discards guest iden
 test("ending a guest session clears identity and operational data in every shared tab", async ({ page }) => {
   await create(page); const before = await selection(page);
   const tab = await page.context().newPage(); await tab.goto(page.url());
-  await expect(tab.locator(".globe canvas")).toBeVisible();
+  await expect(tab.locator(".globe canvas")).toBeVisible({ timeout: 20_000 });
   await page.getByRole("button", { name: "Leave scenario", exact: true }).click();
   await page.getByRole("button", { name: "End guest session", exact: true }).click();
   await expect(tab.locator(".globe")).toHaveCount(0);

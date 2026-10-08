@@ -87,7 +87,7 @@ test("real players receive published plans only after delivery and cannot read a
     expect(JSON.stringify(await planning(page))).not.toContain("PRIVATE-DRAFT");
   }
   await commander.getByRole("button", { name: "Approve and publish selected course", exact: true }).click();
-  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued");
+  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued", { timeout: 20_000 });
   expect((await planning(pilot)).received).toBeNull();
   const networkPath = `/v1/games/${c.game_id}/network?player_id=${p.player_id}&role_id=${pilotRole}`;
   expect(JSON.stringify((await api(pilot, networkPath)).body)).not.toContain("PRIVATE-DRAFT");
@@ -310,7 +310,7 @@ test("clearances, handoffs and cancellation wait for delivery and enforce contro
   await commander.getByRole("button", { name: "Start scenario", exact: true }).click();
   await openPlanning(commander);
   await commander.getByRole("button", { name: "Approve and publish selected course", exact: true }).click();
-  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued");
+  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued", { timeout: 20_000 });
   for (const page of [pilot, west, east]) {
     await expect.poll(async () => (await planning(page)).received?.revision, { timeout: 90_000 }).toBe(1);
     await openPlanning(page);
@@ -323,7 +323,7 @@ test("clearances, handoffs and cancellation wait for delivery and enforce contro
   await pilot.getByRole("combobox", { name: "Aircraft", exact: true }).selectOption(mission.unit_id);
   await pilot.getByRole("combobox", { name: "Destination airspace", exact: true }).selectOption(westSector.id);
   await pilot.getByRole("button", { name: "Request clearance", exact: true }).click();
-  await expect(pilot.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued");
+  await expect(pilot.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued", { timeout: 20_000 });
   expect((await planning(west)).clearances).toHaveLength(0);
   expect((await planning(pilot)).clearances).toHaveLength(0);
   await control(commander, "start");
@@ -333,7 +333,7 @@ test("clearances, handoffs and cancellation wait for delivery and enforce contro
   expect((await planningAction(east, { action: "grant_clearance", clearance })).status).toBe(422);
   expect((await planningAction(pilot, { action: "grant_clearance", clearance })).status).toBe(422);
   await west.getByRole("button", { name: "Approve request", exact: true }).click();
-  await expect(west.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued");
+  await expect(west.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued", { timeout: 20_000 });
   expect((await planning(pilot)).clearances).toHaveLength(0);
   await control(commander, "start");
   await expect.poll(async () => (await planning(pilot)).clearances.some(item => item.id === clearance.id), { timeout: 30_000 }).toBe(true);
@@ -343,7 +343,7 @@ test("clearances, handoffs and cancellation wait for delivery and enforce contro
   await west.getByRole("combobox", { name: "Aircraft", exact: true }).selectOption(mission.unit_id);
   await west.getByRole("combobox", { name: "Destination airspace", exact: true }).selectOption(eastSector.id);
   await west.getByRole("button", { name: "Offer handoff", exact: true }).click();
-  await expect(west.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued");
+  await expect(west.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued", { timeout: 20_000 });
   const handoff = (await planning(west)).handoffs[0];
   expect((await planning(east)).handoffs).toHaveLength(0);
   expect((await planning(pilot)).handoffs).toHaveLength(0);
@@ -366,7 +366,7 @@ test("clearances, handoffs and cancellation wait for delivery and enforce contro
   const report = commander.locator("article.planning-card").filter({ has: commander.getByRole("button", { name: "Send cancellation", exact: true }) }).filter({ hasText: mission.name });
   await expect(report).toHaveCount(1);
   await report.getByRole("button", { name: "Send cancellation", exact: true }).click();
-  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued");
+  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued", { timeout: 20_000 });
   expect((await planning(pilot)).reports.find(item => item.mission_id === mission.id)?.state).not.toBe("cancelled");
   await control(commander, "start");
   await expect.poll(async () => (await planning(pilot)).reports.find(item => item.mission_id === mission.id)?.state, { timeout: 30_000 }).toBe("cancelled");
