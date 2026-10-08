@@ -1,0 +1,57 @@
+name: Performance harness
+
+on:
+  pull_request:
+  push:
+    branches: [main, 'codex/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: performance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: world-at-war
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: world-at-war
+          persist-credentials: false
+      - run: sh scripts/setup-c3mesh.sh
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: '1.89.0'
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+        with:
+          workspaces: world-at-war
+          shared-key: world-performance-1.89.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: world-at-war/web/package-lock.json
+      - run: npm ci --prefix web
+      - run: cargo build --release --locked -p world-at-war-server
+      - run: npm run test:performance --prefix web
+      - name: Core repeat determinism
+        run: |
+          mkdir -p tmp/performance
+          target/release/world-at-war-server --benchmark --ticks 120 --warmup 30 --repeats 2 --seed 12787750 > tmp/performance/core.json
+      - name: Fifty authenticated clients, renewals and reconnects
+        run: node web/scripts/performance-server.mjs --warmup 5 --duration 120 --reconnect-every 30 --output tmp/performance/ci
+      - name: Upload performance evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: performance-evidence
+          path: world-at-war/tmp/performance/
+          if-no-files-found: ignore
+          retention-days: 14

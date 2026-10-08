@@ -1,10 +1,17 @@
-# Scenario performance checkpoint — 2026-10-02
+# Performance measurements
+
+Full-server concurrent-client and soak tooling is documented in
+[LOAD_TESTING.md](LOAD_TESTING.md). The historical core results below are preserved
+for comparison; current reference results are recorded separately.
+
+## Historical scenario checkpoint — 2026-10-02
 
 These measurements and projection hashes describe the campaign branch before its
 2026-10-03 integration with upstream gameplay. The merged implementation retains
 campaign transport optimizations but also includes the upstream packet engine,
 scoped track identities, training combat, and scenario-specific visibility rules.
-Generate a new baseline before comparing performance or projection hashes on main.
+The historical baseline is incompatible with current scenario versions and should
+not be passed to `--baseline` for current code.
 
 Release measurements on WSL Linux x86_64, AMD Ryzen 7 9800X3D, 16 logical CPUs,
 Rust 1.96.0. Each run uses seed 12787750, 30 warmup ticks, 120 measured ticks and
@@ -38,7 +45,7 @@ From the repository root, with the sibling c3mesh checkout available:
 ```sh
 cargo run --release -p world-at-war-server -- --benchmark \
   --ticks 120 --warmup 30 --repeats 2 --seed 12787750 \
-  --check --baseline docs/performance/2026-10-02-before.json > benchmark.json
+  --check > benchmark.json
 ```
 
 The command runs offline without starting HTTP services, loading credentials,
@@ -67,8 +74,8 @@ latest/p95, uncompressed state size and queues visible to the held role. It
 separates a paused simulation from failed state requests and delayed progress.
 Map processing measures JavaScript entity reconciliation, not GPU rendering.
 
-`GET /v1/games/{game_id}/diagnostics?player_id=...&role_id=...` uses the same
-role authorization as `/state`. Samples are bounded to 120 per metric and are
+`GET /v1/games/{game_id}/diagnostics?role_id=...&lease_generation=...` requires
+the authenticated guest cookie and the same role authorization as `/state`. Samples are bounded to 120 per metric and are
 observational only. Full server ticks include AI, authority resolution,
 simulation, delivery handling and planning reports. Projection samples describe
 HTTP `/state` responses; other projection consumers are not included. Diagnostics

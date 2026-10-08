@@ -165,7 +165,19 @@ pub(super) fn run(args: &[String]) -> anyhow::Result<()> {
         .unwrap_or_default()
         .lines()
         .find_map(|line| line.strip_prefix("model name\t: ").map(str::to_owned));
-    let metadata = json!({ "schema_version": 1, "profile": "release", "cpu": cpu,
+    let command = |program: &str, args: &[&str]| {
+        std::process::Command::new(program)
+            .args(args)
+            .output()
+            .ok()
+            .filter(|output| output.status.success())
+            .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_owned())
+    };
+    let metadata = json!({ "schema_version": 1,
+        "revision": command("git", &["rev-parse", "HEAD"]),
+        "dirty": command("git", &["status", "--porcelain"]).map(|status| !status.is_empty()),
+        "c3mesh_revision": include_str!("../../../c3mesh-revision.txt").trim(),
+        "communications_catalog_sha256": format!("{:x}", Sha256::digest(include_bytes!("../../../data/communications/catalog.yaml"))), "profile": "release", "cpu": cpu,
         "logical_cpus": std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1),
         "os": std::env::consts::OS, "arch": std::env::consts::ARCH,
         "rustc": std::process::Command::new("rustc").arg("--version").output().ok().map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned()),

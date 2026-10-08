@@ -79,6 +79,10 @@ pub(super) fn projection_bytes(game: &mut Game, role: &Role) -> Result<Vec<u8>, 
         .iter()
         .map(|link| link.queued_bytes)
         .sum();
+    performance::record(|| {
+        serde_json::json!({"kind": "projection", "transport": "http", "game_id": game.id,
+        "role_id": role.id, "build_ms": build_ms, "serialization_ms": serialization_ms, "bytes": bytes.len()})
+    });
     Ok(bytes)
 }
 

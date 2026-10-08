@@ -11,7 +11,9 @@
     "test:e2e:session": "tsc --project tsconfig.e2e.json && playwright test game-session.e2e.ts",
     "test:e2e:network": "tsc --project tsconfig.e2e.json && playwright test network-workspace.e2e.ts",
     "test:e2e": "tsc --project tsconfig.e2e.json && cargo build --manifest-path ../Cargo.toml --package world-at-war-server --locked && playwright test",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "perf:server": "node scripts/performance-server.mjs",
+    "test:performance": "node --test scripts/performance.node-test.mjs"
   },
   "dependencies": {
     "@xyflow/react": "^12.11.2",
@@ -31,6 +33,7 @@
     "typescript": "^5.7.3",
     "vite": "^6.0.7",
     "vite-plugin-static-copy": "^2.2.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "ws": "^8.22.0"
   }
 }

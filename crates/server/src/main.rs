@@ -10,6 +10,7 @@ mod impact_reports;
 mod intents;
 mod leases;
 mod observers;
+mod performance;
 mod planning;
 #[cfg(test)]
 mod role_tests;
@@ -41,6 +42,7 @@ use axum::{
     Json, Router,
 };
 use credential_cookie::{CredentialCookie, RememberedCredentials};
+use performance::TimedRwLock as RwLock;
 use serde::{Deserialize, Serialize};
 use sim_catalog::{
     airport::{
@@ -61,7 +63,6 @@ use sim_scenario::{
 };
 use space_assets::{SpaceAssetDetail, SpaceAssetService, SpaceAssetsResponse};
 use space_catalog::{SpaceCatalogService, SpaceCatalogSnapshot, SpaceCatalogStatus};
-use tokio::sync::RwLock;
 use tower_http::{
     compression::CompressionLayer,
     cors::{AllowHeaders, AllowMethods, CorsLayer},
@@ -513,6 +514,7 @@ async fn main() -> anyhow::Result<()> {
     if args.first().is_some_and(|arg| arg == "--benchmark") {
         return benchmark::run(&args[1..]);
     }
+    let performance_writer = performance::start()?;
     let scenarios = [
         regional_campaign_scenario(),
         sim_scenario::iftu_exercise_scenario(),
@@ -553,7 +555,7 @@ async fn main() -> anyhow::Result<()> {
         communications_catalog: Arc::new(communications_catalog),
         network_event_dir: Arc::new(network_event_dir),
     };
-    tokio::spawn(run_simulation_loop(state.clone()));
+    let simulation_task = tokio::spawn(run_simulation_loop(state.clone()));
     let airport_catalog = state.airport_catalog.clone();
     tokio::spawn(async move {
         airport_catalog.refresh_if_stale().await;
@@ -564,8 +566,31 @@ async fn main() -> anyhow::Result<()> {
         .parse()?;
     let listener = tokio::net::TcpListener::bind(address).await?;
     println!("World At War server listening on http://{address}");
-    axum::serve(listener, app).await?;
+    let result = tokio::select! {
+        result = axum::serve(listener, app) => result,
+        () = shutdown_signal() => Ok(()),
+    };
+    simulation_task.abort();
+    let _ = simulation_task.await;
+    if let Some(writer) = performance_writer {
+        writer.finish()?;
+    }
+    result?;
     Ok(())
+}
+
+async fn shutdown_signal() {
+    #[cfg(unix)]
+    {
+        let mut terminate =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                .expect("install SIGTERM handler");
+        tokio::select! { _ = tokio::signal::ctrl_c() => {}, _ = terminate.recv() => {} }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = tokio::signal::ctrl_c().await;
+    }
 }
 
 fn router(state: AppState) -> Router {
@@ -2777,6 +2802,7 @@ async fn stream_network_socket(
                 .await;
             return;
         }
+        let projection_started = std::time::Instant::now();
         let frame = {
             let mut games = state.games.write().await;
             let Some(game) = games.get_mut(&game_id) else {
@@ -2817,10 +2843,17 @@ async fn stream_network_socket(
                 },
             }
         };
+        let build_ms = projection_started.elapsed().as_secs_f64() * 1000.0;
         last_sequence = Some(frame.sequence);
+        let serialization_started = std::time::Instant::now();
         let Ok(payload) = serde_json::to_string(&frame) else {
             return;
         };
+        performance::record(|| {
+            serde_json::json!({"kind": "projection", "transport": "websocket", "game_id": game_id,
+            "role_id": query.role_id, "build_including_lock_ms": build_ms,
+            "serialization_ms": serialization_started.elapsed().as_secs_f64() * 1000.0, "bytes": payload.len()})
+        });
         if socket.send(Message::Text(payload.into())).await.is_err() {
             return;
         }
@@ -2845,6 +2878,7 @@ async fn stream_socket(
                 .await;
             return;
         }
+        let projection_started = std::time::Instant::now();
         let projection = {
             let mut games = state.games.write().await;
             let Some(game) = games.get_mut(&game_id) else {
@@ -2863,9 +2897,16 @@ async fn stream_socket(
             game.simulation
                 .projection_for(role.location_unit_id, role.side)
         };
+        let build_ms = projection_started.elapsed().as_secs_f64() * 1000.0;
+        let serialization_started = std::time::Instant::now();
         let Ok(payload) = serde_json::to_string(&projection) else {
             return;
         };
+        performance::record(|| {
+            serde_json::json!({"kind": "projection", "transport": "websocket", "game_id": game_id,
+            "role_id": query.role_id, "build_including_lock_ms": build_ms,
+            "serialization_ms": serialization_started.elapsed().as_secs_f64() * 1000.0, "bytes": payload.len()})
+        });
         if socket.send(Message::Text(payload.into())).await.is_err() {
             return;
         }
@@ -2957,8 +2998,13 @@ async fn run_simulation_loop(state: AppState) {
             ai_orders::process_ai_orders(game);
             advance_game_tick(game);
             intents::record_execution_results(game);
-            game.diagnostics
-                .record_tick(started.elapsed().as_secs_f64() * 1000.0, delay);
+            let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
+            game.diagnostics.record_tick(elapsed_ms, delay);
+            performance::record(|| {
+                serde_json::json!({"kind": "tick", "game_id": game.id,
+                "scenario": game.scenario_id, "tick": game.simulation.tick(), "duration_ms": elapsed_ms,
+                "schedule_delay_ms": delay})
+            });
         }
     }
 }

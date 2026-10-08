@@ -273,7 +273,15 @@ pub(super) async fn stream(
                                 .is_ok()
                         })
                         .and_then(|game| {
-                            serde_json::to_string(&game.simulation.truth_projection()).ok()
+                            let started = std::time::Instant::now();
+                            let projection = game.simulation.truth_projection();
+                            let build_ms = started.elapsed().as_secs_f64() * 1000.0;
+                            let started = std::time::Instant::now();
+                            let bytes = serde_json::to_string(&projection).ok()?;
+                            performance::record(|| serde_json::json!({"kind": "projection", "transport": "observer_websocket",
+                                "game_id": id, "role_id": query.role_id, "build_ms": build_ms,
+                                "serialization_ms": started.elapsed().as_secs_f64() * 1000.0, "bytes": bytes.len()}));
+                            Some(bytes)
                         })
                 };
                 let Some(bytes) = bytes else {
