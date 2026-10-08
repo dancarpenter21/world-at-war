@@ -2,6 +2,16 @@
 
 These screenshots come from the deterministic Playwright regressions. Training radio settings and target motion are authored scenario data; catalog-dependent tests use an isolated local provider fixture.
 
+## Read-only observer truth
+
+In Regional Joint Campaign, the host explicitly grants a joined guest the Game Monitor seat. The observer sees actual Red units and current network topology while an ordinary command role continues to receive only its permitted picture. The browser regression checks reload/reconnect, shared-tab revocation and invalidated streams while paused. Separate cases cover release, logout and restart clearing.
+
+![Scenario-authorized observer ground-truth map and inspector](screenshots/observer-ground-truth.png)
+
+On a phone, the inspector scrolls above the map; neither view overflows the viewport. Background imagery is disabled in the offline fixture.
+
+![Read-only observer workspace on a phone](screenshots/observer-ground-truth-phone.png)
+
 ## Radio-delivered execution confirmation
 
 The real-server regression sends a movement order, waits for the aircraft to execute it, then pauses while its reply is still on the shared radio. The commander's receipt continues to say **Delivered; awaiting execution confirmation** and provides no execution tick. The reply is visible at the aircraft's terminal and withheld from the commander's network projection, message detail, REST history, and WebSocket stream.

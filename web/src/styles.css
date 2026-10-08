@@ -328,3 +328,18 @@ select, textarea { width: 100%; padding: 9px; color: #eef7fa; background: #0e171
 .iftu-panel select { display: block; max-width: 100%; width: 100%; }
 .iftu-panel button { margin: .25rem .25rem .25rem 0; }
 [aria-label="Weapon update messages"] details { border-bottom: 1px solid #34414d; padding: .5rem 0; overflow-wrap: anywhere; }
+
+.truth-workspace { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; grid-template-rows: minmax(0, 1fr); height: 100%; min-height: 0; overflow: hidden; }
+.truth-inspector { padding: 18px; overflow: auto; background: #101d29; color: #e2eef6; }
+.truth-inspector h1 { font-size: 1.25rem; color: #f3cf79; }
+.truth-inspector select, .observer-grants select { width: 100%; padding: 9px; margin: 8px 0 16px; color: #e2eef6; background: #172a3c; }
+.truth-inspector dt { color: #99b3c9; margin-top: 9px; }
+.truth-inspector dd { margin: 3px 0; }
+.truth-map { position: relative; min-width: 0; min-height: 0; height: 100%; }
+.truth-links { overflow: auto; }
+.truth-links table { font-size: 12px; width: 100%; border-collapse: collapse; }
+.truth-links td, .truth-links th { padding: 7px 4px; text-align: left; border-bottom: 1px solid #294154; overflow-wrap: anywhere; }
+.observer-grants { position: fixed; inset: 0; z-index: 100; background: #060e18cc; }
+@media (max-width: 700px) { .truth-workspace { grid-template-columns: 1fr; grid-template-rows: minmax(200px, 40%) minmax(0, 1fr); } }
+
+.truth-links th:nth-child(2), .truth-links td:nth-child(2) { min-width: 68px; overflow-wrap: normal; }

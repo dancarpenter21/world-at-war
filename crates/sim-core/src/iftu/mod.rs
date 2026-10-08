@@ -285,6 +285,33 @@ impl WeaponSystem {
             .find(|l| profile.receiver_links.contains(l))
             .cloned()
     }
+    pub(super) fn truth_weapons(&self) -> Vec<crate::truth::TruthWeapon> {
+        self.flights
+            .values()
+            .filter(|f| f.phase != "impact" && f.phase != "expired")
+            .map(|f| crate::truth::TruthWeapon {
+                id: f.id.to_string(),
+                kind: "iftu".into(),
+                side: Some(f.side),
+                launcher_id: Some(f.launcher),
+                position: Some(f.position),
+                aim_point: None,
+                impact_tick: None,
+                phase: f.phase.clone(),
+                provider_id: Some(f.provider),
+            })
+            .collect()
+    }
+    pub(super) fn truth_links(&self) -> Vec<CommunicationLinkDefinition> {
+        self.flights
+            .values()
+            .filter(|f| f.phase != "impact" && f.phase != "expired")
+            .flat_map(|f| f.links.values().chain(f.return_links.values()))
+            .flatten()
+            .cloned()
+            .collect()
+    }
+
     pub fn projection(&self, owner: Uuid) -> Projection {
         Projection {
             weapons: self

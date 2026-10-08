@@ -2,6 +2,13 @@
 use super::*;
 use std::time::Instant;
 
+#[derive(Debug, Clone, Default)]
+pub(super) struct Occupancy {
+    pub owner: Option<Uuid>,
+    pub lease_generation: u64,
+    pub lease: Option<Lease>,
+}
+
 const ACTIVE_SECONDS: u64 = 90;
 const RESERVED_SECONDS: u64 = 300;
 #[derive(Debug, Clone)]
@@ -39,14 +46,14 @@ pub(super) enum LeaseState {
     Active,
     Reserved,
 }
-pub(super) fn active(role: &Role) -> bool {
+pub(super) fn active(role: &Occupancy) -> bool {
     role.owner.is_some()
         && role
             .lease
             .as_ref()
             .is_some_and(|lease| lease.active(Instant::now()))
 }
-pub(super) fn summary(role: &Role, now: Instant) -> (LeaseState, u64) {
+pub(super) fn summary(role: &Occupancy, now: Instant) -> (LeaseState, u64) {
     match (&role.owner, &role.lease) {
         (Some(_), Some(lease)) if !lease.expired(now) => {
             if lease.active(now) {
@@ -67,26 +74,45 @@ pub(super) fn summary(role: &Role, now: Instant) -> (LeaseState, u64) {
         _ => (LeaseState::Available, 0),
     }
 }
-pub(super) fn release(role: &mut Role) {
+pub(super) fn release(id: Uuid, role: &mut Occupancy) {
     if role.owner.take().is_some() {
         role.lease_generation += 1;
         role.lease = None;
         eprintln!(
-            "role_released role={} generation={}",
-            role.id, role.lease_generation
+            "role_released role={id} generation={}",
+            role.lease_generation
         );
     }
 }
 pub(super) fn expire(game: &mut Game, now: Instant) {
-    for role in game.roles.values_mut() {
+    for (id, role) in game
+        .roles
+        .values_mut()
+        .map(|r| (r.id, &mut r.occupancy))
+        .chain(
+            game.observers
+                .values_mut()
+                .map(|s| (s.definition.id, &mut s.occupancy)),
+        )
+    {
         if role.lease.as_ref().is_some_and(|lease| lease.expired(now)) {
-            release(role);
+            release(id, role);
         }
     }
 }
 pub(super) fn release_player(game: &mut Game, player: Uuid) {
-    for role in game.roles.values_mut().filter(|r| r.owner == Some(player)) {
-        release(role);
+    for (id, role) in game
+        .roles
+        .values_mut()
+        .map(|r| (r.id, &mut r.occupancy))
+        .chain(
+            game.observers
+                .values_mut()
+                .map(|s| (s.definition.id, &mut s.occupancy)),
+        )
+        .filter(|(_, r)| r.owner == Some(player))
+    {
+        release(id, role);
     }
 }
 fn acquire(
@@ -95,15 +121,24 @@ fn acquire(
     resume: bool,
     now: Instant,
 ) -> Result<(), (StatusCode, Json<ErrorResponse>)> {
-    if role.lease.as_ref().is_some_and(|l| l.expired(now)) {
-        release(role);
-    }
     if role.ai_controlled || !role.claimable {
         return Err(api_error(
             StatusCode::FORBIDDEN,
             "ai_role",
             "This role is not claimable",
         ));
+    }
+    acquire_occupancy(role.id, &mut role.occupancy, player, resume, now)
+}
+pub(super) fn acquire_occupancy(
+    id: Uuid,
+    role: &mut Occupancy,
+    player: Uuid,
+    resume: bool,
+    now: Instant,
+) -> Result<(), (StatusCode, Json<ErrorResponse>)> {
+    if role.lease.as_ref().is_some_and(|l| l.expired(now)) {
+        release(id, role);
     }
     if resume && role.owner != Some(player) {
         return Err(api_error(
@@ -127,8 +162,8 @@ fn acquire(
     role.lease_generation += 1;
     role.lease = Some(Lease::new(now));
     eprintln!(
-        "role_acquired role={} player={} generation={}",
-        role.id, player, role.lease_generation
+        "role_acquired role={id} player={player} generation={}",
+        role.lease_generation
     );
     Ok(())
 }
@@ -137,7 +172,7 @@ pub(super) async fn claim(
     State(state): State<AppState>,
     session: auth::Session,
     AuthJson(_request): AuthJson<serde_json::Value>,
-) -> ApiResult<RoleSummary> {
+) -> ApiResult<observers::SeatSummary> {
     acquire_role(state, game_id, role_id, session.player_id, false).await
 }
 pub(super) async fn resume(
@@ -145,7 +180,7 @@ pub(super) async fn resume(
     State(state): State<AppState>,
     session: auth::Session,
     AuthJson(_request): AuthJson<serde_json::Value>,
-) -> ApiResult<RoleSummary> {
+) -> ApiResult<observers::SeatSummary> {
     acquire_role(state, game_id, role_id, session.player_id, true).await
 }
 async fn acquire_role(
@@ -154,7 +189,7 @@ async fn acquire_role(
     role_id: Uuid,
     player: Uuid,
     resume: bool,
-) -> ApiResult<RoleSummary> {
+) -> ApiResult<observers::SeatSummary> {
     let mut games = state.games.write().await;
     let game = games
         .get_mut(&game_id)
@@ -166,12 +201,18 @@ async fn acquire_role(
             "Join the game before claiming a role",
         ));
     }
+    if game.observers.contains_key(&role_id) {
+        return observers::acquire(game, role_id, player, resume);
+    }
     let role = game
         .roles
         .get_mut(&role_id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "role_not_found", "Role not found"))?;
     acquire(role, player, resume, Instant::now())?;
-    Ok(Json(role_summary(role, Some(player))))
+    Ok(Json(observers::SeatSummary::Operational(role_summary(
+        role,
+        Some(player),
+    ))))
 }
 #[derive(Deserialize)]
 pub(super) struct LeaseRequest {
@@ -182,27 +223,55 @@ pub(super) async fn renew(
     State(state): State<AppState>,
     session: auth::Session,
     AuthJson(request): AuthJson<LeaseRequest>,
-) -> ApiResult<RoleSummary> {
+) -> ApiResult<observers::SeatSummary> {
     let mut games = state.games.write().await;
     let game = games
         .get_mut(&game_id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "Game not found"))?;
+    if game.observers.contains_key(&role_id) {
+        observers::validate(game, role_id, session.player_id, request.lease_generation)?;
+        let seat = game.observers.get_mut(&role_id).unwrap();
+        seat.occupancy.lease = Some(Lease::new(Instant::now()));
+        return Ok(Json(observers::SeatSummary::Observer(observers::summary(
+            seat,
+            Some(session.player_id),
+        ))));
+    }
     validate_role_lease(game, role_id, session.player_id, request.lease_generation)?;
     let role = game.roles.get_mut(&role_id).unwrap();
     role.lease = Some(Lease::new(Instant::now()));
-    Ok(Json(role_summary(role, Some(session.player_id))))
+    Ok(Json(observers::SeatSummary::Operational(role_summary(
+        role,
+        Some(session.player_id),
+    ))))
 }
 pub(super) async fn release_role(
     Path((game_id, role_id)): Path<(Uuid, Uuid)>,
     State(state): State<AppState>,
     session: auth::Session,
     AuthJson(request): AuthJson<LeaseRequest>,
-) -> ApiResult<RoleSummary> {
+) -> ApiResult<observers::SeatSummary> {
     let mut games = state.games.write().await;
     let game = games
         .get_mut(&game_id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "Game not found"))?;
     expire(game, Instant::now());
+    if let Some(seat) = game.observers.get_mut(&role_id) {
+        if seat.occupancy.owner != Some(session.player_id)
+            || seat.occupancy.lease_generation != request.lease_generation
+        {
+            return Err(api_error(
+                StatusCode::FORBIDDEN,
+                "invalid_role_lease",
+                "Role lease no longer valid",
+            ));
+        }
+        release(role_id, &mut seat.occupancy);
+        return Ok(Json(observers::SeatSummary::Observer(observers::summary(
+            seat,
+            Some(session.player_id),
+        ))));
+    }
     let role = game
         .roles
         .get_mut(&role_id)
@@ -214,8 +283,11 @@ pub(super) async fn release_role(
             "Role lease no longer valid",
         ));
     }
-    release(role);
-    Ok(Json(role_summary(role, Some(session.player_id))))
+    release(role_id, role);
+    Ok(Json(observers::SeatSummary::Operational(role_summary(
+        role,
+        Some(session.player_id),
+    ))))
 }
 
 #[cfg(test)]

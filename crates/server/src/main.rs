@@ -9,6 +9,7 @@ mod execution_acks;
 mod impact_reports;
 mod intents;
 mod leases;
+mod observers;
 mod planning;
 #[cfg(test)]
 mod role_tests;
@@ -91,6 +92,8 @@ struct AppState {
 
 struct Game {
     members: BTreeSet<Uuid>,
+    participant_names: BTreeMap<Uuid, String>,
+    observers: BTreeMap<Uuid, observers::ObserverSeat>,
     id: Uuid,
     title: String,
     host: Uuid,
@@ -190,10 +193,20 @@ struct Role {
     location_unit_id: Uuid,
     command_units: Vec<Uuid>,
     claimable: bool,
-    owner: Option<Uuid>,
     ai_controlled: bool,
-    lease_generation: u64,
-    lease: Option<leases::Lease>,
+    occupancy: leases::Occupancy,
+}
+
+impl std::ops::Deref for Role {
+    type Target = leases::Occupancy;
+    fn deref(&self) -> &Self::Target {
+        &self.occupancy
+    }
+}
+impl std::ops::DerefMut for Role {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.occupancy
+    }
 }
 
 #[derive(Serialize)]
@@ -578,6 +591,16 @@ fn router(state: AppState) -> Router {
         .route("/v1/games/{game_id}/join", post(join_game))
         .route("/v1/games/{game_id}/roles", get(list_roles))
         .route(
+            "/v1/games/{game_id}/participants",
+            get(observers::participants),
+        )
+        .route(
+            "/v1/games/{game_id}/roles/{role_id}/observer-grant",
+            axum::routing::put(observers::grant).delete(observers::revoke),
+        )
+        .route("/v1/games/{game_id}/truth", get(observers::truth))
+        .route("/v1/games/{game_id}/truth/stream", get(observers::stream))
+        .route(
             "/v1/games/{game_id}/authority",
             get(get_authority).put(update_authority),
         )
@@ -726,7 +749,7 @@ async fn list_scenarios(State(state): State<AppState>) -> Json<Vec<ScenarioSumma
                 description: scenario.description.clone(),
                 version: scenario.version,
                 authored_entity_count: scenario.units.len(),
-                role_count: scenario.authority.roles.len(),
+                role_count: scenario.authority.roles.len() + scenario.observer_seats.len(),
                 requires_space_catalog: scenario.requires_space_catalog,
             })
             .collect(),
@@ -818,10 +841,8 @@ async fn create_game(
                     location_unit_id: template.location_unit_id,
                     command_units: authority.controlled_units(template.id),
                     claimable: template.claimable,
-                    owner: None,
                     ai_controlled: template.ai_controlled,
-                    lease_generation: 0,
-                    lease: None,
+                    occupancy: leases::Occupancy::default(),
                 },
             )
         })
@@ -841,6 +862,8 @@ async fn create_game(
             )
         })?;
     let game = Game {
+        participant_names: BTreeMap::from([(request.host_player_id, "Host".into())]),
+        observers: observers::from_scenario(scenario),
         members: BTreeSet::from([request.host_player_id]),
         id: game_id,
         title: request
@@ -918,11 +941,10 @@ async fn join_game(
             "game not found",
         ));
     }
-    games
-        .get_mut(&game_id)
-        .unwrap()
-        .members
-        .insert(request.player_id);
+    let game = games.get_mut(&game_id).unwrap();
+    game.members.insert(request.player_id);
+    game.participant_names
+        .insert(request.player_id, request.display_name.trim().to_owned());
     Ok(Json(JoinResponse {
         player_id: request.player_id,
         display_name: request.display_name,
@@ -933,7 +955,7 @@ async fn list_roles(
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
     AuthQuery(query): AuthQuery<RolesQuery>,
-) -> ApiResult<Vec<RoleSummary>> {
+) -> ApiResult<Vec<observers::SeatSummary>> {
     let games = state.games.read().await;
     let game = games
         .get(&game_id)
@@ -941,7 +963,10 @@ async fn list_roles(
     Ok(Json(
         game.roles
             .values()
-            .map(|role| role_summary(role, query.player_id))
+            .map(|role| observers::SeatSummary::Operational(role_summary(role, query.player_id)))
+            .chain(game.observers.values().map(|seat| {
+                observers::SeatSummary::Observer(observers::summary(seat, query.player_id))
+            }))
             .collect(),
     ))
 }
@@ -1049,6 +1074,13 @@ async fn update_authority(
         .iter()
         .map(|role| role.id)
         .collect();
+    if new_ids.iter().any(|id| game.observers.contains_key(id)) {
+        return Err(api_error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "observer_authority",
+            "Observer seats cannot be used in command authority",
+        ));
+    }
     for old in game
         .roles
         .values()
@@ -1088,10 +1120,10 @@ async fn update_authority(
                 location_unit_id: definition.location_unit_id,
                 command_units: request.definition.controlled_units(definition.id),
                 claimable: definition.claimable,
-                owner: previous.and_then(|role| role.owner),
                 ai_controlled: definition.ai_controlled,
-                lease_generation: previous.map_or(0, |role| role.lease_generation),
-                lease: previous.and_then(|role| role.lease.clone()),
+                occupancy: previous
+                    .map(|role| role.occupancy.clone())
+                    .unwrap_or_default(),
             },
         );
     }
@@ -3036,15 +3068,19 @@ mod authority_tests {
                         location_unit_id: definition.location_unit_id,
                         command_units: authority.controlled_units(definition.id),
                         claimable: definition.claimable,
-                        owner: None,
                         ai_controlled: definition.ai_controlled,
-                        lease_generation: 0,
-                        lease: Some(leases::Lease::new(std::time::Instant::now())),
+                        occupancy: leases::Occupancy {
+                            owner: None,
+                            lease_generation: 0,
+                            lease: Some(leases::Lease::new(std::time::Instant::now())),
+                        },
                     },
                 )
             })
             .collect();
         Game {
+            participant_names: BTreeMap::new(),
+            observers: observers::from_scenario(&scenario),
             members: BTreeSet::new(),
             id: Uuid::from_u128(900),
             title: "Test".into(),

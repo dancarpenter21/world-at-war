@@ -163,6 +163,23 @@ impl CombatConfig {
 }
 
 impl CombatState {
+    pub(super) fn truth_weapons(&self) -> Vec<crate::truth::TruthWeapon> {
+        self.flights
+            .iter()
+            .map(|f| crate::truth::TruthWeapon {
+                id: f.intent_id.to_string(),
+                kind: "training_pending_impact".into(),
+                side: Some(f.side),
+                launcher_id: Some(f.attacker),
+                position: None,
+                aim_point: Some(f.position),
+                impact_tick: Some(f.impact_tick),
+                phase: "pending impact".into(),
+                provider_id: None,
+            })
+            .collect()
+    }
+
     pub(super) fn from_config(config: CombatConfig, sides: BTreeMap<Uuid, Side>) -> Self {
         let outcome = config.mission.as_ref().map(|mission| MissionOutcome {
             title: mission.title.clone(),
