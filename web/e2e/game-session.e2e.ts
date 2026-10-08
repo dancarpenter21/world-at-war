@@ -29,11 +29,13 @@ async function openSession(page: Page, guest = false, projection = sessionProjec
     const headers = {
       "access-control-allow-origin": request.headers().origin ?? "http://127.0.0.1:4173",
       "access-control-allow-credentials": "true",
-      "access-control-allow-headers": "content-type, authorization",
+      "access-control-allow-headers": "content-type, authorization, x-csrf-token",
       "access-control-allow-methods": "GET, POST, PUT, DELETE, OPTIONS"
     };
     const json = (body: unknown, status = 200) => route.fulfill({ status, headers, contentType: "application/json", body: JSON.stringify(body) });
     if (request.method() === "OPTIONS") { await route.fulfill({ status: 204, headers }); return; }
+    if (pathname.startsWith("/v1/auth/")) { await json({ player_id: PLAYER_ID, display_name: "Commander", csrf_token: "fixture-csrf", expires_unix: 9999999999 }); return; }
+    if (pathname.endsWith("/resume") || pathname.endsWith("/renew")) { await json(state.role); return; }
     if (pathname === "/v1/scenarios") {
       await json([{ id: "jammed-flight", title: "Jammed Flight Test", description: "Two pilot-controlled aircraft under directional jamming.", version: 1, authored_entity_count: 2, role_count: 1, requires_space_catalog: false }]); return;
     }
@@ -43,7 +45,7 @@ async function openSession(page: Page, guest = false, projection = sessionProjec
     if (pathname === "/v1/games") {
       if (request.method() === "POST") {
         state.created = true;
-        state.game.host_player_id = request.postDataJSON().host_player_id;
+        state.game.host_player_id = PLAYER_ID;
         await json({ game: state.game }); return;
       }
       if (state.holdSummary) { state.pendingSummaries.push(route); return; }
@@ -58,7 +60,7 @@ async function openSession(page: Page, guest = false, projection = sessionProjec
     if (pathname.endsWith("/authority")) { await json(sessionAuthority()); return; }
     if (pathname.endsWith("/authority/requests")) { await json([]); return; }
     if (pathname.endsWith("/start") || pathname.endsWith("/pause")) {
-      expect(request.postDataJSON()).toEqual({ player_id: PLAYER_ID });
+      expect(request.postDataJSON()).toEqual({});
       state.controls.push(pathname);
       if (state.holdControl) { state.pendingControls.push(route); return; }
       if (state.controlFailure) { await json({ error: "Unable to pause this scenario." }, 503); return; }
@@ -69,7 +71,7 @@ async function openSession(page: Page, guest = false, projection = sessionProjec
     if (pathname.endsWith("/intent")) {
       const body = request.postDataJSON() as OrderBody;
       state.orderBodies.push(body);
-      expect(body.player_id).toBe(PLAYER_ID);
+      expect(body.player_id).toBeUndefined();
       expect(body.lease_generation).toBe(state.role.lease_generation);
       expect(body.intent.issuer_role).toBe(state.role.id);
       if (state.orderDeclined) { await json({ error: "This unit cannot accept that movement order.", code: "invalid_movement" }, 422); return; }
@@ -81,7 +83,7 @@ async function openSession(page: Page, guest = false, projection = sessionProjec
     if (pathname.includes("/intents/")) {
       state.receiptRequests += 1;
       const query = new URL(request.url()).searchParams;
-      expect(query.get("player_id")).toBe(PLAYER_ID);
+      expect(query.get("player_id")).toBeNull();
       expect(query.get("lease_generation")).toBe(String(state.role.lease_generation));
       const body = state.submittedIntents.get(pathname.split("/").at(-1)!);
       if (!body) { await json({ error: "Order not found." }, 404); return; }
@@ -92,7 +94,7 @@ async function openSession(page: Page, guest = false, projection = sessionProjec
     }
     if (pathname.endsWith("/state")) {
       const query = new URL(request.url()).searchParams;
-      expect(query.get("player_id")).toBe(PLAYER_ID);
+      expect(query.get("player_id")).toBeNull();
       expect(query.get("role_id")).toBe(state.role.id);
       state.projectionRequests += 1;
       if (state.holdProjection) { state.pendingProjections.push(route); return; }
@@ -193,11 +195,11 @@ test("serializes slow map reads and ignores a delayed response after leaving", a
   expect(state.errors).toEqual([]);
 });
 
-test("removes role data and closes inspectors when the role lease changes", async ({ page }) => {
+test("removes role data and closes inspectors when role ownership is revoked", async ({ page }) => {
   const state = await openSession(page);
   await page.getByRole("button", { name: "Map filters", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Map filters" })).toBeVisible();
-  state.role.lease_generation += 1;
+  state.role.lease_generation += 1; state.role.held_by_you = false;
   await expect(page.getByText("Your role lease changed. Choose an available role to continue.", { exact: true })).toBeVisible();
   await expect(page.locator(".globe")).toHaveCount(0);
   await expect(page.getByRole("dialog", { name: "Map filters" })).toHaveCount(0);
@@ -512,9 +514,9 @@ test("restores a paused held role after reload without starting the game again",
   expect(state.errors).toEqual([]);
 });
 
-test("does not restore a role after its saved lease has changed", async ({ page }) => {
+test("does not restore a role after its ownership has changed", async ({ page }) => {
   const state = await openSession(page);
-  state.role.lease_generation += 1;
+  state.role.lease_generation += 1; state.role.held_by_you = false;
   await page.reload();
   await expect(page.getByRole("button", { name: "Create game", exact: true })).toBeVisible();
   await expect(page.locator(".globe")).toHaveCount(0);

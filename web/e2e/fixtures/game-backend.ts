@@ -59,7 +59,7 @@ export async function startGameBackend() {
       cwd: runDirectory, windowsHide: true,
       env: {
         ...process.env,
-        BIND_ADDR: "0.0.0.0:18101", ADMIN_SETUP_TOKEN: "",
+        BIND_ADDR: "0.0.0.0:18101", APP_ALLOWED_ORIGINS: `http://${process.env.E2E_BROWSER_HOST ?? "127.0.0.1"}:4173`, ADMIN_SETUP_TOKEN: "",
         SPACETRACK_USERNAME: "", SPACETRACK_PASSWORD: "",
         SPACETRACK_LOGIN_URL: `http://127.0.0.1:${address.port}/ajaxauth/login`,
         SPACETRACK_GP_URL: `http://127.0.0.1:${address.port}/basicspacedata/query/class/gp/format/json`,

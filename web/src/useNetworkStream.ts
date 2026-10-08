@@ -1,7 +1,9 @@
+import { authorizedUrl, leaseGeneration } from "./apiClient";
 import { useEffect, useState } from "react";
 import { decodeNetworkFrame, type NetworkProjection } from "./networkModel";
 
 export function useNetworkStream(apiBase: string, gameId: string, playerId: string, roleId: string) {
+  const generation = leaseGeneration(gameId, roleId);
   const [projection, setProjection] = useState<NetworkProjection | null>(null);
   const [status, setStatus] = useState<"connecting" | "live" | "reconnecting">("connecting");
   const [notice, setNotice] = useState("");
@@ -30,7 +32,7 @@ export function useNetworkStream(apiBase: string, gameId: string, playerId: stri
       url.searchParams.set("player_id", playerId);
       url.searchParams.set("role_id", roleId);
       if (lastSequence !== undefined) url.searchParams.set("after_sequence", String(lastSequence));
-      socket = new WebSocket(url);
+      socket = new WebSocket(authorizedUrl(url.toString()));
       socket.onmessage = (event) => {
         if (!active) return;
         const frame = decodeNetworkFrame(String(event.data));
@@ -50,7 +52,12 @@ export function useNetworkStream(apiBase: string, gameId: string, playerId: stri
       socket.onerror = () => {
         if (active) setNotice("Network stream unavailable. Showing the last received topology while reconnecting.");
       };
-      socket.onclose = reconnect;
+      socket.onclose = (event) => {
+        if (event.code === 1008) {
+          setProjection(null); setNotice("Session or role lease is no longer valid.");
+          window.dispatchEvent(new Event("role-lease-lost"));
+        } else reconnect();
+      };
     };
     connect();
     return () => {
@@ -58,6 +65,6 @@ export function useNetworkStream(apiBase: string, gameId: string, playerId: stri
       if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
       if (socket) { socket.onclose = null; socket.close(); }
     };
-  }, [apiBase, gameId, playerId, roleId]);
+  }, [apiBase, gameId, playerId, roleId, generation]);
   return { projection, status, notice };
 }

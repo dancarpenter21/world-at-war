@@ -138,7 +138,7 @@ fn view(game: &Game, query: &ProjectionQuery) -> Result<View, (StatusCode, Json<
 pub(super) async fn get_diagnostics(
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
-    Query(query): Query<ProjectionQuery>,
+    AuthQuery(query): AuthQuery<ProjectionQuery>,
 ) -> ApiResult<View> {
     let games = state.games.read().await;
     let game = games
@@ -177,6 +177,7 @@ mod tests {
         .unwrap();
         assert_eq!(projection_bytes(&mut game, &role).unwrap(), expected);
         let query = ProjectionQuery {
+            lease_generation: game.roles[&role_id].lease_generation,
             player_id: player,
             role_id,
             after_sequence: None,

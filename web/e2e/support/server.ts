@@ -26,7 +26,7 @@ export async function startBackend(environment: Record<string, string> = {}) {
   let startError: Error | undefined;
   const processHandle = spawn(path.join(repoRoot, "target/debug/world-at-war-server"), [], {
     cwd: directory,
-    env: { ...process.env, BIND_ADDR: "0.0.0.0:18101", ADMIN_SETUP_TOKEN: "", COOKIE_SECURE: "false",
+    env: { ...process.env, BIND_ADDR: "0.0.0.0:18101", APP_ALLOWED_ORIGINS: `http://${process.env.E2E_BROWSER_HOST ?? "127.0.0.1"}:4173`, ADMIN_SETUP_TOKEN: "", COOKIE_SECURE: "false",
       SPACETRACK_USERNAME: "", SPACETRACK_PASSWORD: "", SPACETRACK_LOGIN_URL: "http://127.0.0.1:1/login", SPACETRACK_GP_URL: "http://127.0.0.1:1/gp",
       SPACE_CARDS_DIR: path.join(directory, "cards"), AIRPORT_CACHE_DIR: airportCache,
       AIRPORT_REFRESH_MAX_AGE_SECONDS: "86400", OURAIRPORTS_AIRPORTS_URL: "http://127.0.0.1:1/airports",

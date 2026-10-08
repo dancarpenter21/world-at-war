@@ -1,4 +1,7 @@
 import { expect, test } from "@playwright/test";
+test.beforeEach(async ({ page }) => {
+  await page.route("**/v1/auth/**", route => route.fulfill({ json: { player_id: "pilot", csrf_token: "fixture-csrf", display_name: "Pilot", expires_unix: 9999999999 } }));
+});
 test("sends authorized update, retarget, handoff and source requests without claiming receipt", async ({page},testInfo)=>{
   const submissions: Record<string, any>[]=[];
   await page.route("**/v1/games/iftu-test/roles/pilot/intent", async route=>{submissions.push(route.request().postDataJSON());await route.fulfill({json:{accepted:true}});});

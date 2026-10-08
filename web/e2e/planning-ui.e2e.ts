@@ -4,19 +4,21 @@ import { readFile } from "node:fs/promises";
 // Browser contract test with explicit API fixtures; backend integration is tested separately.
 test("commander compares, edits and publishes a campaign through the planning workspace", async ({ page }) => {
   const plan = JSON.parse(await readFile(new URL("../../data/scenarios/regional-campaign.json", import.meta.url), "utf8"));
-  const commander = { id: plan.commander_role_id, name: "Joint Force Commander", side: "Blue", kind: "joint_force_commander", location_unit_id: "hq", command_units: [], held: false, ai_controlled: false, lease_generation: 1 };
+  const commander = { id: plan.commander_role_id, name: "Joint Force Commander", side: "Blue", kind: "joint_force_commander", location_unit_id: "hq", command_units: [], held: false, held_by_you: true, ai_controlled: false, lease_generation: 1 };
   const game = { id: "campaign", title: "Regional Joint Campaign", status: "lobby", host_player_id: "", player_roles_available: 1, space_catalog_enabled: false };
   let published = false;
   const actions: string[] = [];
   await page.route("**/v1/**", async route => {
     const request = route.request(); const url = new URL(request.url()); const path = url.pathname;
-    const headers = { "access-control-allow-origin": new URL(page.url()).origin, "access-control-allow-credentials": "true", "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET, POST, OPTIONS" };
+    const headers = { "access-control-allow-origin": new URL(page.url()).origin, "access-control-allow-credentials": "true", "access-control-allow-headers": "content-type, x-csrf-token", "access-control-allow-methods": "GET, POST, OPTIONS" };
     if (request.method() === "OPTIONS") { await route.fulfill({ status:204,headers }); return; }
     let body: unknown = {};
-    if (path === "/v1/scenarios") body = [{ id:"regional-campaign.v1",title:game.title,description:"Offline campaign",version:1,authored_entity_count:12,role_count:10,requires_space_catalog:false }];
+    if (path.startsWith("/v1/auth/")) body = { player_id: "fixture-player", display_name: "Commander", csrf_token: "fixture-csrf", expires_unix: 9999999999 };
+    else if (path.endsWith("/renew") || path.endsWith("/resume")) body = commander;
+    else if (path === "/v1/scenarios") body = [{ id:"regional-campaign.v1",title:game.title,description:"Offline campaign",version:1,authored_entity_count:12,role_count:10,requires_space_catalog:false }];
     else if (path.includes("space-catalog/status")) body = { configured:false,usable:false,remembered_credentials:false };
     else if (path === "/v1/games") {
-      if (request.method() === "POST") { game.host_player_id=request.postDataJSON().host_player_id; body={game}; } else body=game.host_player_id ? [game] : [];
+      if (request.method() === "POST") { game.host_player_id="fixture-player"; body={game}; } else body=game.host_player_id ? [game] : [];
     } else if (path.endsWith("/roles")) body=[commander];
     else if (path.endsWith("/claim")) { commander.held=true; body=commander; }
     else if (path.endsWith("/start")) { game.status="running"; body=game; }

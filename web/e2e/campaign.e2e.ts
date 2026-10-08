@@ -29,7 +29,13 @@ async function session(page: Page) {
 }
 async function api(page: Page, path: string, data?: unknown) {
   return page.evaluate(async ({ url, data }) => {
-    const response = await fetch(url, { credentials: "include", ...(data === undefined ? {} : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data) }) });
+    const endpoint = new URL(url);
+    endpoint.searchParams.delete("player_id");
+    const selected = JSON.parse(localStorage.getItem("world-at-war-session") ?? "null");
+    if (endpoint.searchParams.has("role_id")) endpoint.searchParams.set("lease_generation", String(selected?.lease_generation ?? 0));
+    const session = await (await fetch(new URL("/v1/auth/session", url), { credentials: "include" })).json();
+    if (data && typeof data === "object") { delete (data as Record<string, unknown>).player_id; delete (data as Record<string, unknown>).host_player_id; }
+    const response = await fetch(endpoint, { credentials: "include", ...(data === undefined ? {} : { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": session.csrf_token }, body: JSON.stringify(data) }) });
     return { status: response.status, body: await response.json() };
   }, { url: `${backendUrl}${path}`, data });
 }
@@ -270,7 +276,7 @@ test("diagnostics measure the held role, distinguish pause and recover after sta
   expect((await api(page, `/v1/games/${s.game_id}/diagnostics?player_id=${s.player_id}&role_id=${pilotRole}`)).status).toBe(403);
   await control(page, "pause");
   await expect(panel).toContainText("Simulation is paused; a stationary tick is expected.");
-  const stateText = await page.evaluate(async url => (await fetch(url, { credentials: "include" })).text(), `${backendUrl}/v1/games/${s.game_id}/state?player_id=${s.player_id}&role_id=${s.role_id}`);
+  const stateText = await page.evaluate(async ({ base, game, role }) => { const saved = JSON.parse(localStorage.getItem("world-at-war-session")!); return (await fetch(`${base}/v1/games/${game}/state?role_id=${role}&lease_generation=${saved.lease_generation}`, { credentials: "include" })).text(); }, { base: backendUrl, game: s.game_id, role: s.role_id });
   const state = JSON.parse(stateText);
   const diagnostics = (await api(page, path)).body;
   expect(diagnostics.projection.tick).toBe(state.tick);

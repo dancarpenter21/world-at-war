@@ -308,7 +308,7 @@ pub(super) fn receipt_for(
 pub(super) async fn get_intent_receipt(
     Path((game_id, role_id, intent_id)): Path<(Uuid, Uuid, Uuid)>,
     State(state): State<AppState>,
-    Query(query): Query<ReceiptQuery>,
+    AuthQuery(query): AuthQuery<ReceiptQuery>,
 ) -> ApiResult<IntentReceipt> {
     let games = state.games.read().await;
     let game = games
@@ -608,7 +608,7 @@ pub(super) fn mission_debrief(game: &mut Game, role: &Role) -> MissionDebrief {
 pub(super) async fn get_mission_debrief(
     Path((game_id, role_id)): Path<(Uuid, Uuid)>,
     State(state): State<AppState>,
-    Query(query): Query<ReceiptQuery>,
+    AuthQuery(query): AuthQuery<ReceiptQuery>,
 ) -> ApiResult<MissionDebrief> {
     let mut games = state.games.write().await;
     let game = games

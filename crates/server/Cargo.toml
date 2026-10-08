@@ -6,6 +6,8 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+getrandom = "0.3"
+serde_urlencoded = "0.7"
 sim-geo = { path = "../sim-geo" }
 anyhow.workspace = true
 axum.workspace = true
@@ -25,3 +27,6 @@ sim-scenario = { path = "../sim-scenario" }
 tokio.workspace = true
 tower-http.workspace = true
 uuid.workspace = true
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }

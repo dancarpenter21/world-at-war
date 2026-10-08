@@ -1,12 +1,14 @@
 mod ai_orders;
 mod airport_catalog;
 mod airspace_import;
+mod auth;
 mod benchmark;
 mod credential_cookie;
 mod diagnostics;
 mod execution_acks;
 mod impact_reports;
 mod intents;
+mod leases;
 mod planning;
 #[cfg(test)]
 mod role_tests;
@@ -26,6 +28,7 @@ use std::{
 };
 
 use airport_catalog::{AirportCatalogService, AirportCatalogStatus};
+use auth::{AuthJson, AuthQuery};
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
@@ -60,7 +63,7 @@ use space_catalog::{SpaceCatalogService, SpaceCatalogSnapshot, SpaceCatalogStatu
 use tokio::sync::RwLock;
 use tower_http::{
     compression::CompressionLayer,
-    cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer},
+    cors::{AllowHeaders, AllowMethods, CorsLayer},
     trace::TraceLayer,
 };
 use transport::{
@@ -74,6 +77,7 @@ const EXTERNAL_OPERATOR_APPROVAL_BPS: u16 = 5_000;
 
 #[derive(Clone)]
 struct AppState {
+    sessions: Arc<auth::Sessions>,
     games: Arc<RwLock<BTreeMap<Uuid, Game>>>,
     scenarios: Arc<BTreeMap<String, Scenario>>,
     airport_catalog: AirportCatalogService,
@@ -86,6 +90,7 @@ struct AppState {
 }
 
 struct Game {
+    members: BTreeSet<Uuid>,
     id: Uuid,
     title: String,
     host: Uuid,
@@ -188,6 +193,7 @@ struct Role {
     owner: Option<Uuid>,
     ai_controlled: bool,
     lease_generation: u64,
+    lease: Option<leases::Lease>,
 }
 
 #[derive(Serialize)]
@@ -272,6 +278,8 @@ struct ForceSyncQuery {
 }
 #[derive(Serialize)]
 struct RoleSummary {
+    lease_state: leases::LeaseState,
+    lease_remaining_seconds: u64,
     id: Uuid,
     name: String,
     side: Side,
@@ -299,6 +307,7 @@ struct CreateGameResponse {
 }
 #[derive(Deserialize)]
 struct JoinRequest {
+    player_id: Uuid,
     display_name: String,
 }
 #[derive(Serialize)]
@@ -309,10 +318,6 @@ struct JoinResponse {
 #[derive(Deserialize)]
 struct RolesQuery {
     player_id: Option<Uuid>,
-}
-#[derive(Deserialize)]
-struct ClaimRoleRequest {
-    player_id: Uuid,
 }
 #[derive(Deserialize)]
 struct GameControlRequest {
@@ -408,6 +413,7 @@ struct AuthorityQuery {
 }
 #[derive(Deserialize)]
 struct AuthorityRequestsQuery {
+    lease_generation: Option<u64>,
     player_id: Uuid,
     role_id: Option<Uuid>,
 }
@@ -446,6 +452,7 @@ enum AuthorityDecision {
 }
 #[derive(Deserialize)]
 struct ProjectionQuery {
+    lease_generation: u64,
     player_id: Uuid,
     role_id: Uuid,
     after_sequence: Option<u64>,
@@ -453,6 +460,7 @@ struct ProjectionQuery {
 
 #[derive(Deserialize)]
 struct NetworkEventsQuery {
+    lease_generation: u64,
     player_id: Uuid,
     role_id: Uuid,
     cursor: Option<u64>,
@@ -464,6 +472,7 @@ struct NetworkEventsQuery {
 impl NetworkEventsQuery {
     fn authorization(&self) -> ProjectionQuery {
         ProjectionQuery {
+            lease_generation: self.lease_generation,
             player_id: self.player_id,
             role_id: self.role_id,
             after_sequence: None,
@@ -515,6 +524,7 @@ async fn main() -> anyhow::Result<()> {
     );
     std::fs::create_dir_all(&network_event_dir)?;
     let state = AppState {
+        sessions: Arc::new(auth::Sessions::new()?),
         games: Arc::new(RwLock::new(BTreeMap::new())),
         scenarios: Arc::new(
             scenarios
@@ -535,7 +545,21 @@ async fn main() -> anyhow::Result<()> {
     tokio::spawn(async move {
         airport_catalog.refresh_if_stale().await;
     });
-    let app = Router::new()
+    let app = router(state.clone());
+    let address: SocketAddr = std::env::var("BIND_ADDR")
+        .unwrap_or_else(|_| "0.0.0.0:8000".into())
+        .parse()?;
+    let listener = tokio::net::TcpListener::bind(address).await?;
+    println!("World At War server listening on http://{address}");
+    axum::serve(listener, app).await?;
+    Ok(())
+}
+
+fn router(state: AppState) -> Router {
+    Router::new()
+        .route("/v1/auth/guest", post(auth::guest))
+        .route("/v1/auth/session", get(auth::current))
+        .route("/v1/auth/logout", post(auth::logout))
         .route("/health", get(health))
         .route("/v1/airport-catalog/status", get(airport_catalog_status))
         .route("/v1/airports", get(list_airports))
@@ -571,7 +595,19 @@ async fn main() -> anyhow::Result<()> {
         )
         .route(
             "/v1/games/{game_id}/roles/{role_id}/claim",
-            post(claim_role),
+            post(leases::claim),
+        )
+        .route(
+            "/v1/games/{game_id}/roles/{role_id}/resume",
+            post(leases::resume),
+        )
+        .route(
+            "/v1/games/{game_id}/roles/{role_id}/renew",
+            post(leases::renew),
+        )
+        .route(
+            "/v1/games/{game_id}/roles/{role_id}/release",
+            post(leases::release_role),
         )
         .route("/v1/games/{game_id}/start", post(start_game))
         .route("/v1/games/{game_id}/pause", post(pause_game))
@@ -639,23 +675,20 @@ async fn main() -> anyhow::Result<()> {
             "/v1/settings/space-track/credentials",
             post(restore_space_track).delete(forget_space_track),
         )
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            auth::guard,
+        ))
         .layer(CompressionLayer::new())
         .layer(
             CorsLayer::new()
-                .allow_origin(AllowOrigin::mirror_request())
+                .allow_origin(state.sessions.origins.clone())
                 .allow_methods(AllowMethods::mirror_request())
                 .allow_headers(AllowHeaders::mirror_request())
                 .allow_credentials(true),
         )
         .layer(TraceLayer::new_for_http())
-        .with_state(state);
-    let address: SocketAddr = std::env::var("BIND_ADDR")
-        .unwrap_or_else(|_| "0.0.0.0:8000".into())
-        .parse()?;
-    let listener = tokio::net::TcpListener::bind(address).await?;
-    println!("World At War server listening on http://{address}");
-    axum::serve(listener, app).await?;
-    Ok(())
+        .with_state(state)
 }
 
 async fn health() -> Json<HealthResponse> {
@@ -714,7 +747,7 @@ async fn list_games(State(state): State<AppState>) -> Json<Vec<GameSummary>> {
 
 async fn create_game(
     State(state): State<AppState>,
-    Json(request): Json<CreateGameRequest>,
+    AuthJson(request): AuthJson<CreateGameRequest>,
 ) -> ApiResult<CreateGameResponse> {
     let scenario = state.scenarios.get(&request.scenario_id).ok_or_else(|| {
         api_error(
@@ -788,6 +821,7 @@ async fn create_game(
                     owner: None,
                     ai_controlled: template.ai_controlled,
                     lease_generation: 0,
+                    lease: None,
                 },
             )
         })
@@ -807,6 +841,7 @@ async fn create_game(
             )
         })?;
     let game = Game {
+        members: BTreeSet::from([request.host_player_id]),
         id: game_id,
         title: request
             .title
@@ -866,7 +901,7 @@ async fn create_game(
 async fn join_game(
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
-    Json(request): Json<JoinRequest>,
+    AuthJson(request): AuthJson<JoinRequest>,
 ) -> ApiResult<JoinResponse> {
     if request.display_name.trim().is_empty() {
         return Err(api_error(
@@ -875,15 +910,21 @@ async fn join_game(
             "display name is required",
         ));
     }
-    if !state.games.read().await.contains_key(&game_id) {
+    let mut games = state.games.write().await;
+    if !games.contains_key(&game_id) {
         return Err(api_error(
             StatusCode::NOT_FOUND,
             "game_not_found",
             "game not found",
         ));
     }
+    games
+        .get_mut(&game_id)
+        .unwrap()
+        .members
+        .insert(request.player_id);
     Ok(Json(JoinResponse {
-        player_id: Uuid::new_v4(),
+        player_id: request.player_id,
         display_name: request.display_name,
     }))
 }
@@ -891,7 +932,7 @@ async fn join_game(
 async fn list_roles(
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
-    Query(query): Query<RolesQuery>,
+    AuthQuery(query): AuthQuery<RolesQuery>,
 ) -> ApiResult<Vec<RoleSummary>> {
     let games = state.games.read().await;
     let game = games
@@ -905,49 +946,17 @@ async fn list_roles(
     ))
 }
 
-async fn claim_role(
-    Path((game_id, role_id)): Path<(Uuid, Uuid)>,
-    State(state): State<AppState>,
-    Json(request): Json<ClaimRoleRequest>,
-) -> ApiResult<RoleSummary> {
-    let mut games = state.games.write().await;
-    let game = games
-        .get_mut(&game_id)
-        .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
-    let role = game
-        .roles
-        .get_mut(&role_id)
-        .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "role_not_found", "role not found"))?;
-    if role.ai_controlled || !role.claimable {
-        return Err(api_error(
-            StatusCode::FORBIDDEN,
-            "ai_role",
-            "this role is controlled by scenario AI",
-        ));
-    }
-    if role.owner.is_some() && role.owner != Some(request.player_id) {
-        return Err(api_error(
-            StatusCode::CONFLICT,
-            "role_held",
-            "role is already held",
-        ));
-    }
-    role.owner = Some(request.player_id);
-    role.lease_generation += 1;
-    Ok(Json(role_summary(role, Some(request.player_id))))
-}
-
 async fn start_game(
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
-    Json(request): Json<GameControlRequest>,
+    AuthJson(request): AuthJson<GameControlRequest>,
 ) -> ApiResult<GameSummary> {
     set_game_status(state, game_id, request.player_id, GameStatus::Running).await
 }
 async fn pause_game(
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
-    Json(request): Json<GameControlRequest>,
+    AuthJson(request): AuthJson<GameControlRequest>,
 ) -> ApiResult<GameSummary> {
     set_game_status(state, game_id, request.player_id, GameStatus::Paused).await
 }
@@ -982,7 +991,7 @@ async fn set_game_status(
 async fn submit_intent(
     Path((game_id, role_id)): Path<(Uuid, Uuid)>,
     State(state): State<AppState>,
-    Json(request): Json<SubmitIntentRequest>,
+    AuthJson(request): AuthJson<SubmitIntentRequest>,
 ) -> ApiResult<SubmissionOutcome> {
     let mut games = state.games.write().await;
     let game = games
@@ -994,7 +1003,7 @@ async fn submit_intent(
 async fn get_authority(
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
-    Query(query): Query<AuthorityQuery>,
+    AuthQuery(query): AuthQuery<AuthorityQuery>,
 ) -> ApiResult<AuthorityDefinition> {
     let games = state.games.read().await;
     let game = games
@@ -1007,7 +1016,7 @@ async fn get_authority(
 async fn update_authority(
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
-    Json(mut request): Json<UpdateAuthorityRequest>,
+    AuthJson(mut request): AuthJson<UpdateAuthorityRequest>,
 ) -> ApiResult<AuthorityDefinition> {
     let mut games = state.games.write().await;
     let game = games
@@ -1082,6 +1091,7 @@ async fn update_authority(
                 owner: previous.and_then(|role| role.owner),
                 ai_controlled: definition.ai_controlled,
                 lease_generation: previous.map_or(0, |role| role.lease_generation),
+                lease: previous.and_then(|role| role.lease.clone()),
             },
         );
     }
@@ -1099,7 +1109,7 @@ async fn update_authority(
 async fn list_authority_requests(
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
-    Query(query): Query<AuthorityRequestsQuery>,
+    AuthQuery(query): AuthQuery<AuthorityRequestsQuery>,
 ) -> ApiResult<Vec<AuthorityRequest>> {
     let games = state.games.read().await;
     let game = games
@@ -1131,17 +1141,18 @@ async fn list_authority_requests(
             "role_id is required for non-host players",
         )
     })?;
-    let role = game
-        .roles
-        .get(&role_id)
-        .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "role_not_found", "role not found"))?;
-    if role.owner != Some(query.player_id) {
-        return Err(api_error(
-            StatusCode::FORBIDDEN,
-            "role_not_held",
-            "role is not held by this player",
-        ));
-    }
+    validate_role_lease(
+        game,
+        role_id,
+        query.player_id,
+        query.lease_generation.ok_or_else(|| {
+            api_error(
+                StatusCode::BAD_REQUEST,
+                "lease_required",
+                "lease_generation is required",
+            )
+        })?,
+    )?;
     Ok(Json(
         game.authority_requests
             .values()
@@ -1154,7 +1165,7 @@ async fn list_authority_requests(
 async fn create_authority_request(
     Path((game_id, role_id)): Path<(Uuid, Uuid)>,
     State(state): State<AppState>,
-    Json(request): Json<CreateAuthorityRequest>,
+    AuthJson(request): AuthJson<CreateAuthorityRequest>,
 ) -> ApiResult<SubmissionOutcome> {
     let mut games = state.games.write().await;
     let game = games
@@ -1182,7 +1193,7 @@ async fn create_authority_request(
 async fn decide_authority_request(
     Path((game_id, role_id, request_id)): Path<(Uuid, Uuid, Uuid)>,
     State(state): State<AppState>,
-    Json(request): Json<DecideAuthorityRequest>,
+    AuthJson(request): AuthJson<DecideAuthorityRequest>,
 ) -> ApiResult<AuthorityRequest> {
     let mut games = state.games.write().await;
     let game = games
@@ -1232,7 +1243,7 @@ async fn decide_authority_request(
 async fn create_satellite_request(
     Path((game_id, role_id, norad_id)): Path<(Uuid, Uuid, u64)>,
     State(state): State<AppState>,
-    Json(request): Json<CreateSatelliteRequest>,
+    AuthJson(request): AuthJson<CreateSatelliteRequest>,
 ) -> ApiResult<SubmissionOutcome> {
     if request.summary.chars().count() > 500 {
         return Err(api_error(
@@ -1641,7 +1652,10 @@ fn validate_role_lease(
         .roles
         .get(&role_id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "role_not_found", "role not found"))?;
-    if role.owner != Some(player_id) || role.lease_generation != lease_generation {
+    if role.owner != Some(player_id)
+        || role.lease_generation != lease_generation
+        || !leases::active(role)
+    {
         return Err(api_error(
             StatusCode::FORBIDDEN,
             "invalid_role_lease",
@@ -1659,7 +1673,7 @@ fn require_game_participant(
         || game
             .roles
             .values()
-            .any(|role| role.owner == Some(player_id))
+            .any(|role| role.owner == Some(player_id) && leases::active(role))
     {
         Ok(())
     } else {
@@ -1906,7 +1920,7 @@ fn process_vacant_authority_requests(game: &mut Game) {
 async fn get_projection(
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
-    Query(query): Query<ProjectionQuery>,
+    AuthQuery(query): AuthQuery<ProjectionQuery>,
 ) -> Result<axum::response::Response, (StatusCode, Json<ErrorResponse>)> {
     let mut games = state.games.write().await;
     let game = games
@@ -1930,7 +1944,7 @@ async fn get_projection(
 async fn get_network_projection(
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
-    Query(query): Query<ProjectionQuery>,
+    AuthQuery(query): AuthQuery<ProjectionQuery>,
 ) -> ApiResult<NetworkProjection> {
     let mut games = state.games.write().await;
     let game = games
@@ -1958,7 +1972,7 @@ async fn get_network_projection(
 async fn list_network_events(
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
-    Query(query): Query<NetworkEventsQuery>,
+    AuthQuery(query): AuthQuery<NetworkEventsQuery>,
 ) -> ApiResult<NetworkEventsPage> {
     let games = state.games.read().await;
     let game = games
@@ -1993,7 +2007,7 @@ async fn list_network_events(
 async fn get_network_message(
     Path((game_id, message_id)): Path<(Uuid, Uuid)>,
     State(state): State<AppState>,
-    Query(query): Query<ProjectionQuery>,
+    AuthQuery(query): AuthQuery<ProjectionQuery>,
 ) -> ApiResult<NetworkMessageRecord> {
     let games = state.games.read().await;
     let game = games
@@ -2052,7 +2066,7 @@ fn network_record_for_role(record: &NetworkMessageRecord, role: &Role) -> Networ
 async fn game_space_catalog(
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
-    Query(query): Query<ProjectionQuery>,
+    AuthQuery(query): AuthQuery<ProjectionQuery>,
 ) -> ApiResult<SpaceCatalogSnapshot> {
     let games = state.games.read().await;
     let game = games
@@ -2077,7 +2091,7 @@ async fn game_space_catalog(
 async fn game_space_assets(
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
-    Query(query): Query<ProjectionQuery>,
+    AuthQuery(query): AuthQuery<ProjectionQuery>,
 ) -> Result<(HeaderMap, Json<SpaceAssetsResponse>), (StatusCode, Json<ErrorResponse>)> {
     let checksum = {
         let games = state.games.read().await;
@@ -2114,7 +2128,7 @@ async fn game_space_assets(
 async fn game_space_asset(
     Path((game_id, norad_id)): Path<(Uuid, u64)>,
     State(state): State<AppState>,
-    Query(query): Query<ProjectionQuery>,
+    AuthQuery(query): AuthQuery<ProjectionQuery>,
 ) -> Result<(HeaderMap, Json<SpaceAssetDetail>), (StatusCode, Json<ErrorResponse>)> {
     let checksum = {
         let games = state.games.read().await;
@@ -2167,13 +2181,7 @@ fn authorized_role<'a>(
         .roles
         .get(&query.role_id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "role_not_found", "role not found"))?;
-    if role.owner != Some(query.player_id) {
-        return Err(api_error(
-            StatusCode::FORBIDDEN,
-            "role_not_held",
-            "role is not held by this player",
-        ));
-    }
+    validate_role_lease(game, query.role_id, query.player_id, query.lease_generation)?;
     Ok(role)
 }
 
@@ -2681,20 +2689,40 @@ fn require_admin(
 
 async fn stream_projection(
     ws: WebSocketUpgrade,
+    session: auth::Session,
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
-    Query(query): Query<ProjectionQuery>,
-) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| stream_socket(socket, state, game_id, query))
+    AuthQuery(query): AuthQuery<ProjectionQuery>,
+) -> Result<axum::response::Response, (StatusCode, Json<ErrorResponse>)> {
+    {
+        let games = state.games.read().await;
+        let game = games
+            .get(&game_id)
+            .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "Game not found"))?;
+        authorized_role(game, &query)?;
+    }
+    Ok(ws
+        .on_upgrade(move |socket| stream_socket(socket, state, game_id, query, session))
+        .into_response())
 }
 
 async fn stream_network_projection(
     ws: WebSocketUpgrade,
+    session: auth::Session,
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
-    Query(query): Query<ProjectionQuery>,
-) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| stream_network_socket(socket, state, game_id, query))
+    AuthQuery(query): AuthQuery<ProjectionQuery>,
+) -> Result<axum::response::Response, (StatusCode, Json<ErrorResponse>)> {
+    {
+        let games = state.games.read().await;
+        let game = games
+            .get(&game_id)
+            .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "Game not found"))?;
+        authorized_role(game, &query)?;
+    }
+    Ok(ws
+        .on_upgrade(move |socket| stream_network_socket(socket, state, game_id, query, session))
+        .into_response())
 }
 
 async fn stream_network_socket(
@@ -2702,17 +2730,34 @@ async fn stream_network_socket(
     state: AppState,
     game_id: Uuid,
     query: ProjectionQuery,
+    session: auth::Session,
 ) {
     let mut interval = tokio::time::interval(Duration::from_secs(1));
     let mut last_sequence = query.after_sequence;
     loop {
         interval.tick().await;
+        if !state.sessions.valid(&session) {
+            let _ = socket
+                .send(Message::Close(Some(axum::extract::ws::CloseFrame {
+                    code: 1008,
+                    reason: "Session expired".into(),
+                })))
+                .await;
+            return;
+        }
         let frame = {
             let mut games = state.games.write().await;
             let Some(game) = games.get_mut(&game_id) else {
                 return;
             };
             let Ok(role) = authorized_role(game, &query).cloned() else {
+                drop(games);
+                let _ = socket
+                    .send(Message::Close(Some(axum::extract::ws::CloseFrame {
+                        code: 1008,
+                        reason: "Role lease invalid".into(),
+                    })))
+                    .await;
                 return;
             };
             let role_projection = game
@@ -2754,16 +2799,33 @@ async fn stream_socket(
     state: AppState,
     game_id: Uuid,
     query: ProjectionQuery,
+    session: auth::Session,
 ) {
     let mut interval = tokio::time::interval(Duration::from_secs(1));
     loop {
         interval.tick().await;
+        if !state.sessions.valid(&session) {
+            let _ = socket
+                .send(Message::Close(Some(axum::extract::ws::CloseFrame {
+                    code: 1008,
+                    reason: "Session expired".into(),
+                })))
+                .await;
+            return;
+        }
         let projection = {
             let mut games = state.games.write().await;
             let Some(game) = games.get_mut(&game_id) else {
                 return;
             };
             let Ok(role) = authorized_role(game, &query) else {
+                drop(games);
+                let _ = socket
+                    .send(Message::Close(Some(axum::extract::ws::CloseFrame {
+                        code: 1008,
+                        reason: "Role lease invalid".into(),
+                    })))
+                    .await;
                 return;
             };
             game.simulation
@@ -2846,7 +2908,14 @@ async fn run_simulation_loop(state: AppState) {
     let mut interval = tokio::time::interval(Duration::from_secs(1));
     loop {
         let scheduled = interval.tick().await;
+        let expired = state.sessions.expired_players();
         let mut games = state.games.write().await;
+        for game in games.values_mut() {
+            for player in &expired {
+                leases::release_player(game, *player);
+            }
+            leases::expire(game, std::time::Instant::now());
+        }
         for game in games
             .values_mut()
             .filter(|game| game.status == GameStatus::Running)
@@ -2896,15 +2965,26 @@ fn require_game_catalog(game: &Game) -> Result<String, (StatusCode, Json<ErrorRe
     })
 }
 fn role_summary(role: &Role, player: Option<Uuid>) -> RoleSummary {
+    let (lease_state, lease_remaining_seconds) = leases::summary(role, std::time::Instant::now());
     RoleSummary {
+        lease_state,
+        lease_remaining_seconds,
         id: role.id,
         name: role.name.clone(),
         side: role.side,
         kind: role.kind,
         location_unit_id: role.location_unit_id,
         command_units: role.command_units.clone(),
-        held: role.owner.is_some(),
-        held_by_you: player.is_some_and(|player| role.owner == Some(player)),
+        held: role.owner.is_some()
+            && role
+                .lease
+                .as_ref()
+                .is_some_and(|l| !l.expired(std::time::Instant::now())),
+        held_by_you: player.is_some_and(|player| role.owner == Some(player))
+            && role
+                .lease
+                .as_ref()
+                .is_some_and(|l| !l.expired(std::time::Instant::now())),
         claimable: role.claimable,
         ai_controlled: role.ai_controlled,
         lease_generation: role.lease_generation,
@@ -2959,11 +3039,13 @@ mod authority_tests {
                         owner: None,
                         ai_controlled: definition.ai_controlled,
                         lease_generation: 0,
+                        lease: Some(leases::Lease::new(std::time::Instant::now())),
                     },
                 )
             })
             .collect();
         Game {
+            members: BTreeSet::new(),
             id: Uuid::from_u128(900),
             title: "Test".into(),
             host: Uuid::from_u128(901),

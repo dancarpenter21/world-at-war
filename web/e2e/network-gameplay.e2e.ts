@@ -1,3 +1,4 @@
+import { playerRequests, browserStream } from "./support/players";
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
@@ -7,12 +8,15 @@ import { startGameBackend } from "./fixtures/game-backend";
 const playerId = "00000000-0000-4000-8000-000000008001";
 const roleId = "00000000-0000-0000-0000-00000000006a";
 const targetId = "00000000-0000-0000-0000-00000000000b";
+const clients: ReturnType<typeof playerRequests>[] = [];
+test.afterEach(async () => { await Promise.all(clients.splice(0).map(client => client.dispose())); });
 let backend: Awaited<ReturnType<typeof startGameBackend>>;
 
 test.beforeAll(async () => { backend = await startGameBackend(); });
 test.afterAll(async () => { if (backend) await backend.close(); });
 
-test("plays the command exercise without a catalog and retains a congested radio queue through pause", async ({ page, request }, testInfo) => {
+test("plays the command exercise without a catalog and retains a congested radio queue through pause", async ({ page }, testInfo) => {
+  const request = playerRequests(page, playerId); clients.push(request);
   const exerciseRole = "00000000-0000-0000-0000-000000004e86";
   const secondTarget = "00000000-0000-0000-0000-00000000000c";
   const initialCatalog = await (await request.get(backend.url + "/v1/settings/space-catalog/status")).json();
@@ -94,7 +98,8 @@ test("plays the command exercise without a catalog and retains a congested radio
   await expect(page.getByRole("button", { name: "Create game", exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });
-test("waits for the return-radio acknowledgement before confirming an executed movement order", async ({ page, request }, testInfo) => {
+test("waits for the return-radio acknowledgement before confirming an executed movement order", async ({ page }, testInfo) => {
+  const request = playerRequests(page, playerId); clients.push(request);
   const commander = "00000000-0000-0000-0000-000000004e86";
   const pilot = "00000000-0000-0000-0000-000000004e87";
   const pilotPlayer = randomUUID();
@@ -146,12 +151,10 @@ test("waits for the return-radio acknowledgement before confirming an executed m
   expect((await request.get(`${backend.url}/v1/games/${gameId}/network/messages/${ack.message.id}?${authorization}`)).status()).toBe(404);
   const events = await (await request.get(`${backend.url}/v1/games/${gameId}/network/events?${authorization}`)).json();
   expect(events.events.some((record: { message: { id: string } }) => record.message.id === ack.message.id)).toBe(false);
-  const streamFrames: { projection: { messages: { state: string; message: { id: string } }[] } }[] = [];
-  const stream = new WebSocket(`${backend.url.replace("http:", "ws:")}/v1/games/${gameId}/network/stream?${authorization}`);
-  stream.addEventListener("message", (event) => streamFrames.push(JSON.parse(String(event.data))));
+  const stream = await browserStream(page, `${backend.url.replace("http:", "ws:")}/v1/games/${gameId}/network/stream?${authorization}`);
   try {
-    await expect.poll(() => streamFrames.length, { timeout: 5_000 }).toBeGreaterThan(0);
-    expect(streamFrames.flatMap((frame) => frame.projection.messages).some((record) => record.message.id === ack.message.id)).toBe(false);
+    await expect.poll(async () => (await stream.frames()).length, { timeout: 5_000 }).toBeGreaterThan(0);
+    expect((await stream.frames()).flatMap((frame) => frame.projection.messages).some((record) => record.message.id === ack.message.id)).toBe(false);
     await page.screenshot({ path: testInfo.outputPath("execution-awaiting-confirmation.png") });
     await page.waitForTimeout(1_100);
     expect(await (await request.get(receiptUrl)).json()).toEqual(unknown);
@@ -164,14 +167,15 @@ test("waits for the return-radio acknowledgement before confirming an executed m
     expect(delivered.state).toBe("delivered");
     expect(delivered.message.fields.executed_tick).toBe(confirmed.executed_tick);
     expect(delivered.message.fields.result.status).toBe("Accepted");
-    await expect.poll(() => streamFrames.some((frame) => frame.projection.messages.some((record) => record.message.id === ack.message.id)), { timeout: 5_000 }).toBe(true);
-    expect(streamFrames.flatMap((frame) => frame.projection.messages).filter((record) => record.message.id === ack.message.id).every((record) => record.state === "delivered")).toBe(true);
+    await expect.poll(async () => (await stream.frames()).some((frame) => frame.projection.messages.some((record) => record.message.id === ack.message.id)), { timeout: 5_000 }).toBe(true);
+    expect((await stream.frames()).flatMap((frame) => frame.projection.messages).filter((record) => record.message.id === ack.message.id).every((record) => record.state === "delivered")).toBe(true);
     await page.screenshot({ path: testInfo.outputPath("execution-confirmed.png") });
     await page.getByRole("button", { name: "Pause scenario", exact: true }).click();
-  } finally { stream.close(); }
+  } finally { await stream.close(); }
 });
 
-test("withholds remote sensor knowledge and message contents until radio delivery", async ({ page, request }, testInfo) => {
+test("withholds remote sensor knowledge and message contents until radio delivery", async ({ page }, testInfo) => {
+  const request = playerRequests(page, playerId); clients.push(request);
   const commander = "00000000-0000-0000-0000-000000004e86";
   const sensorRole = "00000000-0000-0000-0000-000000004e87";
   const otherPilot = "00000000-0000-0000-0000-000000004e88";
@@ -220,12 +224,10 @@ test("withholds remote sensor knowledge and message contents until radio deliver
   expect((await (await request.get(`${backend.url}/v1/games/${gameId}/state?${otherAuthorization}`)).json()).tracks).toEqual([]);
   await expect(page.getByText("Scenario paused", { exact: true })).toBeVisible();
   await expect(page.getByText("No reports received.", { exact: true })).toBeVisible();
-  const streamFrames: { projection: { messages: { state: string; message: { id: string } }[] } }[] = [];
-  const stream = new WebSocket(`${backend.url.replace("http:", "ws:")}/v1/games/${gameId}/network/stream?${authorization}`);
-  stream.addEventListener("message", (event) => streamFrames.push(JSON.parse(String(event.data))));
+  const stream = await browserStream(page, `${backend.url.replace("http:", "ws:")}/v1/games/${gameId}/network/stream?${authorization}`);
   try {
-    await expect.poll(() => streamFrames.length, { timeout: 5_000 }).toBeGreaterThan(0);
-    expect(streamFrames[0].projection.messages).toEqual([]);
+    await expect.poll(async () => (await stream.frames()).length, { timeout: 5_000 }).toBeGreaterThan(0);
+    expect((await stream.frames())[0].projection.messages).toEqual([]);
     await page.getByRole("button", { name: "Resume scenario", exact: true }).click();
     await expect.poll(async () => (await (await request.get(stateUrl)).json()).tracks.length, { timeout: 10_000, intervals: [100] }).toBe(1);
     expect((await request.post(`${backend.url}/v1/games/${gameId}/pause`, { data: { player_id: playerId } })).ok()).toBe(true);
@@ -249,14 +251,15 @@ test("withholds remote sensor knowledge and message contents until radio deliver
     await expect(report).toContainText(`${track.received_tick - track.observed_tick}s delivery delay`);
     await page.screenshot({ path: testInfo.outputPath("sensor-report-delivered.png") });
     await page.getByRole("button", { name: "Leave scenario", exact: true }).click();
-    await expect.poll(() => streamFrames.some((frame) => frame.projection.messages.some((record) => record.message.id === source.message.id)), { timeout: 5_000 }).toBe(true);
-    expect(streamFrames.flatMap((frame) => frame.projection.messages).every((record) => record.state === "delivered")).toBe(true);
+    await expect.poll(async () => (await stream.frames()).some((frame) => frame.projection.messages.some((record) => record.message.id === source.message.id)), { timeout: 5_000 }).toBe(true);
+    expect((await stream.frames()).flatMap((frame) => frame.projection.messages).every((record) => record.state === "delivered")).toBe(true);
     expect(errors).toEqual([]);
   } finally {
     stream.close();
   }
 });
-test("runs a real game, persists networked command delivery, and retains the map through host pause", async ({ page, request }, testInfo) => {
+test("runs a real game, persists networked command delivery, and retains the map through host pause", async ({ page }, testInfo) => {
+  const request = playerRequests(page, playerId); clients.push(request);
   const started = Date.now();
   const timings: { stage: string; elapsed_ms: number; dom_nodes: number; communications_rows: number }[] = [];
   const mark = async (stage: string) => timings.push({ stage, elapsed_ms: Date.now() - started,
@@ -393,7 +396,8 @@ test("runs a real game, persists networked command delivery, and retains the map
   console.log("gameplay performance", JSON.stringify(timings));
 });
 
-test("rejoins a paused game through the players held role without resuming or claiming another players slot", async ({ page, request }) => {
+test("rejoins a paused game through the players held role without resuming or claiming another players slot", async ({ page }) => {
+  const request = playerRequests(page, playerId); clients.push(request);
   const commanderRole = "00000000-0000-0000-0000-000000004e86";
   const pilotRole = "00000000-0000-0000-0000-000000004e87";
   const otherPlayer = "00000000-0000-4000-8000-000000008099";
@@ -420,7 +424,7 @@ test("rejoins a paused game through the players held role without resuming or cl
   const pausedState = await (await request.get(`${backend.url}/v1/games/${gameId}/state?${authorization}`)).json() as { tick: number };
   const pausedTick = `TICK ${pausedState.tick}`;
   await expect(page.locator("header .tick")).toHaveText(pausedTick);
-  const anonymous = await (await request.get(`${backend.url}/v1/games/${gameId}/roles`)).json() as { id: string; held_by_you: boolean }[];
+  const anonymous = await (await request.get(`${backend.url}/v1/games/${gameId}/roles?player_id=spectator`)).json() as { id: string; held_by_you: boolean }[];
   expect(anonymous.every((role) => !role.held_by_you)).toBe(true);
   expect(JSON.stringify(anonymous)).not.toContain(otherPlayer);
   const foreignClaim = await request.post(`${backend.url}/v1/games/${gameId}/roles/${commanderRole}/claim`, { data: { player_id: otherPlayer } });
@@ -436,9 +440,9 @@ test("rejoins a paused game through the players held role without resuming or cl
   const reclaim = page.waitForResponse((response) => response.url().endsWith(`/roles/${commanderRole}/claim`));
   await owned.click();
   const secondLease = (await (await reclaim).json()).lease_generation as number;
-  expect(secondLease).toBeGreaterThan(firstLease);
+  expect(secondLease).toBe(firstLease);
   const staleOrder = await request.post(`${backend.url}/v1/games/${gameId}/roles/${commanderRole}/intent`, { data: {
-    player_id: playerId, lease_generation: firstLease,
+    player_id: playerId, lease_generation: firstLease - 1,
     intent: { intent_id: randomUUID(), issuer_role: commanderRole, target: targetId,
       kind: { Move: { north_mps: 0, east_mps: 0 } }, requested_tick: 0 }
   } });
@@ -453,7 +457,8 @@ test("rejoins a paused game through the players held role without resuming or cl
   expect(errors).toEqual([]);
 });
 
-test("completes combat training after a radio-delivered engagement and safely retries a lost submission response", async ({ page, request }, testInfo) => {
+test("completes combat training after a radio-delivered engagement and safely retries a lost submission response", async ({ page }, testInfo) => {
+  const request = playerRequests(page, playerId); clients.push(request);
   const commander = "00000000-0000-0000-0000-000000004e86";
   const enemyId = "00000000-0000-0000-0000-000000000033";
   const errors: string[] = [];
@@ -513,7 +518,8 @@ test("completes combat training after a radio-delivered engagement and safely re
   expect(errors).toEqual([]);
 });
 
-test("a pilot requests firing authority, respects denial, and launches only after commander approval arrives", async ({ page, browser, request }, testInfo) => {
+test("a pilot requests firing authority, respects denial, and launches only after commander approval arrives", async ({ page, browser }, testInfo) => {
+  const request = playerRequests(page, playerId); clients.push(request);
   const commander = "00000000-0000-0000-0000-000000004e86";
   const pilotRole = "00000000-0000-0000-0000-000000004e87";
   const pilotPlayer = "00000000-0000-4000-8000-000000009001";
@@ -529,6 +535,7 @@ test("a pilot requests firing authority, respects denial, and launches only afte
   await page.getByRole("button", { name: "Start scenario", exact: true }).click();
   const pilotContext = await browser.newContext({ baseURL: page.url() });
   try {
+    request.register(pilotPlayer, pilotContext.request);
     const pilot = await pilotContext.newPage();
     await pilot.addInitScript((id) => localStorage.setItem("world-at-war-player", id), pilotPlayer);
     await pilot.route(/https:\/\/[^/]*tile\.openstreetmap\.org\//, (route) => route.abort());
@@ -577,7 +584,8 @@ test("a pilot requests firing authority, respects denial, and launches only afte
   } finally { await pilotContext.close(); }
 });
 
-test("reacquires a patrolling target after a blackout and receives its final impact in the mission debrief", async ({ page, request }, testInfo) => {
+test("reacquires a patrolling target after a blackout and receives its final impact in the mission debrief", async ({ page }, testInfo) => {
+  const request = playerRequests(page, playerId); clients.push(request);
   test.setTimeout(90_000);
   const commander = "00000000-0000-0000-0000-000000004e86";
   const errors: string[] = [];
