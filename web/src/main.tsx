@@ -546,7 +546,7 @@ function App() {
         <button className="planning-launch" onClick={() => setShowPlanning(true)}>Joint planning</button>
         <GameSessionNotice game={game} status={connectionStatus} error={connectionError} controlError={controlError} hasProjection={true} onRetry={retryConnection} mission={projection?.combat?.mission} />
         <Suspense fallback={<div className="map-loading" role="status">Loading operational map…</div>}>
-        <Globe key={`${game.id}:${role.id}:${role.lease_generation}`} projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} onMapUpdate={recordMapUpdate} keyboardEnabled={!showAuthority && !showNetwork && !showMapFilters && !showPlanning && !showDiagnostics} renderingEnabled={!showAuthority && !showNetwork} />
+        <Globe key={`${game.id}:${role.id}:${role.lease_generation}`} projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} onMapUpdate={recordMapUpdate} keyboardEnabled={!showAuthority && !showNetwork && !showMapFilters && !showPlanning && !showDiagnostics} renderingEnabled={!showAuthority && !showNetwork && !showPlanning} />
         </Suspense>
         {showMapFilters && <MapFilterDialog filters={mapFilters} spaceAssetsAvailable={game.space_catalog_enabled} onChange={setMapFilters} onClose={() => setShowMapFilters(false)} />}
         <div className="map-caption">{role.name} · {role.side} · operational picture</div>

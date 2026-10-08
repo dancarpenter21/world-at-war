@@ -372,4 +372,14 @@ test("clearances, handoffs and cancellation wait for delivery and enforce contro
   await expect.poll(async () => (await planning(pilot)).reports.find(item => item.mission_id === mission.id)?.state, { timeout: 30_000 }).toBe("cancelled");
   await expect(report).toContainText("cancelled", { timeout: 30_000 });
   await pilot.screenshot({ path: "test-results/campaign-handoff-cancellation.png", fullPage: true });
+  const canvas = pilot.locator(".globe canvas");
+  await canvas.evaluate(element => element.setAttribute("data-retained", "planning"));
+  await pilot.getByRole("button", { name: "Close planning", exact: true }).click();
+  await expect(canvas).toBeVisible();
+  await expect(canvas).toHaveAttribute("data-retained", "planning");
+  const beforePan = await canvas.screenshot();
+  await pilot.keyboard.down("w");
+  await pilot.waitForTimeout(300);
+  await pilot.keyboard.up("w");
+  await expect.poll(async () => (await canvas.screenshot()).equals(beforePan)).toBe(false);
 });
