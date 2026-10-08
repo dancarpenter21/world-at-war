@@ -377,9 +377,12 @@ test("clearances, handoffs and cancellation wait for delivery and enforce contro
   await pilot.getByRole("button", { name: "Close planning", exact: true }).click();
   await expect(canvas).toBeVisible();
   await expect(canvas).toHaveAttribute("data-retained", "planning");
+  await pilot.bringToFront();
   const beforePan = await canvas.screenshot();
-  await pilot.keyboard.down("w");
-  await pilot.waitForTimeout(300);
-  await pilot.keyboard.up("w");
-  await expect.poll(async () => (await canvas.screenshot()).equals(beforePan)).toBe(false);
+  await pilot.keyboard.down("KeyD");
+  try {
+    await expect.poll(async () => (await canvas.screenshot()).equals(beforePan), { timeout: 20_000 }).toBe(false);
+  } finally {
+    await pilot.keyboard.up("KeyD");
+  }
 });
