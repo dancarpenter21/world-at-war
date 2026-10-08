@@ -1,3 +1,4 @@
+import { authenticatedFetch } from "./apiClient";
 import { useEffect, useState } from "react";
 import type { Role } from "./AuthorityWorkspace";
 import { AirspaceImport } from "./AirspaceImport";
@@ -27,7 +28,7 @@ export function PlanningWorkspace({ apiBase, gameId, playerId, role, roles, onCl
     let cancelled = false;
     const refresh = async () => {
       try {
-        const response = await fetch(`${base}/planning?player_id=${playerId}&role_id=${role.id}`, { credentials: "include" });
+        const response = await authenticatedFetch(`${base}/planning?player_id=${playerId}&role_id=${role.id}`, { credentials: "include" });
         if (!response.ok) throw new Error((await response.json()).error ?? "Could not load planning");
         const next = await response.json() as PlanningView;
         if (!cancelled) { setView(next); setError(""); if (!dirty) setDraft(next.draft ?? next.received); }
@@ -49,7 +50,7 @@ export function PlanningWorkspace({ apiBase, gameId, playerId, role, roles, onCl
   async function act(action: Record<string, unknown>) {
     setBusy(true); setError(""); setFeedback("");
     try {
-      const response = await fetch(`${base}/roles/${role.id}/planning`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ player_id: playerId, lease_generation: role.lease_generation, ...action }) });
+      const response = await authenticatedFetch(`${base}/roles/${role.id}/planning`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ player_id: playerId, lease_generation: role.lease_generation, ...action }) });
       const body = await response.json(); if (!response.ok) throw new Error(body.error ?? "Planning action rejected");
       setView(body); setDraft(body.draft ?? body.received); setDirty(false);
       setFeedback(action.action === "save" ? "Draft saved." : "Message queued. Recipients act after delivery.");

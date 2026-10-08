@@ -216,7 +216,7 @@ pub(super) fn view(game: &mut Game, role: &Role) -> PlanningView {
 pub(super) async fn get_planning(
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
-    Query(query): Query<ProjectionQuery>,
+    AuthQuery(query): AuthQuery<ProjectionQuery>,
 ) -> ApiResult<PlanningView> {
     let mut games = state.games.write().await;
     let game = games
@@ -229,7 +229,7 @@ pub(super) async fn get_planning(
 pub(super) async fn update_planning(
     Path((game_id, role_id)): Path<(Uuid, Uuid)>,
     State(state): State<AppState>,
-    Json(request): Json<PlanningRequest>,
+    AuthJson(request): AuthJson<PlanningRequest>,
 ) -> ApiResult<PlanningView> {
     let mut games = state.games.write().await;
     let game = games

@@ -47,7 +47,7 @@ export function usePollingResource<T>(key: string | null, load: (signal: AbortSi
         if (!active || (controller.signal.aborted && !timedOut)) return;
         const error = timedOut ? new Error("The server did not respond within 10 seconds.")
           : cause instanceof Error ? cause : new Error(String(cause));
-        terminal = error instanceof ApiError && (error.status === 403 || error.status === 404);
+        terminal = error instanceof ApiError && (error.status === 401 || error.status === 403 || error.status === 404);
         delay = Math.min(intervalMs * 2 ** Math.min(failures++, 4), 10_000);
         setSnapshot((current) => ({
           key, data: terminal ? null : current.key === key ? current.data : null,

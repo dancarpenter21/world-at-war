@@ -1,3 +1,4 @@
+import { leaseGeneration } from "./apiClient";
 import { Cartesian3, Color, PointPrimitiveCollection, type PointPrimitive, type Viewer } from "cesium";
 
 type StatusCallback = (status: string) => void;
@@ -45,6 +46,7 @@ export class SpaceAssetLayer {
       gameId,
       playerId,
       roleId,
+      leaseGeneration: leaseGeneration(gameId, roleId),
       initialFilters: hiddenFilters
     });
   }

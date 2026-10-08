@@ -1,3 +1,4 @@
+import { authenticatedFetch } from "./apiClient";
 import { useState } from "react";
 import type { Role } from "./AuthorityWorkspace";
 import type { ActivationPeriod, PlanningView } from "./PlanningWorkspace";
@@ -38,7 +39,7 @@ export function AirspaceImport({ base, playerId, role, roles, revision, dirty, b
   async function submit(action: "preview" | "apply") {
     onBusyChange(true); setError(""); setFeedback("");
     try {
-      const response = await fetch(`${base}/roles/${role.id}/planning/aco/${action}`, {
+      const response = await authenticatedFetch(`${base}/roles/${role.id}/planning/aco/${action}`, {
         method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: key
       });
       const body = await response.json();

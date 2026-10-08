@@ -30,8 +30,8 @@ scope.onmessage = (event: MessageEvent) => {
   if (message.type === "select") { selected = message.noradId; postOrbitPath(); }
 };
 
-async function initialize(message: { apiBase: string; gameId: string; playerId: string; roleId: string; initialFilters?: Filters }) {
-  const query = new URLSearchParams({ player_id: message.playerId, role_id: message.roleId });
+async function initialize(message: { apiBase: string; gameId: string; playerId: string; roleId: string; leaseGeneration: number; initialFilters?: Filters }) {
+  const query = new URLSearchParams({ role_id: message.roleId, lease_generation: String(message.leaseGeneration) });
   const [indexResponse, rawResponse] = await Promise.all([
     fetch(`${message.apiBase}/v1/games/${message.gameId}/space-assets?${query}`, { credentials: "include" }),
     fetch(`${message.apiBase}/v1/games/${message.gameId}/space-catalog?${query}`, { credentials: "include" }),

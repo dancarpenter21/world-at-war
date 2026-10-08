@@ -1,3 +1,4 @@
+import { authenticatedFetch } from "./apiClient";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Cartesian2, Cartesian3, Color, EllipsoidTerrainProvider, ImageryLayer, OpenStreetMapImageryProvider,
@@ -92,7 +93,7 @@ export function SpaceAssetViewer({ gameId, playerId, roleId, leaseGeneration, on
         viewer.entities.add({ id: "selected-orbit", polyline: { positions, width: 2, material: Color.fromCssColorString("#f3d168") } });
       }
     };
-    worker.postMessage({ type: "init", apiBase: API_BASE, gameId, playerId, roleId });
+    worker.postMessage({ type: "init", apiBase: API_BASE, gameId, playerId, roleId, leaseGeneration });
     return () => { worker.terminate(); workerRef.current = null; };
   }, [gameId, onMessage, playerId, roleId]);
 
@@ -111,7 +112,7 @@ export function SpaceAssetViewer({ gameId, playerId, roleId, leaseGeneration, on
     if (selected === undefined) return;
     workerRef.current?.postMessage({ type: "select", noradId: selected }); setLoadingDetail(true); setDetail(undefined);
     const query = new URLSearchParams({ player_id: playerId, role_id: roleId });
-    fetch(`${API_BASE}/v1/games/${gameId}/space-assets/${selected}?${query}`, { credentials: "include" }).then(async (response) => {
+    authenticatedFetch(`${API_BASE}/v1/games/${gameId}/space-assets/${selected}?${query}`, { credentials: "include" }).then(async (response) => {
       if (!response.ok) throw new Error((await response.json()).error ?? response.statusText);
       return response.json() as Promise<Detail>;
     }).then(setDetail).catch((error: Error) => onMessage(error.message)).finally(() => setLoadingDetail(false));
@@ -129,7 +130,7 @@ export function SpaceAssetViewer({ gameId, playerId, roleId, leaseGeneration, on
 
   async function submitRequest(action: string) {
     if (selected === undefined) return;
-    const response = await fetch(`${API_BASE}/v1/games/${gameId}/roles/${roleId}/space-assets/${selected}/requests`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ player_id: playerId, lease_generation: leaseGeneration, action, summary }) });
+    const response = await authenticatedFetch(`${API_BASE}/v1/games/${gameId}/roles/${roleId}/space-assets/${selected}/requests`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ player_id: playerId, lease_generation: leaseGeneration, action, summary }) });
     const body = await response.json();
     if (!response.ok) { onMessage(body.error ?? response.statusText); return; }
     onMessage(`Satellite authority request ${body.request_id} created.`);

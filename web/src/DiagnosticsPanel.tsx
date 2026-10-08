@@ -1,3 +1,4 @@
+import { authenticatedFetch } from "./apiClient";
 import { useEffect, useState } from "react";
 
 export type ClientDiagnostics = {
@@ -35,7 +36,7 @@ export function DiagnosticsPanel({ apiBase, gameId, playerId, roleId, client, on
       controller = new AbortController();
       const timeout = window.setTimeout(() => controller?.abort(), 8000);
       try {
-        const response = await fetch(`${apiBase}/v1/games/${gameId}/diagnostics?player_id=${playerId}&role_id=${roleId}`, { credentials: "include", signal: controller.signal });
+        const response = await authenticatedFetch(`${apiBase}/v1/games/${gameId}/diagnostics?player_id=${playerId}&role_id=${roleId}`, { credentials: "include", signal: controller.signal });
         if (!response.ok) throw new Error("Diagnostics unavailable");
         const next = await response.json() as Diagnostics;
         if (active) { setData(next); setError(""); }

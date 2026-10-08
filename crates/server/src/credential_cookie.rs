@@ -25,6 +25,14 @@ pub struct RememberedCredentials {
 }
 
 impl CredentialCookie {
+    #[cfg(test)]
+    pub(super) fn ephemeral() -> Self {
+        Self {
+            cipher: Arc::new(ChaCha20Poly1305::new_from_slice(&[7_u8; 32]).unwrap()),
+            secure: false,
+        }
+    }
+
     pub async fn load() -> anyhow::Result<Self> {
         let key = match tokio::fs::read(KEY_PATH).await {
             Ok(bytes) if bytes.len() == 32 => bytes,

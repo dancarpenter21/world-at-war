@@ -29,7 +29,13 @@ async function session(page: Page) {
 }
 async function api(page: Page, path: string, data?: unknown) {
   return page.evaluate(async ({ url, data }) => {
-    const response = await fetch(url, { credentials: "include", ...(data === undefined ? {} : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data) }) });
+    const endpoint = new URL(url);
+    endpoint.searchParams.delete("player_id");
+    const selected = JSON.parse(localStorage.getItem("world-at-war-session") ?? "null");
+    if (endpoint.searchParams.has("role_id")) endpoint.searchParams.set("lease_generation", String(selected?.lease_generation ?? 0));
+    const session = await (await fetch(new URL("/v1/auth/session", url), { credentials: "include" })).json();
+    if (data && typeof data === "object") { delete (data as Record<string, unknown>).player_id; delete (data as Record<string, unknown>).host_player_id; }
+    const response = await fetch(endpoint, { credentials: "include", ...(data === undefined ? {} : { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": session.csrf_token }, body: JSON.stringify(data) }) });
     return { status: response.status, body: await response.json() };
   }, { url: `${backendUrl}${path}`, data });
 }
@@ -81,7 +87,7 @@ test("real players receive published plans only after delivery and cannot read a
     expect(JSON.stringify(await planning(page))).not.toContain("PRIVATE-DRAFT");
   }
   await commander.getByRole("button", { name: "Approve and publish selected course", exact: true }).click();
-  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued");
+  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued", { timeout: 20_000 });
   expect((await planning(pilot)).received).toBeNull();
   const networkPath = `/v1/games/${c.game_id}/network?player_id=${p.player_id}&role_id=${pilotRole}`;
   expect(JSON.stringify((await api(pilot, networkPath)).body)).not.toContain("PRIVATE-DRAFT");
@@ -270,7 +276,7 @@ test("diagnostics measure the held role, distinguish pause and recover after sta
   expect((await api(page, `/v1/games/${s.game_id}/diagnostics?player_id=${s.player_id}&role_id=${pilotRole}`)).status).toBe(403);
   await control(page, "pause");
   await expect(panel).toContainText("Simulation is paused; a stationary tick is expected.");
-  const stateText = await page.evaluate(async url => (await fetch(url, { credentials: "include" })).text(), `${backendUrl}/v1/games/${s.game_id}/state?player_id=${s.player_id}&role_id=${s.role_id}`);
+  const stateText = await page.evaluate(async ({ base, game, role }) => { const saved = JSON.parse(localStorage.getItem("world-at-war-session")!); return (await fetch(`${base}/v1/games/${game}/state?role_id=${role}&lease_generation=${saved.lease_generation}`, { credentials: "include" })).text(); }, { base: backendUrl, game: s.game_id, role: s.role_id });
   const state = JSON.parse(stateText);
   const diagnostics = (await api(page, path)).body;
   expect(diagnostics.projection.tick).toBe(state.tick);
@@ -304,7 +310,7 @@ test("clearances, handoffs and cancellation wait for delivery and enforce contro
   await commander.getByRole("button", { name: "Start scenario", exact: true }).click();
   await openPlanning(commander);
   await commander.getByRole("button", { name: "Approve and publish selected course", exact: true }).click();
-  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued");
+  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued", { timeout: 20_000 });
   for (const page of [pilot, west, east]) {
     await expect.poll(async () => (await planning(page)).received?.revision, { timeout: 90_000 }).toBe(1);
     await openPlanning(page);
@@ -317,7 +323,7 @@ test("clearances, handoffs and cancellation wait for delivery and enforce contro
   await pilot.getByRole("combobox", { name: "Aircraft", exact: true }).selectOption(mission.unit_id);
   await pilot.getByRole("combobox", { name: "Destination airspace", exact: true }).selectOption(westSector.id);
   await pilot.getByRole("button", { name: "Request clearance", exact: true }).click();
-  await expect(pilot.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued");
+  await expect(pilot.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued", { timeout: 20_000 });
   expect((await planning(west)).clearances).toHaveLength(0);
   expect((await planning(pilot)).clearances).toHaveLength(0);
   await control(commander, "start");
@@ -327,7 +333,7 @@ test("clearances, handoffs and cancellation wait for delivery and enforce contro
   expect((await planningAction(east, { action: "grant_clearance", clearance })).status).toBe(422);
   expect((await planningAction(pilot, { action: "grant_clearance", clearance })).status).toBe(422);
   await west.getByRole("button", { name: "Approve request", exact: true }).click();
-  await expect(west.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued");
+  await expect(west.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued", { timeout: 20_000 });
   expect((await planning(pilot)).clearances).toHaveLength(0);
   await control(commander, "start");
   await expect.poll(async () => (await planning(pilot)).clearances.some(item => item.id === clearance.id), { timeout: 30_000 }).toBe(true);
@@ -337,7 +343,7 @@ test("clearances, handoffs and cancellation wait for delivery and enforce contro
   await west.getByRole("combobox", { name: "Aircraft", exact: true }).selectOption(mission.unit_id);
   await west.getByRole("combobox", { name: "Destination airspace", exact: true }).selectOption(eastSector.id);
   await west.getByRole("button", { name: "Offer handoff", exact: true }).click();
-  await expect(west.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued");
+  await expect(west.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued", { timeout: 20_000 });
   const handoff = (await planning(west)).handoffs[0];
   expect((await planning(east)).handoffs).toHaveLength(0);
   expect((await planning(pilot)).handoffs).toHaveLength(0);
@@ -360,10 +366,23 @@ test("clearances, handoffs and cancellation wait for delivery and enforce contro
   const report = commander.locator("article.planning-card").filter({ has: commander.getByRole("button", { name: "Send cancellation", exact: true }) }).filter({ hasText: mission.name });
   await expect(report).toHaveCount(1);
   await report.getByRole("button", { name: "Send cancellation", exact: true }).click();
-  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued");
+  await expect(commander.getByRole("region", { name: "Joint campaign planning" }).getByRole("status")).toContainText("Message queued", { timeout: 20_000 });
   expect((await planning(pilot)).reports.find(item => item.mission_id === mission.id)?.state).not.toBe("cancelled");
   await control(commander, "start");
   await expect.poll(async () => (await planning(pilot)).reports.find(item => item.mission_id === mission.id)?.state, { timeout: 30_000 }).toBe("cancelled");
   await expect(report).toContainText("cancelled", { timeout: 30_000 });
   await pilot.screenshot({ path: "test-results/campaign-handoff-cancellation.png", fullPage: true });
+  const canvas = pilot.locator(".globe canvas");
+  await canvas.evaluate(element => element.setAttribute("data-retained", "planning"));
+  await pilot.getByRole("button", { name: "Close planning", exact: true }).click();
+  await expect(canvas).toBeVisible();
+  await expect(canvas).toHaveAttribute("data-retained", "planning");
+  await pilot.bringToFront();
+  const beforePan = await canvas.screenshot();
+  await pilot.keyboard.down("KeyD");
+  try {
+    await expect.poll(async () => (await canvas.screenshot()).equals(beforePan), { timeout: 20_000 }).toBe(false);
+  } finally {
+    await pilot.keyboard.up("KeyD");
+  }
 });

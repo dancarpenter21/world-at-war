@@ -204,7 +204,7 @@ fn prepare(
 pub(super) async fn preview(
     Path((game_id, role_id)): Path<(Uuid, Uuid)>,
     State(state): State<AppState>,
-    Json(request): Json<ImportRequest>,
+    AuthJson(request): AuthJson<ImportRequest>,
 ) -> ApiResult<ImportPreview> {
     let games = state.games.read().await;
     let game = games
@@ -217,7 +217,7 @@ pub(super) async fn preview(
 pub(super) async fn apply(
     Path((game_id, role_id)): Path<(Uuid, Uuid)>,
     State(state): State<AppState>,
-    Json(request): Json<ImportRequest>,
+    AuthJson(request): AuthJson<ImportRequest>,
 ) -> ApiResult<planning::PlanningView> {
     let mut games = state.games.write().await;
     let game = games

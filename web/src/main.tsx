@@ -9,7 +9,7 @@ import { OperationalInspector } from "./OperationalInspector";
 import { MovementOrders } from "./MovementOrders";
 import { IftuPanel } from "./IftuPanel";
 import { CombatOrders } from "./CombatOrders";
-import { ApiError, apiRequest } from "./apiClient";
+import { ApiError, apiRequest, ensureGuest, rememberLease, forgetLease, clearGuest, GUEST_REVOKED_KEY } from "./apiClient";
 import { parseSavedSession } from "./savedSession";
 import { usePollingResource, type PollingStatus } from "./usePollingResource";
 import { GameSessionControls, GameSessionNotice, type Game } from "./GameSessionControls";
@@ -125,7 +125,8 @@ function App() {
   const [authorityRequests, setAuthorityRequests] = useState<AuthorityRequest[]>([]);
   const restoreAttempted = useRef(false);
   const sessionRestoreAttempted = useRef(false);
-  const playerId = useMemo(() => localStorage.getItem("world-at-war-player") ?? crypto.randomUUID(), []);
+  const [playerId, setPlayerId] = useState("");
+  if (game && role) rememberLease(game.id, role.id, role.lease_generation);
   const playable = (game?.status === "running" || game?.status === "paused") && role !== null;
   const refreshWaitSeconds = Math.max(0, (spaceStatus?.next_sync_unix ?? 0) - nowUnix);
   const catalogRefreshBlocked = refreshWaitSeconds > 0;
@@ -171,6 +172,56 @@ function App() {
     return Array.from(ids, (id) => ({ id, name: `Unit ${id.slice(-6)}`, domain: "Command" }));
   }, [projection, roles]);
 
+  useEffect(() => {
+    const lost = () => {
+      leave(); setPlayerId(""); sessionRestoreAttempted.current = false;
+      localStorage.removeItem("world-at-war-session");
+      setMessage("Guest session ended. Previous roles and host ownership cannot be recovered.");
+    };
+    const changed = (event: StorageEvent) => { if (event.key === GUEST_REVOKED_KEY) { clearGuest(); lost(); } };
+    window.addEventListener("guest-session-lost", lost);
+    window.addEventListener("storage", changed);
+    return () => { window.removeEventListener("guest-session-lost", lost); window.removeEventListener("storage", changed); };
+  }, []);
+
+  useEffect(() => {
+    if (!game || !role) return;
+    let active = true;
+    const renew = async () => {
+      try {
+        await request(`/v1/games/${game.id}/roles/${role.id}/renew`, { method: "POST", body: JSON.stringify({ lease_generation: role.lease_generation }) });
+      } catch (error) {
+        if (active && error instanceof ApiError && error.status === 403) {
+          try {
+            const resumed = await request<Role>(`/v1/games/${game.id}/roles/${role.id}/resume`, { method: "POST", body: "{}" });
+            if (active) { rememberLease(game.id, role.id, resumed.lease_generation); setRole(resumed); }
+          } catch {
+            if (active) { forgetLease(game.id, role.id); setRole(null); setMessage("Your role reservation expired or was released. Choose an available role."); }
+          }
+        }
+      }
+    };
+    const timer = setInterval(() => void renew(), 30_000);
+    const wake = () => { if (document.visibilityState === "visible") void renew(); };
+    window.addEventListener("online", wake); document.addEventListener("visibilitychange", wake);
+    return () => { active = false; clearInterval(timer); window.removeEventListener("online", wake); document.removeEventListener("visibilitychange", wake); };
+  }, [game?.id, role?.id, role?.lease_generation]);
+
+  async function releaseRole() {
+    if (!game || !role) return;
+    try {
+      await request(`/v1/games/${game.id}/roles/${role.id}/release`, { method: "POST", body: JSON.stringify({ lease_generation: role.lease_generation }) });
+      forgetLease(game.id, role.id); leave(); setMessage("Role released for another player.");
+    } catch (error) { setMessage((error as Error).message); }
+  }
+  async function endGuest() {
+    try {
+      await request("/v1/auth/logout", { method: "POST", body: "{}" });
+      clearGuest(true); localStorage.removeItem("world-at-war-session"); setPlayerId("");
+      setMessage("Guest session ended. Previous host ownership cannot be recovered.");
+    } catch (error) { setMessage((error as Error).message); }
+  }
+
   async function refreshLobby() {
     const [loadedScenarios, loadedGames, status] = await Promise.all([
       request<Scenario[]>("/v1/scenarios"), request<Game[]>("/v1/games"), request<SpaceStatus>("/v1/settings/space-catalog/status")
@@ -185,9 +236,16 @@ function App() {
       const savedGame = loadedGames.find((candidate) => candidate.id === session?.game_id);
       if (session?.player_id === playerId && savedGame) {
         const savedRoles = await request<Role[]>(`/v1/games/${savedGame.id}/roles?${new URLSearchParams({ player_id: playerId })}`);
-        const savedRole = savedRoles.find((candidate) => candidate.id === session.role_id && candidate.held && candidate.lease_generation === session.lease_generation);
+        const savedRole = savedRoles.find((candidate) => candidate.id === session.role_id && candidate.held && candidate.held_by_you);
         if (savedRole) {
-          setGame(savedGame); setRoles(savedRoles); setRole(savedRole);
+          try {
+            const resumed = await request<Role>(`/v1/games/${savedGame.id}/roles/${savedRole.id}/resume`, { method: "POST", body: "{}" });
+            rememberLease(savedGame.id, resumed.id, resumed.lease_generation);
+            setGame(savedGame); setRoles(savedRoles); setRole(resumed);
+          } catch (error) {
+            if (!(error instanceof ApiError) || ![401, 403, 404].includes(error.status)) throw error;
+            localStorage.removeItem("world-at-war-session"); setMessage("Previous role is unavailable. Choose a scenario.");
+          }
         } else { localStorage.removeItem("world-at-war-session"); setMessage("Previous role is unavailable. Choose a scenario."); }
       } else { localStorage.removeItem("world-at-war-session"); if (session) setMessage("Previous scenario is unavailable. Choose a scenario."); }
       sessionRestoreAttempted.current = true;
@@ -201,12 +259,19 @@ function App() {
   }
 
   useEffect(() => {
-    localStorage.setItem("world-at-war-player", playerId);
+    if (!playerId) {
+      let active = true;
+      let timer: ReturnType<typeof setTimeout>;
+      const connect = () => { void ensureGuest(API_BASE).then(session => { if (active) setPlayerId(session.player_id); }).catch(() => { if (active) { setMessage("Connection unavailable; retrying…"); timer = setTimeout(connect, 2000); } }); };
+      connect();
+      return () => { active = false; clearTimeout(timer); };
+    }
+    localStorage.removeItem("world-at-war-player");
     void refreshLobby().catch(() => setMessage("Connection unavailable; retrying…"));
   }, [playerId]);
 
   useEffect(() => {
-    if (game) return;
+    if (game || !playerId) return;
     const timer = window.setInterval(() => void refreshLobby().catch(() => setMessage("Connection unavailable; retrying…")), 2000);
     return () => window.clearInterval(timer);
   }, [game?.id, playerId]);
@@ -250,7 +315,7 @@ function App() {
     setRoles(roleResource.data);
     if (role) {
       const current = roleResource.data.find((candidate) => candidate.id === role.id);
-      if (!current?.held || current.lease_generation !== role.lease_generation) {
+      if (!current?.held || !current.held_by_you) {
         setRole(null); setAuthorityRequests([]); setShowAuthority(false); setShowNetwork(false); setShowMapFilters(false);
         setMessage("Your role lease changed. Choose an available role to continue.");
       } else {
@@ -267,11 +332,26 @@ function App() {
 
   useEffect(() => {
     const error = projectionResource.error;
-    if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
+    if (!(error instanceof ApiError) || ![401, 403, 404].includes(error.status)) return;
+    const clear = () => {
       setRole(null); setAuthorityRequests([]); setShowAuthority(false); setShowNetwork(false); setShowMapFilters(false);
       setMessage("Your role is no longer available. Choose an available role to continue.");
-    }
-  }, [projectionResource.error]);
+    };
+    if (error.code !== "invalid_role_lease" || !game || !role) { clear(); return; }
+    let active = true;
+    const controller = new AbortController();
+    void request<Role>(`/v1/games/${game.id}/roles/${role.id}/resume`, { method: "POST", body: "{}", signal: controller.signal })
+      .then(resumed => {
+        if (!active || activeGameId.current !== game.id) return;
+        rememberLease(game.id, role.id, resumed.lease_generation); setRole(resumed);
+        projectionResource.refresh(); roleResource.refresh();
+      }).catch(error => {
+        if (!active) return;
+        if (error instanceof ApiError && [401, 403, 404].includes(error.status)) clear();
+        else { setMessage("Connection unavailable; retrying…"); projectionResource.refresh(); }
+      });
+    return () => { active = false; controller.abort(); };
+  }, [projectionResource.error, game?.id, role?.id]);
 
   useEffect(() => {
     setPendingControl(null); setControlError("");
@@ -347,6 +427,7 @@ function App() {
     try {
       const claimed = await request<Role>(`/v1/games/${game.id}/roles/${selected.id}/claim`, { method: "POST", body: JSON.stringify({ player_id: playerId }) });
       if (activeGameId.current !== game.id) return;
+      rememberLease(game.id, claimed.id, claimed.lease_generation);
       setRole(claimed); setRoles((items) => items.map((item) => item.id === claimed.id ? claimed : item));
       setAuthorityRequests([]); setMessage(`${claimed.name} claimed.`);
     } catch (error) { setMessage((error as Error).message); }
@@ -410,7 +491,6 @@ function App() {
     setGame(null); setRole(null); setRoles([]); setAuthority(null); setAuthorityRequests([]);
     setShowAuthority(false); setShowNetwork(false); setShowMapFilters(false); setShowCommands(false); setControlError("");
     setMessage("Create a scenario or join a running game");
-    void refreshLobby().catch(() => setMessage("Connection unavailable; retrying…"));
   }
 
   return <main className="app-shell">
@@ -419,6 +499,8 @@ function App() {
       {game && game.status !== "lobby" ? <GameSessionControls game={game} isHost={game.host_player_id === playerId} pending={pendingControl} onControl={(status) => void controlGame(status)} /> : <span>{game?.status ?? "scenario lobby"}</span>}
       <span className="tick">{projection ? `TICK ${projection.tick}` : ""}</span>
       {playable && <button className="secondary mobile-command-toggle" aria-expanded={showCommands} aria-controls="command-panel" onClick={() => setShowCommands((value) => !value)}>Commands</button>}
+      {role && <button className="secondary" onClick={() => void releaseRole()}>Release role</button>}
+      {!game && playerId && <button className="secondary" onClick={() => void endGuest()}>End guest session</button>}
       {game && <button className="secondary session-leave" onClick={leave}>Leave scenario</button>}
     </header>
     {!playable && <div className="lobby-stage"><section className="scenario-modal" aria-modal="true" role="dialog">
@@ -464,7 +546,7 @@ function App() {
         <button className="planning-launch" onClick={() => setShowPlanning(true)}>Joint planning</button>
         <GameSessionNotice game={game} status={connectionStatus} error={connectionError} controlError={controlError} hasProjection={true} onRetry={retryConnection} mission={projection?.combat?.mission} />
         <Suspense fallback={<div className="map-loading" role="status">Loading operational map…</div>}>
-        <Globe key={`${game.id}:${role.id}:${role.lease_generation}`} projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} onMapUpdate={recordMapUpdate} keyboardEnabled={!showAuthority && !showNetwork && !showMapFilters && !showPlanning && !showDiagnostics} renderingEnabled={!showAuthority && !showNetwork} />
+        <Globe key={`${game.id}:${role.id}:${role.lease_generation}`} projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} onMapUpdate={recordMapUpdate} keyboardEnabled={!showAuthority && !showNetwork && !showMapFilters && !showPlanning && !showDiagnostics} renderingEnabled={!showAuthority && !showNetwork && !showPlanning} />
         </Suspense>
         {showMapFilters && <MapFilterDialog filters={mapFilters} spaceAssetsAvailable={game.space_catalog_enabled} onChange={setMapFilters} onClose={() => setShowMapFilters(false)} />}
         <div className="map-caption">{role.name} · {role.side} · operational picture</div>
