@@ -28,6 +28,8 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Scenario {
     #[serde(default)]
+    pub observer_seats: Vec<ObserverSeatDefinition>,
+    #[serde(default)]
     pub iftu: Option<sim_core::iftu::Configuration>,
     #[serde(default)]
     pub campaign: Option<sim_core::operations::CampaignPlan>,
@@ -50,6 +52,29 @@ pub struct Scenario {
     pub impact_report_routes: Vec<ImpactReportRoute>,
     #[serde(default)]
     pub reporting_window_ticks: u64,
+}
+
+/// Scenario-owned observation privileges, independent of editable command authority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ObserverKind {
+    Controller,
+    Monitor,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObserverSeatDefinition {
+    pub id: Uuid,
+    pub name: String,
+    pub kind: ObserverKind,
+}
+
+fn training_observers() -> Vec<ObserverSeatDefinition> {
+    serde_json::from_str(include_str!(
+        "../../../data/scenarios/training-observers.v1.json"
+    ))
+    .expect("committed training observer seats must parse")
 }
 
 /// An explicit subscription to a sensing role's local observations, not side-wide awareness.
@@ -117,6 +142,15 @@ impl Scenario {
                     .all(|character| character.is_ascii_digit())
             {
                 return Err(ScenarioError::InvalidSidc(unit.id));
+            }
+        }
+        let mut seat_ids = ids.clone();
+        seat_ids.extend(self.authority.roles.iter().map(|r| r.id));
+        for seat in &self.observer_seats {
+            if seat.name.trim().is_empty() || !seat_ids.insert(seat.id) {
+                return Err(ScenarioError::InvalidAuthority(
+                    "observer seats need unique IDs and nonempty names".into(),
+                ));
             }
         }
         self.authority
@@ -447,7 +481,7 @@ pub fn regional_campaign_scenario() -> Scenario {
         }
     }
     let (network, communication_links, simulator_options) = global_communications(&mut units);
-    Scenario { iftu: Some(campaign_iftu_configuration()), sensor_report_routes: vec![], combat: None, impact_report_routes: vec![], reporting_window_ticks: 0, campaign: Some(campaign), id: "regional-campaign.v1".into(), title: "Regional Joint Campaign".into(), description: "Two delegated sectors, competing joint plans, interception and strike under communications disruption. Offline training estimates.".into(), version: 1, requires_space_catalog: false, units, network, simulator_options, communication_links, authority, jamming_regions: vec![JammingRegion { active_from_tick: 0, active_until_tick: None, id: "sector-boundary-outage".into(), name: "Receiver interference near sector boundary".into(), center: GeoPose { latitude_deg: 38.1, longitude_deg: -76.55, altitude_m: 0.0 }, radius_m: 8000.0, band: FrequencyBand::new(960_000_000,1_215_000_000), jammed: 1.0 }] }
+    Scenario { observer_seats: training_observers(), iftu: Some(campaign_iftu_configuration()), sensor_report_routes: vec![], combat: None, impact_report_routes: vec![], reporting_window_ticks: 0, campaign: Some(campaign), id: "regional-campaign.v1".into(), title: "Regional Joint Campaign".into(), description: "Two delegated sectors, competing joint plans, interception and strike under communications disruption. Offline training estimates.".into(), version: 2, requires_space_catalog: false, units, network, simulator_options, communication_links, authority, jamming_regions: vec![JammingRegion { active_from_tick: 0, active_until_tick: None, id: "sector-boundary-outage".into(), name: "Receiver interference near sector boundary".into(), center: GeoPose { latitude_deg: 38.1, longitude_deg: -76.55, altitude_m: 0.0 }, radius_m: 8000.0, band: FrequencyBand::new(960_000_000,1_215_000_000), jammed: 1.0 }] }
 }
 
 pub fn global_crisis_scenario() -> Scenario {
@@ -558,6 +592,7 @@ pub fn global_crisis_scenario() -> Scenario {
     let authority = global_crisis_authority();
     let (network, communication_links, simulator_options) = global_communications(&mut units);
     Scenario {
+        observer_seats: vec![],
         iftu: None,
         campaign: None,
         id: "global-crisis.v2".into(),
@@ -1343,6 +1378,7 @@ pub fn jammed_flight_scenario() -> Scenario {
     };
 
     Scenario {
+        observer_seats: vec![],
         iftu: None,        campaign: None,
         id: "jammed-flight.v1".into(),
         title: "Jammed Flight Test".into(),

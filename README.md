@@ -31,7 +31,7 @@ The broader target architecture, planned simulation fidelity, and acceptance cri
 - Bounded role-authorized runtime diagnostics for tick/projection costs, state-request freshness, map processing and visible queues; an offline release benchmark with repeat and baseline projection-hash checks.
 - Earth-horizon sensing, scan intervals and field of regard, aging tracks, and campaign-specific delayed friendly-position/contact reports. Training exercises retain their authored friendly-unit overview and explicit sensor-report subscriptions.
 
-Current limitations: controller ground-truth privileges, durable packet-level history, crash recovery, and full replay remain planned. The message log records server C2 lifecycle events; internal knowledge reports and individual fragments are not a complete durable packet audit. Sensor, airspace and combat behavior uses simplified training estimates: airspaces use shared spherical geometry and explicit MSL bounds, while the Cesium altitude rendering remains approximate; unapproved entry is reported as a violation. The broader terrain, logistics, cyber, multi-domain platform and multi-source catalog systems remain planned work. The pre-merge campaign implementation measured Global Crisis core tick p95 at 52–58 ms on the documented development hardware; those historical numbers and hashes do not certify this integrated implementation, and full server/client load and roadmap-scale budgets remain uncertified. See [performance measurements and reproduction commands](docs/performance/README.md).
+Current limitations: full controller inspection of messages/plans, simulation intervention, durable packet-level history, crash recovery, and full replay remain planned. The message log records server C2 lifecycle events; internal knowledge reports and individual fragments are not a complete durable packet audit. Sensor, airspace and combat behavior uses simplified training estimates: airspaces use shared spherical geometry and explicit MSL bounds, while the Cesium altitude rendering remains approximate; unapproved entry is reported as a violation. The broader terrain, logistics, cyber, multi-domain platform and multi-source catalog systems remain planned work. The pre-merge campaign implementation measured Global Crisis core tick p95 at 52–58 ms on the documented development hardware; those historical numbers and hashes do not certify this integrated implementation, and full server/client load and roadmap-scale budgets remain uncertified. See [performance measurements and reproduction commands](docs/performance/README.md).
 
 [Verified gameplay screenshots](docs/gameplay-checkpoints.md) show firing authorization, mission completion, delivered sensor knowledge, executed movement, network inspection, and map loading.
 
@@ -250,6 +250,28 @@ Open **Import airspace order** in the planning workspace to paste an ACO or sele
 ACO endpoints are `POST /v1/games/{id}/roles/{role_id}/planning/aco/preview` and `/apply`. Both accept `lease_generation`, `expected_revision`, `source`, and `options` (`anchor_utc`, `anchor_tick`, `year`, `horizon_end_utc`, and per-external-ID `resolutions`). Apply rejects invalid or stale requests without modifying the draft. Reimporting an unchanged message preserves IDs and the draft revision. The supported dialect is fixture-defined in `data/aco/labelled.aco`; this is not a universal ACO parser.
 
 The planning API is `GET /v1/games/{id}/planning?role_id=...&lease_generation=...` and `POST /v1/games/{id}/roles/{role_id}/planning`. Mutations require the guest cookie, CSRF token, `lease_generation`, and a tagged `action`: `save`, `propose`, `adopt_proposal`, `publish`, `request_clearance`, `grant_clearance`, `offer_handoff`, `accept_handoff`, or `cancel`. Saves and publication use `expected_revision`; published revisions are immutable. Fixture plans, defensive tasking and explicitly estimated combat parameters live in `data/scenarios/`.
+
+## Controller and monitor observation
+
+Regional Joint Campaign and the In-flight Target Update Exercise (scenario version 2) include **Game Controller** and **Game Monitor** seats. Both are read-only in this increment. These are separate from operational sector-controller roles and the editable authority graph.
+
+As host, open **Observer access**, select a joined guest for a seat, and close the dialog. That guest can then claim the seat from the role picker. Hosts must explicitly grant themselves a seat too. One guest is eligible per seat; replacing or revoking the grant releases its lease. Start/pause remains a host privilege.
+
+The **Ground truth — read only** workspace displays actual units on both sides, current weapon positions when modeled, pending impact state otherwise, active jamming regions, and network links/queues including temporary weapon endpoints. Select a map object or use **Inspect truth object**. The network table shows current topology and queue sizes. It contains no message contents, unpublished/undelivered plans, role knowledge bases, or operational controls. Training weapons without trajectories are labeled as pending impacts, not moving missiles.
+
+Observer seats reuse the 90-second active lease, 30-second browser renewal and five-minute reconnect reservation. Reads and streams recheck both the grant and lease. Release, revocation, logout and restart clear the browser picture; invalid streams close with code 1008. Grants and their administrative history remain in memory and do not survive server restart. Existing role-switching policy is unchanged.
+
+New API surfaces (cookie authentication and the existing CSRF/origin checks apply):
+
+| Endpoint | Access and response |
+| --- | --- |
+| `GET /v1/games/{game_id}/participants` | Host only; joined display names/IDs and observer-seat assignments. |
+| `PUT /v1/games/{game_id}/roles/{role_id}/observer-grant` | Host only; body `{ "target_player_id": "<joined guest UUID>" }`. This identifies the assignee, not the authenticated actor. |
+| `DELETE /v1/games/{game_id}/roles/{role_id}/observer-grant` | Host only; JSON body `{}`; revokes access. |
+| `GET /v1/games/{game_id}/truth?role_id=...&lease_generation=...` | Active granted observer lease; current `TruthProjection`. |
+| `GET /v1/games/{game_id}/truth/stream?role_id=...&lease_generation=...` | WebSocket; complete truth snapshots once per second, including while paused; reconnect starts with a fresh snapshot. |
+
+Role listing and claim/resume/renew/release include observer seats. Their summaries contain `observer_kind` (`controller` or `monitor`), lease state and caller-specific claimability; they have no side, command terminal or command-unit list. Ordinary role summaries and operational projections retain their existing shapes. Observer IDs are rejected by operational role endpoints. Scenario `observer_seats` defaults to an empty list and cannot be edited through the authority API. The enabled exercises load their seats from [the training observer fixture](data/scenarios/training-observers.v1.json).
 
 ## Communications catalog and network APIs
 

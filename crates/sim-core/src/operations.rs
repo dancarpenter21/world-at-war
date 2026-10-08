@@ -608,6 +608,24 @@ pub(super) struct Operations {
     revisions: BTreeMap<(Uuid, Uuid), u64>,
 }
 impl Operations {
+    pub(super) fn truth_weapons(&self) -> Vec<crate::truth::TruthWeapon> {
+        self.weapons
+            .iter()
+            .enumerate()
+            .map(|(i, w)| crate::truth::TruthWeapon {
+                id: format!("campaign-impact-{}-{}-{i}", w.target, w.impact_tick),
+                kind: "campaign_pending_impact".into(),
+                side: None,
+                launcher_id: None,
+                position: None,
+                aim_point: None,
+                impact_tick: Some(w.impact_tick),
+                phase: "pending impact".into(),
+                provider_id: None,
+            })
+            .collect()
+    }
+
     pub(super) fn new(seed: u64) -> Self {
         Self {
             seed,

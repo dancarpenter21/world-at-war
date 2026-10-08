@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { DiagnosticsPanel, type ClientDiagnostics } from "./DiagnosticsPanel";
-import type { AuthorityDefinition, AuthorityRequest, Role } from "./AuthorityWorkspace";
+import type { AuthorityDefinition, AuthorityRequest, Role as OperationalRole } from "./AuthorityWorkspace";
 import type { Projection } from "./globeEntities";
 import { MapFilterDialog, type MapFilters } from "./MapFilterDialog";
 import { OperationalInspector } from "./OperationalInspector";
@@ -13,6 +13,11 @@ import { ApiError, apiRequest, ensureGuest, rememberLease, forgetLease, clearGue
 import { parseSavedSession } from "./savedSession";
 import { usePollingResource, type PollingStatus } from "./usePollingResource";
 import { GameSessionControls, GameSessionNotice, type Game } from "./GameSessionControls";
+
+import type { ObserverRole } from "./observerTypes";
+import { ObserverGrants } from "./ObserverGrants";
+type Role = OperationalRole | ObserverRole;
+function isObserver(role: Role | null): role is ObserverRole { return role?.observer_kind !== undefined; }
 
 function UnavailableMap() {
   return <div className="map-loading map-load-error" role="alert">
@@ -26,6 +31,8 @@ const Globe = lazy(() => import("./Globe").catch(() => ({ default: UnavailableMa
 const AuthorityWorkspace = lazy(() => import("./AuthorityWorkspace").then((module) => ({ default: module.AuthorityWorkspace })));
 const PlanningWorkspace = lazy(() => import("./PlanningWorkspace").then(module => ({ default: module.PlanningWorkspace })));
 const NetworkWorkspace = lazy(() => import("./NetworkWorkspace").then((module) => ({ default: module.NetworkWorkspace })));
+
+const ObserverWorkspace = lazy(() => import("./ObserverWorkspace").then(module => ({ default: module.ObserverWorkspace })));
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 const SAVED_PASSWORD_MASK = "••••••••••••";
@@ -108,6 +115,8 @@ function App() {
   const [spaceTrackSyncing, setSpaceTrackSyncing] = useState(false);
   const [spaceTrackFeedback, setSpaceTrackFeedback] = useState<SpaceTrackFeedback | null>(null);
   const [nowUnix, setNowUnix] = useState(() => Math.floor(Date.now() / 1000));
+  const [observerStatus, setObserverStatus] = useState<{ key: string; status: PollingStatus; tick: number | null } | null>(null);
+  const [showObserverGrants, setShowObserverGrants] = useState(false);
   const [showAuthority, setShowAuthority] = useState(false);
   const [showPlanning, setShowPlanning] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
@@ -144,7 +153,7 @@ function App() {
   const roleResource = usePollingResource<Role[]>(game ? game.id + ":" + (role?.id ?? "") + ":" + (role?.lease_generation ?? "") : null,
     (signal) => request<Role[]>("/v1/games/" + game!.id + "/roles?" + new URLSearchParams({ player_id: playerId }), { signal }), 2_000);
   const authorityResource = usePollingResource<{ definition: AuthorityDefinition; requests: AuthorityRequest[] }>(
-    game && (role || game.host_player_id === playerId) ? game.id + ":" + playerId + ":" + (role?.id ?? "") + ":" + (role?.lease_generation ?? "") : null,
+    game && !isObserver(role) && (role || game.host_player_id === playerId) ? game.id + ":" + playerId + ":" + (role?.id ?? "") + ":" + (role?.lease_generation ?? "") : null,
     async (signal) => {
       const query = new URLSearchParams({ player_id: playerId });
       const [definition, requests] = await Promise.all([
@@ -154,12 +163,14 @@ function App() {
       return { definition, requests };
     }, 2_000);
   const projectionResource = usePollingResource<Projection>(
-    playable && game && role ? game.id + ":" + playerId + ":" + role.id + ":" + role.lease_generation : null,
+    playable && game && role && !isObserver(role) ? game.id + ":" + playerId + ":" + role.id + ":" + role.lease_generation : null,
     async (signal) => { const started = performance.now(); const result = await request<Projection>("/v1/games/" + game!.id + "/state?" + new URLSearchParams({ player_id: playerId, role_id: role!.id }), { signal }); if (!signal.aborted) setClientDiagnostics(previous => ({ ...previous, requestMs: performance.now() - started })); return result; });
   const projection = projectionResource.data;
   useEffect(() => { if (projection) setClientDiagnostics(previous => ({ ...previous, lastReceivedAt: performance.now(), failed: false })); }, [projection]);
   useEffect(() => { if (projectionResource.error) setClientDiagnostics(previous => ({ ...previous, failed: true })); }, [projectionResource.error]);
-  const connectionStatus: PollingStatus = [projectionResource.status, gameResource.status].includes("unavailable") ? "unavailable"
+  const observerKey = game && isObserver(role) ? `${game.id}:${role.id}:${role.lease_generation}` : null;
+  const currentObserverStatus = observerStatus?.key === observerKey ? observerStatus : null;
+  const connectionStatus: PollingStatus = isObserver(role) ? currentObserverStatus?.status ?? "connecting" : [projectionResource.status, gameResource.status].includes("unavailable") ? "unavailable"
     : [projectionResource.status, gameResource.status].includes("reconnecting") ? "reconnecting"
     : projectionResource.status === "live" && gameResource.status === "live" ? "live" : "connecting";
   const connectionError = projectionResource.error ?? gameResource.error;
@@ -168,7 +179,7 @@ function App() {
   const authorityUnits = useMemo(() => {
     if (projection?.own_units.length) return projection.own_units;
     const ids = new Set<string>();
-    for (const item of roles) { ids.add(item.location_unit_id); item.command_units.forEach((id) => ids.add(id)); }
+    for (const item of roles) { if (isObserver(item)) continue; ids.add(item.location_unit_id); item.command_units.forEach((id) => ids.add(id)); }
     return Array.from(ids, (id) => ({ id, name: `Unit ${id.slice(-6)}`, domain: "Command" }));
   }, [projection, roles]);
 
@@ -486,7 +497,7 @@ function App() {
   }
 
   function leave() {
-    setShowPlanning(false); setShowDiagnostics(false);
+    setShowObserverGrants(false); setShowPlanning(false); setShowDiagnostics(false);
     activeGameId.current = null; controlRequest.current?.abort(); controlPending.current = false;
     setGame(null); setRole(null); setRoles([]); setAuthority(null); setAuthorityRequests([]);
     setShowAuthority(false); setShowNetwork(false); setShowMapFilters(false); setShowCommands(false); setControlError("");
@@ -497,8 +508,9 @@ function App() {
     <header className="app-header"><span className="brand">WORLD AT WAR</span>
       <span className={"status-dot " + (playable ? connectionStatus : "")} />
       {game && game.status !== "lobby" ? <GameSessionControls game={game} isHost={game.host_player_id === playerId} pending={pendingControl} onControl={(status) => void controlGame(status)} /> : <span>{game?.status ?? "scenario lobby"}</span>}
-      <span className="tick">{projection ? `TICK ${projection.tick}` : ""}</span>
-      {playable && <button className="secondary mobile-command-toggle" aria-expanded={showCommands} aria-controls="command-panel" onClick={() => setShowCommands((value) => !value)}>Commands</button>}
+      <span className="tick">{isObserver(role) ? currentObserverStatus?.tick != null ? `TICK ${currentObserverStatus.tick}` : "" : projection ? `TICK ${projection.tick}` : ""}</span>
+      {playable && !isObserver(role) && <button className="secondary mobile-command-toggle" aria-expanded={showCommands} aria-controls="command-panel" onClick={() => setShowCommands((value) => !value)}>Commands</button>}
+      {game && game.host_player_id === playerId && roles.some(isObserver) && <button className="secondary" onClick={() => setShowObserverGrants(true)}>Observer access</button>}
       {role && <button className="secondary" onClick={() => void releaseRole()}>Release role</button>}
       {!game && playerId && <button className="secondary" onClick={() => void endGuest()}>End guest session</button>}
       {game && <button className="secondary session-leave" onClick={leave}>Leave scenario</button>}
@@ -535,12 +547,12 @@ function App() {
           {spaceStatus?.remembered_credentials && <button className="text-command" onClick={() => void forgetSpaceTrack()}>Forget saved credentials</button>}
         </div>}
       </>}
-      {game && <div className="modal-body"><h2>{game.title}</h2><p className="muted">{game.status === "lobby" ? "Claim a command role. The operational map remains offline until the scenario starts." : game.status === "paused" ? "Choose your role to return to the operational map. The scenario remains paused." : "Choose your role to open its operational map."}</p><div className="role-grid">{roles.map((item) => <button key={item.id} className={`role ${role?.id === item.id ? "selected" : ""}`} disabled={item.ai_controlled || item.claimable === false || (item.held && !item.held_by_you && role?.id !== item.id)} onClick={() => void claim(item)}><span>{item.name}</span><small>{item.ai_controlled ? "AI" : item.claimable === false ? "unavailable" : item.held_by_you ? "your role" : item.held ? "held" : item.kind.replaceAll("_", " ")}</small></button>)}</div><div className="modal-actions"><button className="secondary" onClick={leave}>Back</button>{game.host_player_id === playerId && <button className="secondary" onClick={() => setShowAuthority(true)}>Configure authorities</button>}{game.host_player_id === playerId && <button className="command" disabled={!role || pendingControl !== null} aria-busy={pendingControl !== null} onClick={() => void start()}>{pendingControl ? "Starting…" : game.status === "paused" ? "Resume scenario" : "Start scenario"}</button>}{game.host_player_id !== playerId && <span className="muted">Waiting for host to start</span>}</div></div>}
+      {game && <div className="modal-body"><h2>{game.title}</h2><p className="muted">{game.status === "lobby" ? "Claim a command role. The operational map remains offline until the scenario starts." : game.status === "paused" ? "Choose your role to return to the operational map. The scenario remains paused." : "Choose your role to open its operational map."}</p><div className="role-grid">{roles.map((item) => <button key={item.id} className={`role ${role?.id === item.id ? "selected" : ""}`} disabled={item.ai_controlled || item.claimable === false || (item.held && !item.held_by_you && role?.id !== item.id)} onClick={() => void claim(item)}><span>{item.name}</span><small>{item.ai_controlled ? "AI" : item.claimable === false ? isObserver(item) ? "host grant required" : "unavailable" : item.held_by_you ? "your role" : item.held ? "held" : item.kind.replaceAll("_", " ")}</small></button>)}</div><div className="modal-actions"><button className="secondary" onClick={leave}>Back</button>{game.host_player_id === playerId && <button className="secondary" onClick={() => setShowAuthority(true)}>Configure authorities</button>}{game.host_player_id === playerId && <button className="command" disabled={!role || pendingControl !== null} aria-busy={pendingControl !== null} onClick={() => void start()}>{pendingControl ? "Starting…" : game.status === "paused" ? "Resume scenario" : "Start scenario"}</button>}{game.host_player_id !== playerId && <span className="muted">Waiting for host to start</span>}</div></div>}
     </section></div>}
-    {playable && !projection && game && <section className="workspace-loading">
+    {playable && !isObserver(role) && !projection && game && <section className="workspace-loading">
       <GameSessionNotice game={game} status={connectionStatus} error={connectionError} controlError={controlError} hasProjection={false} onRetry={retryConnection} />
     </section>}
-    {playable && projection && <section className={`workspace ${showCommands ? "commands-open" : ""}`}>
+    {playable && !isObserver(role) && projection && <section className={`workspace ${showCommands ? "commands-open" : ""}`}>
       <aside id="command-panel" className={`sidebar ${showCommands ? "commands-open" : ""}`}><h1>{role.name}</h1><p className="message">{game.title}</p><CombatOrders key={`combat:${game.id}:${role.id}:${role.lease_generation}`} apiBase={API_BASE} gameId={game.id} playerId={playerId} role={role} projection={projection} canIssueOrders={canIssueOrders} canRecoverOrder={connectionStatus === "live"} onExecuted={projectionResource.refresh} settlingReports={game.settling_reports} /><IftuPanel key={`iftu:${game.id}:${role.id}:${role.lease_generation}`} apiBase={API_BASE} gameId={game.id} playerId={playerId} role={role} projection={projection} canIssueOrders={canIssueOrders} /><MovementOrders key={`${game.id}:${role.id}:${role.lease_generation}`} apiBase={API_BASE} gameId={game.id} playerId={playerId} role={role} projection={projection} canIssueOrders={canIssueOrders} canRecoverOrder={connectionStatus === "live"} onExecuted={projectionResource.refresh} /><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command network-launch" onClick={() => setShowNetwork(true)}>Network</button><button className="command map-filter-launch" onClick={() => setShowMapFilters((value) => !value)}>Map filters</button><button className="command" onClick={() => setShowDiagnostics(value => !value)}>Diagnostics</button><h2>Catalog</h2><p className="muted">{game.space_catalog_enabled ? spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status" : "No orbital catalog in this scenario"}</p><p className="session-command-feedback" role="status">{message}</p></aside>
       <section className="map-region">
         <button className="planning-launch" onClick={() => setShowPlanning(true)}>Joint planning</button>
@@ -553,10 +565,12 @@ function App() {
       </section>
       <OperationalInspector projection={projection} role={role} onInspectNetwork={() => setShowNetwork(true)} />
     </section>}
-    {showAuthority && authority && game && <Suspense fallback={<div className="authority-loading">Loading authority graph…</div>}><AuthorityWorkspace definition={authority} runtimeRoles={roles} units={authorityUnits} requests={authorityRequests} currentRole={role} isHost={game.host_player_id === playerId} tick={projection?.tick ?? 0} onClose={() => setShowAuthority(false)} onSave={saveAuthority} onCreateRequest={createAuthorityRequest} onDecision={decideAuthorityRequest} /></Suspense>}
-    {showDiagnostics && game && role && <DiagnosticsPanel apiBase={API_BASE} gameId={game.id} playerId={playerId} roleId={role.id} client={clientDiagnostics} onClose={() => setShowDiagnostics(false)} />}
-    {showPlanning && game && role && <Suspense fallback={<div className="authority-loading">Loading joint planning…</div>}><PlanningWorkspace apiBase={API_BASE} gameId={game.id} playerId={playerId} role={role} roles={roles} onClose={() => setShowPlanning(false)} /></Suspense>}
-    {showNetwork && game && role && <Suspense fallback={<div className="authority-loading">Loading C2 network…</div>}><NetworkWorkspace key={`${game.id}:${role.id}`} apiBase={API_BASE} gameId={game.id} playerId={playerId} roleId={role.id} initialFocusNodeId={role.location_unit_id} onClose={() => setShowNetwork(false)} /></Suspense>}
+    {showAuthority && authority && game && !isObserver(role) && <Suspense fallback={<div className="authority-loading">Loading authority graph…</div>}><AuthorityWorkspace definition={authority} runtimeRoles={roles.filter((r): r is OperationalRole => !isObserver(r))} units={authorityUnits} requests={authorityRequests} currentRole={role} isHost={game.host_player_id === playerId} tick={projection?.tick ?? 0} onClose={() => setShowAuthority(false)} onSave={saveAuthority} onCreateRequest={createAuthorityRequest} onDecision={decideAuthorityRequest} /></Suspense>}
+    {showDiagnostics && game && role && !isObserver(role) && <DiagnosticsPanel apiBase={API_BASE} gameId={game.id} playerId={playerId} roleId={role.id} client={clientDiagnostics} onClose={() => setShowDiagnostics(false)} />}
+    {showPlanning && game && role && !isObserver(role) && <Suspense fallback={<div className="authority-loading">Loading joint planning…</div>}><PlanningWorkspace apiBase={API_BASE} gameId={game.id} playerId={playerId} role={role} roles={roles.filter((r): r is OperationalRole => !isObserver(r))} onClose={() => setShowPlanning(false)} /></Suspense>}
+    {showNetwork && game && role && !isObserver(role) && <Suspense fallback={<div className="authority-loading">Loading C2 network…</div>}><NetworkWorkspace key={`${game.id}:${role.id}`} apiBase={API_BASE} gameId={game.id} playerId={playerId} roleId={role.id} initialFocusNodeId={role.location_unit_id} onClose={() => setShowNetwork(false)} /></Suspense>}
+    {playable && game && isObserver(role) && <Suspense fallback={<p>Loading ground truth…</p>}><ObserverWorkspace key={`${game.id}:${role.id}:${role.lease_generation}`} apiBase={API_BASE} gameId={game.id} role={role} onStatus={(status, tick) => setObserverStatus({ key: `${game.id}:${role.id}:${role.lease_generation}`, status, tick })} onAccessEnded={() => { setRole(null); setMessage("Observer access ended. Choose an available role."); }} /></Suspense>}
+    {showObserverGrants && game && game.host_player_id === playerId && <ObserverGrants key={game.id} apiBase={API_BASE} gameId={game.id} seats={roles.filter(isObserver)} onChanged={roleResource.refresh} onClose={() => setShowObserverGrants(false)} />}
   </main>;
 }
 

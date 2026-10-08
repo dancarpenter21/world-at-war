@@ -331,3 +331,27 @@ fn invalid_weapon_and_mission_definitions_are_rejected_before_spawn() {
         assert!(invalid.validate(&sides).is_err());
     }
 }
+
+#[test]
+fn truth_inspection_reports_pending_impact_without_a_fabricated_flight_position() {
+    let mut sim = fixture(2, 100, 60);
+    sim.step();
+    fire(&mut sim, 100, 0);
+    sim.step();
+    let truth = sim.truth_projection();
+    assert_eq!(truth.weapons.len(), 1);
+    let weapon = &truth.weapons[0];
+    assert_eq!(weapon.kind, "training_pending_impact");
+    assert!(weapon.position.is_none());
+    assert!(weapon.aim_point.is_some());
+    assert!(weapon.impact_tick.unwrap() > truth.tick);
+    assert_eq!(
+        truth
+            .units
+            .iter()
+            .find(|u| u.state.id == SHOOTER)
+            .unwrap()
+            .ammunition,
+        1
+    );
+}

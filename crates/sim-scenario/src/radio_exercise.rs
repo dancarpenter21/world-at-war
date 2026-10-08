@@ -79,6 +79,7 @@ fn parse_radio_scenario(data: &str) -> Result<Scenario, ScenarioError> {
     }
     simulator_options.seed = definition.radio.seed;
     let scenario = Scenario {
+        observer_seats: vec![],
         iftu: None,
         campaign: None,
         id: definition.id,

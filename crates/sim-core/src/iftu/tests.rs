@@ -576,3 +576,35 @@ fn seeker_observes_locally_after_update_loss_and_misses_outside_acquisition() {
     );
     assert!(!other.weapon_positions()[&TARGET].2);
 }
+
+#[test]
+fn truth_inspection_includes_live_weapon_endpoints_and_removes_retired_ones() {
+    let mut sim = fixture();
+    let weapon = launch(&mut sim);
+    let truth = sim.truth_projection();
+    let live = truth
+        .weapons
+        .iter()
+        .find(|w| w.id == weapon.to_string())
+        .unwrap();
+    assert!(live.position.is_some());
+    assert_eq!(live.provider_id, Some(SHOOTER));
+    assert!(truth
+        .communication_links
+        .iter()
+        .any(|l| l.from_entity_id == weapon || l.to_entity_id == weapon));
+    assert!(sim
+        .projection_for(TARGET, Side::Red)
+        .iftu
+        .weapons
+        .is_empty());
+    for _ in 0..150 {
+        sim.step();
+    }
+    let truth = sim.truth_projection();
+    assert!(!truth.weapons.iter().any(|w| w.id == weapon.to_string()));
+    assert!(!truth
+        .communication_links
+        .iter()
+        .any(|l| l.from_entity_id == weapon || l.to_entity_id == weapon));
+}
