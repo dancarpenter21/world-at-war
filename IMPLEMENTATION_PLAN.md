@@ -55,6 +55,25 @@ Merge checkpoint: [PR #6](https://github.com/dancarpenter21/world-at-war/pull/6)
 
 Next increments, in order: refresh the integrated performance baseline and concurrent-client/soak measurements; add durable accounts, game/lease persistence and packet audit; implement deterministic recovery/replay; then extend terrain sensing, fusion/SIGINT and the remaining multi-domain simulation. Historical performance numbers above remain uncertified for this integration.
 
+### Simulator retention increment — 2026-10-09
+
+The original one-hour, 50-player mixed soak completed successfully for timing and
+reconnect checks, but RSS grew from 158.09 to 2,603.69 MiB. Its trace was revalidated
+and the previously stale [performance report](docs/performance/2026-10-09-results.md)
+now records the completed result.
+
+The implementation adds opt-in c3mesh mobility/interference history compaction,
+retaining snapshots needed by every pending reception and preserving future changes.
+World At War compacts after completed network advancement, including IFTU and
+post-mission reporting. Aggregate retention counts are sampled into the existing
+local performance trace every five seconds. Message history, completed IDs,
+authority records, intent receipts and audit files remain intact.
+
+The exact sibling source pin prepares c3mesh 0.4.0; registry publication is pending
+credentials. This closes an internal retention mechanism, not the persistence,
+recovery/replay, full-scale workload or 24-hour release milestones. Post-change
+reference measurements will be recorded after validation.
+
 ## 1. Product Contract
 
 World At War is a persistent, server-authoritative, multiplayer command simulation. The first complete release models a feature-rich Blue force across air, space, cyber, sea, undersea, and land. Red is controlled by a basic deterministic AI that uses the same imperfect information and legal command interface as a human player.

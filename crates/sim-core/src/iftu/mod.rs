@@ -1416,6 +1416,19 @@ impl Simulation {
         &mut self,
         boundary: NetworkTime,
     ) -> Result<Vec<NetworkEvent>, c3mesh::SimulationError> {
+        let events = self.advance_iftu_network_uncompacted(boundary)?;
+        #[cfg(test)]
+        if !self.compact_network_history {
+            return Ok(events);
+        }
+        self.communications.simulator.compact_history();
+        Ok(events)
+    }
+
+    fn advance_iftu_network_uncompacted(
+        &mut self,
+        boundary: NetworkTime,
+    ) -> Result<Vec<NetworkEvent>, c3mesh::SimulationError> {
         if self
             .world
             .resource::<WeaponSystem>()

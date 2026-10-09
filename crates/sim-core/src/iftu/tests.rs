@@ -349,6 +349,76 @@ fn replay_produces_same_flight_and_message_history() {
 }
 
 #[test]
+fn compaction_preserves_projections_fragment_retries_and_iftu_handoffs() {
+    let mut compact = fixture();
+    let mut full = fixture();
+    full.compact_network_history = false;
+    let weapon = launch(&mut compact);
+    assert_eq!(launch(&mut full), weapon);
+    let message = Uuid::from_u128(99_001);
+    for sim in [&mut compact, &mut full] {
+        sim.world
+            .resource_mut::<WeaponSystem>()
+            .flights
+            .get_mut(&weapon)
+            .unwrap()
+            .profile
+            .handoff = true;
+        jam(sim, FrequencyBand::new(8_000_000_000, 9_000_000_000), 12);
+        sim.send_message(message, SENSOR, SHOOTER, vec![42; 1600], 50)
+            .unwrap();
+        sim.world.resource_mut::<WeaponSystem>().commands.push((
+            SHOOTER,
+            weapon,
+            Command::AssignProvider {
+                provider_id: BACKUP,
+            },
+        ));
+    }
+    for index in 0..100 {
+        if index == 15 {
+            for sim in [&mut compact, &mut full] {
+                sim.world.resource_mut::<WeaponSystem>().commands.push((
+                    SHOOTER,
+                    weapon,
+                    Command::AssignProvider {
+                        provider_id: BACKUP,
+                    },
+                ));
+            }
+        }
+        compact.step();
+        full.step();
+        let a = compact.drain_deliveries();
+        let b = full.drain_deliveries();
+        assert_eq!(format!("{a:?}"), format!("{b:?}"));
+        assert_eq!(
+            compact.advance_network().unwrap(),
+            full.advance_network().unwrap()
+        );
+        for role in [SHOOTER, SENSOR, BACKUP, RELAY] {
+            assert_eq!(
+                serde_json::to_value(compact.projection_for(role, Side::Blue)).unwrap(),
+                serde_json::to_value(full.projection_for(role, Side::Blue)).unwrap()
+            );
+        }
+        assert_eq!(
+            serde_json::to_value(&compact.world.resource::<WeaponSystem>().trace).unwrap(),
+            serde_json::to_value(&full.world.resource::<WeaponSystem>().trace).unwrap()
+        );
+    }
+    assert!(compact.retention_statistics().transport_completed_ids > 0);
+    // Completion tombstones remain effective even after many compactions.
+    compact
+        .send_message(message, SENSOR, SHOOTER, vec![42; 1600], 500)
+        .unwrap();
+    assert_eq!(compact.retention_statistics().transport_messages, 0);
+    let a = compact.retention_statistics().network;
+    let b = full.retention_statistics().network;
+    assert!(a.interference_entries < b.interference_entries / 2);
+}
+
+#[test]
 fn handoff_does_not_change_receiver_authority_until_assignment_arrives() {
     let mut sim = fixture();
     let id = launch(&mut sim);

@@ -126,6 +126,28 @@ pub(super) fn enabled() -> bool {
     TRACE.get().is_some()
 }
 
+/// Only emitted into the opt-in local trace, never exposed to role projections.
+pub(super) fn record_retention(game: &super::Game) {
+    record(|| {
+        json!({
+            "kind": "retention", "game_id": game.id, "tick": game.simulation.tick(),
+            "radio_tick": game.simulation.radio_tick(),
+            "simulation": game.simulation.retention_statistics(),
+            "server": {
+                "network_messages": game.network_messages.len(),
+                "network_message_events": game.network_message_events.len(),
+                "network_encoded_payload_bytes": game.network_messages.iter()
+                    .chain(&game.network_message_events).map(|m| m.encoded_bytes.len()).sum::<usize>(),
+                "authority_requests": game.authority_requests.len(),
+                "authority_events": game.authority_events.len(),
+                "intent_receipts": game.intent_submissions.len(),
+                "packet_messages": game.packet_messages.len(),
+                "pending_deliveries": game.pending_deliveries.len()
+            }
+        })
+    });
+}
+
 /// Instruments every acquisition of the shared games lock, including early returns.
 /// Caller locations are static source locations, never user-controlled strings.
 pub(super) struct TimedRwLock<T>(tokio::sync::RwLock<T>);

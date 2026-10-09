@@ -18,6 +18,25 @@ test('reference profiles use distinct scenario seats and configurable player cou
   assert.equal(profiles('regional', 50).reduce((sum, [, n]) => sum + n, 0), 50);
   assert.throws(() => profiles('unknown')); assert.throws(() => profiles('mixed', 0));
 });
+test('retention analysis preserves counters, peaks and sampling windows without requiring legacy traces to contain them', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'waw-retention-test-'));
+  try {
+    const row = (elapsed_ms, entries) => ({ kind: 'retention', game_id: 'a', elapsed_ms, tick: elapsed_ms,
+      simulation: { network: { interference_entries: entries } }, server: { intent_receipts: 2 } });
+    const server = [{ kind: 'trace_start', unix_ms: 1000, elapsed_ms: 0 }, row(10, 900), row(100, 20), row(150, 5),
+      { kind: 'trace_end', written: 4, dropped: 0 }];
+    await writeFile(path.join(directory, 'server.jsonl'), server.map(JSON.stringify).join('\n'));
+    await writeFile(path.join(directory, 'clients.jsonl'), '');
+    const result = await analyze(directory, 1050, 1200);
+    assert.equal(result.valid, true);
+    const counts = result.retention['game:a'];
+    assert.equal(counts.samples, 2);
+    assert.equal(counts.first.counts['simulation.network.interference_entries'], 20);
+    assert.equal(counts.last.counts['simulation.network.interference_entries'], 5);
+    assert.equal(counts.peak['simulation.network.interference_entries'], 20);
+    assert.equal(counts.series.length, 2);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
 test('analysis excludes warmup and detects incomplete or dropped traces', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'waw-perf-test-'));
   try {

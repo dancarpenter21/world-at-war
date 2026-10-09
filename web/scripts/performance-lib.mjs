@@ -47,7 +47,7 @@ export async function* records(file) {
 }
 export async function analyze(directory, start, end) {
   const groups = new Map(); const errors = []; let traceEnd, serverEpoch, written = 0;
-  const resources = []; const outcomes = {}; const traffic = new Map();
+  const resources = []; const retention = {}; const outcomes = {}; const traffic = new Map();
   const add = (group, name, value) => {
     if (value === undefined || value === null) return;
     if (!groups.has(group)) groups.set(group, new Map());
@@ -62,6 +62,22 @@ export async function analyze(directory, start, end) {
     const time = serverEpoch + row.elapsed_ms;
     if (!(time >= start && time <= end)) continue;
     const group = row.game_id ? `game:${row.game_id}` : 'server';
+    if (row.kind === 'retention') {
+      const entry = retention[group] ??= { samples: 0, first: null, last: null, peak: {}, series: [] };
+      const counts = {};
+      const flatten = (value, prefix = '') => {
+        for (const [key, item] of Object.entries(value)) {
+          const name = prefix ? `${prefix}.${key}` : key;
+          if (item !== null && typeof item === 'object') flatten(item, name);
+          else if (Number.isSafeInteger(item) && item >= 0) counts[name] = item;
+          else errors.push(`Invalid retention counter: ${name}`);
+        }
+      };
+      flatten({ simulation: row.simulation, server: row.server });
+      const sample = { time, tick: row.tick, radio_tick: row.radio_tick, counts };
+      entry.samples++; entry.first ??= sample; entry.last = sample; entry.series.push(sample);
+      for (const [key, value] of Object.entries(counts)) entry.peak[key] = Math.max(entry.peak[key] ?? 0, value);
+    }
     if (row.kind === 'tick') for (const name of ['duration_ms', 'schedule_delay_ms']) add(group, `tick_${name}`, row[name]);
     if (row.kind === 'game_lock') for (const name of ['wait_ms', 'hold_ms']) {
       add('server', `lock_${name}`, row[name]); add(`lock:${row.caller}:${row.mode}`, name, row[name]);
@@ -91,6 +107,6 @@ export async function analyze(directory, start, end) {
     }
   }
   for (const [key, bytes] of traffic) add(`client:${key.split(':')[0]}`, 'received_bytes_per_active_second', bytes);
-  return { valid: errors.length === 0, errors, trace: traceEnd, measured_seconds: (end - start) / 1000, intent_observations: outcomes, resources,
+  return { valid: errors.length === 0, errors, trace: traceEnd, measured_seconds: (end - start) / 1000, intent_observations: outcomes, resources, retention,
     metrics: Object.fromEntries([...groups].map(([group, metrics]) => [group, Object.fromEntries([...metrics].map(([name, metric]) => [name, metric.summary()]))])) };
 }

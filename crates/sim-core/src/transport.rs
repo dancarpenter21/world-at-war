@@ -51,6 +51,24 @@ pub(super) struct Transport {
     finished: BTreeSet<Uuid>,
 }
 
+impl Transport {
+    pub(super) fn retention_statistics(&self) -> performance::RetentionStatistics {
+        performance::RetentionStatistics {
+            transport_messages: self.messages.len(),
+            transport_fragments: self.packets.len(),
+            transport_completed_ids: self.finished.len(),
+            transport_events: self.events.len(),
+            transport_payload_bytes: self
+                .messages
+                .values()
+                .map(|m| m.payload.len())
+                .sum::<usize>()
+                + self.events.iter().map(|e| e.payload.len()).sum::<usize>(),
+            ..Default::default()
+        }
+    }
+}
+
 impl Simulation {
     pub(super) fn is_fragment_event(&self, event: &NetworkEvent) -> bool {
         match event {

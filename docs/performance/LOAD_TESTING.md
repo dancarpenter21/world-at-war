@@ -112,3 +112,27 @@ and reconnect <=3 seconds. Budget misses are findings by default. Add
 correctness, not timing on shared runners. A short run without reconnect samples
 does not certify reconnect latency. Optimization, the full roadmap scale and the
 24-hour release soak remain separate increments.
+
+## Retention measurements
+
+The opt-in server trace emits aggregate `retention` records every five seconds,
+including paused games. They contain c3mesh device, interference/mobility history,
+interference-contribution, pending-event/reception counts and the retained-time
+boundary; application transport messages/fragments/completed IDs; and server
+message/history, authority, receipt and pending-delivery counts. No message bodies,
+identities or credentials are included beyond the existing game identifier.
+
+`summary.json.retention` groups first/last/peak counts and the sample series by
+game. Older traces remain readable and return an empty retention object. Payload
+byte counts measure stored byte-vector lengths, not container overhead, spare
+capacity, complete message object sizes or exact heap allocation.
+
+Compaction runs at completed network boundaries and keeps every snapshot needed
+by the oldest pending reception, an anchor at or before that time, and future
+changes. A long reception intentionally retains its entire interference interval.
+When no reception or future update remains, each active device retains one
+interference and one mobility anchor. Compare these structural bounds and the
+RSS series with the baseline; RSS alone cannot distinguish retained allocations
+from allocator high-water marks. Player-visible message history, completed IDs,
+intent receipts and audit files still grow with activity and are not expired by
+this increment. Their archival policy belongs to persistence work.
