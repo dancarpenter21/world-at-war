@@ -72,7 +72,8 @@ authority records, intent receipts and audit files remain intact.
 The exact sibling source pin prepares c3mesh 0.4.0; registry publication is pending
 credentials. This closes an internal retention mechanism, not the persistence,
 recovery/replay, full-scale workload or 24-hour release milestones. Post-change
-reference measurements will be recorded after validation.
+reference measurements remain pending. See the [resume-at-home handoff](docs/performance/RETENTION_HANDOFF.md)
+for pushed branches, validation evidence and exact remaining commands.
 
 ## 1. Product Contract
 

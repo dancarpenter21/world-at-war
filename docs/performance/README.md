@@ -1,5 +1,10 @@
 # Performance measurements
 
+The memory-retention implementation is on `codex/memory-retention`; see the
+[handoff](RETENTION_HANDOFF.md) for validation, dependency publication and the
+remaining post-change reference measurements.
+
+
 Full-server concurrent-client and soak tooling is documented in
 [LOAD_TESTING.md](LOAD_TESTING.md). The historical core results below are preserved
 for comparison; current reference results are recorded separately.
