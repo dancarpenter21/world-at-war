@@ -55,6 +55,43 @@ Merge checkpoint: [PR #6](https://github.com/dancarpenter21/world-at-war/pull/6)
 
 Next increments, in order: refresh the integrated performance baseline and concurrent-client/soak measurements; add durable accounts, game/lease persistence and packet audit; implement deterministic recovery/replay; then extend terrain sensing, fusion/SIGINT and the remaining multi-domain simulation. Historical performance numbers above remain uncertified for this integration.
 
+### Simulator retention increment — 2026-10-09
+
+The original one-hour, 50-player mixed soak completed successfully for timing and
+reconnect checks, but RSS grew from 158.09 to 2,603.69 MiB. Its trace was revalidated
+and the previously stale [performance report](docs/performance/2026-10-09-results.md)
+now records the completed result.
+
+The implementation adds opt-in c3mesh mobility/interference history compaction,
+retaining snapshots needed by every pending reception and preserving future changes.
+World At War compacts after completed network advancement, including IFTU and
+post-mission reporting. Aggregate retention counts are sampled into the existing
+local performance trace every five seconds. Message history, completed IDs,
+authority records, intent receipts and audit files remain intact.
+
+The exact sibling source pin prepares c3mesh 0.4.0; registry publication is pending
+credentials. This closes an internal retention mechanism, not the persistence,
+recovery/replay, full-scale workload or 24-hour release milestones. Post-change core and five-minute reference measurements are recorded below;
+a completed post-change long soak remains pending. See the [resume-at-home handoff](docs/performance/RETENTION_HANDOFF.md)
+for pushed branches, validation evidence and exact remaining commands.
+
+### Post-compaction measurement checkpoint — 2026-10-10
+
+- [x] Revalidate existing core and regional/global/mixed five-minute measurements,
+  preserve metadata and summaries, and publish the [results](docs/performance/2026-10-10-results.md).
+- [x] Verify all four core projection hashes against the pre-compaction baseline.
+  All short profiles have complete traces, no client errors and passing regional
+  tick budgets. Every retention sample has one mobility/interference entry per
+  active device; application histories still grow.
+- [ ] Complete post-compaction long-soak validation when explicitly requested.
+  The existing attempted hour was terminated after 1,124 measured ticks per game
+  and is invalid. No new soak was run for this checkpoint.
+
+The reference machine changed from Intel i9-11950H to AMD Ryzen 7 9800X3D, so
+these results do not establish a controlled speedup or memory-reduction ratio.
+Mixed five-minute RSS grew from 114.66 to 129.69 MiB. c3mesh publication,
+persistence/audit, recovery/replay and roadmap-scale release budgets remain open.
+
 ## 1. Product Contract
 
 World At War is a persistent, server-authoritative, multiplayer command simulation. The first complete release models a feature-rich Blue force across air, space, cyber, sea, undersea, and land. Red is controlled by a basic deterministic AI that uses the same imperfect information and legal command interface as a human player.

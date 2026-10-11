@@ -14,7 +14,7 @@ Keep domain data separate from executable code so simulation logic can be tested
 
 ## Build, Test, and Development Commands
 
-Run Rust commands at the repository root and npm commands from `web/`. The workspace requires Rust 1.89+ and the sibling `../c3mesh` checkout pinned by `c3mesh-revision.txt` (v0.3.0, including runtime endpoint support). Use `sh scripts/setup-c3mesh.sh` or `scripts/setup-c3mesh.ps1` for setup and their verify modes to check the pin. Commands:
+Run Rust commands at the repository root and npm commands from `web/`. The workspace requires Rust 1.89+ and the sibling `../c3mesh` checkout pinned by `c3mesh-revision.txt` (prepared v0.4.0 source, including runtime endpoints and safe history compaction; registry publication pending). Use `sh scripts/setup-c3mesh.sh` or `scripts/setup-c3mesh.ps1` for setup and their verify modes to check the pin. Commands:
 
 - `cargo test`: run Rust unit and integration tests.
 - `cargo check`: validate Rust compilation quickly during development.
@@ -32,6 +32,8 @@ Use Rust 2021 idioms for simulation code. Format Rust with `cargo fmt` and lint 
 For frontend code, use TypeScript where possible, keep components focused, and name files by feature, for example `MapViewport.tsx` or `unit-layer.ts`.
 
 ## Testing Guidelines
+
+Do not run long soak tests (including hour-long or longer endurance runs) unless the user explicitly asks to run them. General requests to implement, resume work, validate changes, or follow a plan do not authorize long soak tests, even when plan or handoff documents list them as pending.
 
 Place fast unit tests near the code they exercise and broader scenario tests under `tests/`. Favor deterministic fixtures for sensors, orbital tracks, and communications failures. Name tests after observable behavior, for example `detects_unit_when_inside_radar_horizon`.
 

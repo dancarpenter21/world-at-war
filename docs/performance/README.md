@@ -1,5 +1,11 @@
 # Performance measurements
 
+The [October 10 post-compaction checkpoint](2026-10-10-results.md) records
+validated core and five-minute full-server results. The existing post-change
+soak was interrupted and is excluded from acceptance. See the
+[handoff](RETENTION_HANDOFF.md) for dependency publication and remaining work.
+
+
 Full-server concurrent-client and soak tooling is documented in
 [LOAD_TESTING.md](LOAD_TESTING.md). The historical core results below are preserved
 for comparison; current reference results are recorded separately.

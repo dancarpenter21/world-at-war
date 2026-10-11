@@ -646,6 +646,8 @@ struct CommunicationsRuntime {
 }
 
 pub struct Simulation {
+    #[cfg(test)]
+    compact_network_history: bool,
     world: World,
     schedule: Schedule,
     communications: CommunicationsRuntime,
@@ -931,6 +933,8 @@ impl Simulation {
             deliver_reports.after(detect_contacts),
         ));
         let mut simulation = Self {
+            #[cfg(test)]
+            compact_network_history: true,
             world,
             schedule,
             transport: transport::Transport::default(),

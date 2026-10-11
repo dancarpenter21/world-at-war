@@ -41,7 +41,7 @@ function emit(row) {
 function fail(error) { const message = String(error?.message ?? error); errors.push(message); emit({ kind: 'error', message }); stopping = true; }
 process.on('SIGINT', () => { fail(new Error('Run interrupted')); });
 process.on('SIGTERM', () => { fail(new Error('Run terminated')); });
-const metadata = { schema_version: 1, profile: values.profile, layout, seed, warmup_seconds: warmup, measured_seconds: duration,
+const metadata = { schema_version: 1, retention_sample_seconds: 5, profile: values.profile, layout, seed, warmup_seconds: warmup, measured_seconds: duration,
   reconnect_every_seconds: reconnectEvery, started_at: new Date().toISOString(),
   revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
   dirty: execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim().length > 0,

@@ -316,6 +316,35 @@ fn the_time_limit_has_a_stable_failure_outcome_and_rejects_further_launches() {
 }
 
 #[test]
+fn reporting_after_mission_completion_compacts_without_advancing_combat() {
+    let mut compact = fixture(2, 100, 2);
+    let mut full = fixture(2, 100, 2);
+    full.compact_network_history = false;
+    for sim in [&mut compact, &mut full] {
+        sim.step();
+        sim.step();
+        assert!(sim.mission_complete());
+    }
+    for _ in 0..100 {
+        for sim in [&mut compact, &mut full] {
+            sim.advance_reporting_clock();
+            assert!(sim.advance_network().unwrap().is_empty());
+            assert_eq!(sim.tick(), 2);
+        }
+        assert_eq!(
+            serde_json::to_value(compact.projection_for(SHOOTER, Side::Blue)).unwrap(),
+            serde_json::to_value(full.projection_for(SHOOTER, Side::Blue)).unwrap()
+        );
+    }
+    let counts = compact.retention_statistics().network;
+    assert_eq!(counts.retained_from_ns, 102_000_000_000);
+    assert_eq!(counts.interference_entries, counts.devices);
+    assert!(
+        full.retention_statistics().network.interference_entries > counts.interference_entries * 50
+    );
+}
+
+#[test]
 fn invalid_weapon_and_mission_definitions_are_rejected_before_spawn() {
     let sides = BTreeMap::from([(SHOOTER, Side::Blue), (ENEMY, Side::Red)]);
     for kind in 0..6 {

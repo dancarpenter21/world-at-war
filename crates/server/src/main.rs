@@ -2979,6 +2979,7 @@ fn advance_game_tick(game: &mut Game) {
 }
 async fn run_simulation_loop(state: AppState) {
     let mut interval = tokio::time::interval(Duration::from_secs(1));
+    let mut last_retention_sample = std::time::Instant::now();
     loop {
         let scheduled = interval.tick().await;
         let expired = state.sessions.expired_players();
@@ -3005,6 +3006,12 @@ async fn run_simulation_loop(state: AppState) {
                 "scenario": game.scenario_id, "tick": game.simulation.tick(), "duration_ms": elapsed_ms,
                 "schedule_delay_ms": delay})
             });
+        }
+        if performance::enabled() && last_retention_sample.elapsed() >= Duration::from_secs(5) {
+            for game in games.values() {
+                performance::record_retention(game);
+            }
+            last_retention_sample = std::time::Instant::now();
         }
     }
 }
