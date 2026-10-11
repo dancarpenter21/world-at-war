@@ -54,6 +54,12 @@ corrupt or incompatible run makes startup fail explicitly, without resetting an
 existing game ID to tick zero. Running games recover paused; the host resumes
 using the existing controls. Lobby games remain in the lobby.
 
+The durable writer reuses prepared statements and batches memberships, seats and
+archive records within the same transaction. Unchanged memberships and seats do
+not create new row versions. Only checkpoint writes submit the complete snapshot
+to PostgreSQL; ordinary ticks still encode and hash complete state for deterministic
+verification and retain the existing checkpoint cadence and rollback boundaries.
+
 The archive stores each C2 message body once and references it from ordered
 lifecycle records. Committed lifecycle history is removed from the live event
 buffer. Existing event pagination, profile/state filters and role visibility

@@ -33,8 +33,10 @@ export class PerformancePostgres {
     catch { await this.run(['pull', this.image], { timeout: 180_000 }); }
     const [image] = JSON.parse(await this.run(['image', 'inspect', this.image]));
     this.imageId = image.Id;
-    await this.run(['volume', 'create', '--label', 'world-at-war.performance=true', this.volume]);
+    // Creation can succeed in Docker even if the CLI is interrupted before
+    // returning. Remember the owned name before issuing the command.
     this.volumeCreated = true;
+    await this.run(['volume', 'create', '--label', 'world-at-war.performance=true', this.volume]);
     this.containerAttempted = true;
     await this.run(['run', '--detach', '--name', this.name, '--label', 'world-at-war.performance=true',
       '--publish', '127.0.0.1::5432', '--mount', `type=volume,source=${this.volume},target=/var/lib/postgresql/data`,
@@ -73,6 +75,10 @@ export class PerformancePostgres {
       if (found) await this.run(['rm', '--force', this.name]);
       this.containerAttempted = false;
     }
-    if (this.volumeCreated) { await this.run(['volume', 'rm', this.volume]); this.volumeCreated = false; }
+    if (this.volumeCreated) {
+      const found = await this.run(['volume', 'ls', '-q', '--filter', `name=^${this.volume}$`]);
+      if (found) await this.run(['volume', 'rm', this.volume]);
+      this.volumeCreated = false;
+    }
   }
 }

@@ -16,8 +16,23 @@ const MIGRATIONS: &[&str] = &[
 ];
 const RUNTIME_LOCK: i64 = 0x57415752554e;
 
+const COMMIT_SQL: &[(&str, &str)] = &[
+    ("delete_session", "DELETE FROM browser_sessions WHERE token_hash = $1"),
+    ("insert_session", "INSERT INTO browser_sessions(token_hash, player_id, csrf_token, expires_unix) VALUES ($1, $2, $3, $4)"),
+    ("insert_game", "INSERT INTO games(id, sequence, snapshot_sequence, snapshot, snapshot_sha256, current_sha256) VALUES ($1, $2, $2, $3, $4, $4)"),
+    ("checkpoint_game", "UPDATE games SET sequence = $2, current_sha256 = $3, snapshot_sequence = $2, snapshot = $4, snapshot_sha256 = $3 WHERE id = $1 AND sequence = $2::BIGINT - 1"),
+    ("advance_game", "UPDATE games SET sequence = $2, current_sha256 = $3 WHERE id = $1 AND sequence = $2::BIGINT - 1"),
+    ("journal", "INSERT INTO game_events(game_id, sequence, kind, actor, operation, payload, state_sha256) VALUES ($1, $2, $3, $4, $5, $6, $7)"),
+    ("metadata", "INSERT INTO game_metadata(game_id,title,host_id,scenario_id,scenario_version,scenario_checksum,status,tick) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(game_id) DO UPDATE SET title=EXCLUDED.title,status=EXCLUDED.status,tick=EXCLUDED.tick"),
+    ("messages", "INSERT INTO network_messages(game_id,message_id,profile_id,origin_role,origin_entity,recipient_entity,content,encoded) SELECT $1, * FROM UNNEST($2::uuid[],$3::text[],$4::uuid[],$5::uuid[],$6::uuid[],$7::jsonb[],$8::bytea[]) ON CONFLICT(game_id,message_id) DO NOTHING"),
+    ("events", "INSERT INTO network_events(game_id,sequence,message_id,detail) SELECT $1, * FROM UNNEST($2::bigint[],$3::uuid[],$4::jsonb[])"),
+    ("memberships", "INSERT INTO game_memberships(game_id,player_id,display_name) SELECT $1, * FROM UNNEST($2::uuid[],$3::text[]) ON CONFLICT(game_id,player_id) DO UPDATE SET display_name=EXCLUDED.display_name WHERE game_memberships.display_name IS DISTINCT FROM EXCLUDED.display_name"),
+    ("seats", "INSERT INTO game_seats(game_id,seat_id,owner_id,grant_id,generation,lease) SELECT $1, * FROM UNNEST($2::uuid[],$3::uuid[],$4::uuid[],$5::bigint[],$6::jsonb[]) ON CONFLICT(game_id,seat_id) DO UPDATE SET owner_id=EXCLUDED.owner_id,grant_id=EXCLUDED.grant_id,generation=EXCLUDED.generation,lease=EXCLUDED.lease WHERE (game_seats.owner_id,game_seats.grant_id,game_seats.generation,game_seats.lease) IS DISTINCT FROM (EXCLUDED.owner_id,EXCLUDED.grant_id,EXCLUDED.generation,EXCLUDED.lease)"),
+];
+
 pub(super) struct Store {
     client: Mutex<Client>,
+    statements: BTreeMap<&'static str, tokio_postgres::Statement>,
 }
 
 pub(super) struct StoredSession {
@@ -87,8 +102,8 @@ impl Store {
             "game_ids": changes.iter().map(|c| c.id).collect::<Vec<_>>(),
                 "checkpoints": changes.iter().filter(|c| c.checkpoint).count(),
                 "journal_bytes": changes.iter().map(|c| c.payload.len()).sum::<usize>(),
-                // Baseline SQL sends state even when CASE discards it.
-                "snapshot_submitted_bytes": changes.iter().map(|c| c.state.len()).sum::<usize>(),
+                // Only checkpoints submit snapshot bytes to PostgreSQL.
+                "snapshot_submitted_bytes": changes.iter().filter(|c| c.checkpoint || c.sequence == 1).map(|c| c.state.len()).sum::<usize>(),
                 "archived_events": changes.iter().map(|c| games[&c.id].network_message_events.len()).sum::<usize>()
             })
         });
@@ -100,69 +115,172 @@ impl Store {
         if let Some(identity) = identity {
             if let Some(previous) = &identity.previous {
                 transaction
-                    .execute(
-                        "DELETE FROM browser_sessions WHERE token_hash = $1",
-                        &[previous],
-                    )
+                    .execute(&self.statements["delete_session"], &[previous])
                     .await?;
             }
             if let Some(session) = &identity.session {
                 let session = auth::stored(session);
-                transaction.execute(
-                    "INSERT INTO browser_sessions(token_hash, player_id, csrf_token, expires_unix) VALUES ($1, $2, $3, $4)",
-                    &[&session.token_hash, &session.player_id, &session.csrf_token, &i64::try_from(session.expires_unix)?],
-                ).await?;
+                transaction
+                    .execute(
+                        &self.statements["insert_session"],
+                        &[
+                            &session.token_hash,
+                            &session.player_id,
+                            &session.csrf_token,
+                            &i64::try_from(session.expires_unix)?,
+                        ],
+                    )
+                    .await?;
             }
         }
         for change in changes {
             let count = if change.sequence == 1 {
-                transaction.execute("INSERT INTO games(id, sequence, snapshot_sequence, snapshot, snapshot_sha256, current_sha256) VALUES ($1, $2, $2, $3, $4, $4)",
-                    &[&change.id, &change.sequence, &change.state, &change.hash]).await?
+                transaction
+                    .execute(
+                        &self.statements["insert_game"],
+                        &[&change.id, &change.sequence, &change.state, &change.hash],
+                    )
+                    .await?
+            } else if change.checkpoint {
+                transaction
+                    .execute(
+                        &self.statements["checkpoint_game"],
+                        &[&change.id, &change.sequence, &change.hash, &change.state],
+                    )
+                    .await?
             } else {
-                transaction.execute("UPDATE games SET sequence = $2, current_sha256 = $3, snapshot_sequence = CASE WHEN $4 THEN $2 ELSE snapshot_sequence END, snapshot = CASE WHEN $4 THEN $5 ELSE snapshot END, snapshot_sha256 = CASE WHEN $4 THEN $3 ELSE snapshot_sha256 END WHERE id = $1 AND sequence = $2::BIGINT - 1",
-                    &[&change.id, &change.sequence, &change.hash, &change.checkpoint, &change.state]).await?
+                transaction
+                    .execute(
+                        &self.statements["advance_game"],
+                        &[&change.id, &change.sequence, &change.hash],
+                    )
+                    .await?
             };
             anyhow::ensure!(count == 1, "stale game journal sequence");
-            transaction.execute("INSERT INTO game_events(game_id, sequence, kind, actor, operation, payload, state_sha256) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-                &[&change.id, &change.sequence, &change.kind, &change.actor, &change.operation, &change.payload, &change.hash]).await?;
+            transaction
+                .execute(
+                    &self.statements["journal"],
+                    &[
+                        &change.id,
+                        &change.sequence,
+                        &change.kind,
+                        &change.actor,
+                        &change.operation,
+                        &change.payload,
+                        &change.hash,
+                    ],
+                )
+                .await?;
             let game = &games[&change.id];
             let status = match game.status {
                 GameStatus::Lobby => "lobby",
                 GameStatus::Running => "running",
                 GameStatus::Paused => "paused",
             };
-            transaction.execute(
-                "INSERT INTO game_metadata(game_id,title,host_id,scenario_id,scenario_version,scenario_checksum,status,tick) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(game_id) DO UPDATE SET title=EXCLUDED.title,status=EXCLUDED.status,tick=EXCLUDED.tick",
-                &[&game.id, &game.title, &game.host, &game.scenario_id, &i64::from(game.scenario_version), &game.scenario_checksum, &status, &i64::try_from(game.simulation.tick())?],
-            ).await?;
+            transaction
+                .execute(
+                    &self.statements["metadata"],
+                    &[
+                        &game.id,
+                        &game.title,
+                        &game.host,
+                        &game.scenario_id,
+                        &i64::from(game.scenario_version),
+                        &game.scenario_checksum,
+                        &status,
+                        &i64::try_from(game.simulation.tick())?,
+                    ],
+                )
+                .await?;
+            // Archive every ordered transition, but serialize each message body once.
+            let mut messages = BTreeMap::new();
+            let mut event_sequences = Vec::new();
+            let mut event_messages = Vec::new();
+            let mut event_details = Vec::new();
             for record in &game.network_message_events {
-                let message = &record.message;
-                transaction.execute(
-                    "INSERT INTO network_messages(game_id, message_id, profile_id, origin_role, origin_entity, recipient_entity, content, encoded) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(game_id,message_id) DO NOTHING",
-                    &[&game.id, &message.id, &message.profile_id, &message.header.origin_role_id,
-                      &message.header.origin_entity_id, &message.header.recipient_entity_id,
-                      &serde_json::to_value(message)?, &record.encoded_bytes],
-                ).await?;
-                let mut detail = serde_json::to_value(record)?;
-                let object = detail.as_object_mut().unwrap();
-                object.remove("message");
-                object.remove("encoded_bytes");
-                transaction.execute(
-                    "INSERT INTO network_events(game_id, sequence, message_id, detail) VALUES ($1,$2,$3,$4)",
-                    &[&game.id, &i64::try_from(record.sequence)?, &message.id, &detail],
-                ).await?;
+                messages.entry(record.message.id).or_insert(record);
+                // Match the persisted lifecycle fields without constructing and
+                // then discarding another copy of the body and byte vector.
+                let detail = json!({
+                    "sequence": record.sequence,
+                    "state": record.state,
+                    "packet_id": record.packet_id,
+                    "started_at_ns": record.started_at_ns,
+                    "terminal_at_ns": record.terminal_at_ns,
+                    "delivered_at_ns": record.delivered_at_ns,
+                    "drop_reason": record.drop_reason,
+                });
+                event_sequences.push(i64::try_from(record.sequence)?);
+                event_messages.push(record.message.id);
+                event_details.push(detail);
             }
-            // Membership and seat ownership commit with the checkpoint/journal.
-            // Runtime fencing plus the sequence compare prevents stale writers.
-            for player in &game.members {
-                let name = game
-                    .participant_names
-                    .get(player)
-                    .map(String::as_str)
-                    .unwrap_or("Guest");
-                transaction.execute("INSERT INTO game_memberships(game_id, player_id, display_name) VALUES ($1, $2, $3) ON CONFLICT(game_id, player_id) DO UPDATE SET display_name = EXCLUDED.display_name", &[&game.id, player, &name]).await?;
+            if !messages.is_empty() {
+                let records: Vec<_> = messages.values().collect();
+                let ids: Vec<_> = records.iter().map(|r| r.message.id).collect();
+                let profiles: Vec<_> = records
+                    .iter()
+                    .map(|r| r.message.profile_id.as_str())
+                    .collect();
+                let roles: Vec<_> = records
+                    .iter()
+                    .map(|r| r.message.header.origin_role_id)
+                    .collect();
+                let origins: Vec<_> = records
+                    .iter()
+                    .map(|r| r.message.header.origin_entity_id)
+                    .collect();
+                let recipients: Vec<_> = records
+                    .iter()
+                    .map(|r| r.message.header.recipient_entity_id)
+                    .collect();
+                let contents = records
+                    .iter()
+                    .map(|r| serde_json::to_value(&r.message))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let encoded: Vec<_> = records.iter().map(|r| r.encoded_bytes.as_slice()).collect();
+                transaction
+                    .execute(
+                        &self.statements["messages"],
+                        &[
+                            &game.id,
+                            &ids,
+                            &profiles,
+                            &roles,
+                            &origins,
+                            &recipients,
+                            &contents,
+                            &encoded,
+                        ],
+                    )
+                    .await?;
+                transaction
+                    .execute(
+                        &self.statements["events"],
+                        &[&game.id, &event_sequences, &event_messages, &event_details],
+                    )
+                    .await?;
             }
-            for (id, occupancy, grant) in game
+            // Bulk upserts retain the same transaction and sequence fence. Avoid
+            // new row versions (and WAL) when membership or seat data is unchanged.
+            let players: Vec<_> = game.members.iter().copied().collect();
+            let names: Vec<_> = players
+                .iter()
+                .map(|id| {
+                    game.participant_names
+                        .get(id)
+                        .map(String::as_str)
+                        .unwrap_or("Guest")
+                })
+                .collect();
+            if !players.is_empty() {
+                transaction
+                    .execute(
+                        &self.statements["memberships"],
+                        &[&game.id, &players, &names],
+                    )
+                    .await?;
+            }
+            let seats: Vec<_> = game
                 .roles
                 .iter()
                 .map(|(id, role)| (id, &role.occupancy, None))
@@ -171,14 +289,34 @@ impl Store {
                         .iter()
                         .map(|(id, seat)| (id, &seat.occupancy, seat.granted_player)),
                 )
-            {
-                let generation = i64::try_from(occupancy.lease_generation)?;
-                let lease = occupancy
-                    .lease
-                    .as_ref()
-                    .map(serde_json::to_value)
-                    .transpose()?;
-                transaction.execute("INSERT INTO game_seats(game_id, seat_id, owner_id, grant_id, generation, lease) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT(game_id, seat_id) DO UPDATE SET owner_id = EXCLUDED.owner_id, grant_id = EXCLUDED.grant_id, generation = EXCLUDED.generation, lease = EXCLUDED.lease", &[&game.id, id, &occupancy.owner, &grant, &generation, &lease]).await?;
+                .collect();
+            if !seats.is_empty() {
+                let ids: Vec<_> = seats.iter().map(|(id, _, _)| **id).collect();
+                let owners: Vec<_> = seats
+                    .iter()
+                    .map(|(_, occupancy, _)| occupancy.owner)
+                    .collect();
+                let grants: Vec<_> = seats.iter().map(|(_, _, grant)| *grant).collect();
+                let generations = seats
+                    .iter()
+                    .map(|(_, occupancy, _)| i64::try_from(occupancy.lease_generation))
+                    .collect::<Result<Vec<_>, _>>()?;
+                let leases = seats
+                    .iter()
+                    .map(|(_, occupancy, _)| {
+                        occupancy
+                            .lease
+                            .as_ref()
+                            .map(serde_json::to_value)
+                            .transpose()
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                transaction
+                    .execute(
+                        &self.statements["seats"],
+                        &[&game.id, &ids, &owners, &grants, &generations, &leases],
+                    )
+                    .await?;
             }
         }
         sql.finish();
@@ -292,8 +430,13 @@ impl Store {
             }
         }
         transaction.commit().await?;
+        let mut statements = BTreeMap::new();
+        for (name, sql) in COMMIT_SQL {
+            statements.insert(*name, client.prepare(sql).await?);
+        }
         Ok(Self {
             client: Mutex::new(client),
+            statements,
         })
     }
 

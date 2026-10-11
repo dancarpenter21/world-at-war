@@ -127,6 +127,7 @@ test('PostgreSQL startup failure cleans up only owned resources and does not exp
     if (args[0] === 'image') return JSON.stringify([{ Id: 'sha256:test', RepoDigests: ['test@sha256:test'] }]);
     if (args[0] === 'run') throw new Error('Docker run failed');
     if (args[0] === 'ps') return '';
+    if (args[0] === 'volume' && args[1] === 'ls') return db.volume;
     return '';
   });
   await assert.rejects(db.start(), { message: 'Docker run failed' });

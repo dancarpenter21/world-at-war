@@ -122,7 +122,7 @@ class Player {
         }
         // Small chunks allow prompt teardown without leaving renewal timers alive.
         const until = clock.now() + interval;
-        while (!stopping && clock.now() < until) await sleep(Math.min(100, until - clock.now()));
+        while (!stopping && clock.now() < until) await sleep(Math.max(0, Math.min(100, until - clock.now())));
       }
     })(); tasks.push(task);
   }
@@ -178,6 +178,8 @@ async function resources() {
 try {
   if (values.storage === 'postgres') {
     database = new PerformancePostgres(values['postgres-image']);
+    metadata.postgres = { container_name: database.name, volume_name: database.volume };
+    await writeFile(path.join(output, 'metadata.json'), JSON.stringify(metadata, null, 2));
     metadata.postgres = await database.start();
     await writeFile(path.join(output, 'metadata.json'), JSON.stringify(metadata, null, 2));
     assert.ok(!stopping, 'Run stopped during database startup');
@@ -248,7 +250,7 @@ try {
     while (!stopping) {
       const next = clock.now() + 5000;
       emit(await database.sample());
-      while (!stopping && clock.now() < next) await sleep(Math.min(100, next - clock.now()));
+      while (!stopping && clock.now() < next) await sleep(Math.max(0, Math.min(100, next - clock.now())));
     }
   })().catch(fail);
   let nextResource = 0, nextReconnect = measurementStart + reconnectEvery * 1000, cycle = 0, nextProgress = 0;
