@@ -185,6 +185,9 @@ pub(super) fn record_retention(game: &super::Game) {
             "radio_tick": game.simulation.radio_tick(),
             "simulation": game.simulation.retention_statistics(),
             "server": {
+                "audit_pending_events": game.audit.pending.len(),
+                "audit_history_events": game.audit.history.len(),
+                "audit_correlations": game.simulation.audit_correlations().len(),
                 "network_messages": game.network_messages.len(),
                 "network_message_events": game.network_message_events.len(),
                 "network_encoded_payload_bytes": game.network_messages.iter()

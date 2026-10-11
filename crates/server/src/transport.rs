@@ -130,6 +130,17 @@ pub(super) fn transmit_c2_message_from_entity(
         Err(error) => (MessageState::Dropped, None, Some(error.to_string())),
     };
     let message_id = message.id;
+    if let Some(packet) = packet_id {
+        game.simulation.annotate_audit_packet(
+            packet,
+            sim_core::audit::Context {
+                message_id: Some(message_id.to_string()),
+                from: Some(origin_entity_id),
+                to: Some(recipient_entity_id),
+                ..Default::default()
+            },
+        );
+    }
     let record = NetworkMessageRecord {
         sequence: 0,
         message,
@@ -310,6 +321,7 @@ pub(super) fn record_transition(game: &mut Game, mut record: NetworkMessageRecor
         game.status = GameStatus::Paused;
         game.operational_error = Some("network event store write failed; game paused".into());
     }
+    audit::transition(game, &record);
     game.network_message_events.push(record.clone());
     if let Some(current) = game
         .network_messages
@@ -368,6 +380,19 @@ pub(super) fn finish_reporting(game: &mut Game) {
         record.state = MessageState::Dropped;
         record.terminal_at_ns = Some(tick_time_ns(game.simulation.radio_tick()));
         record.drop_reason = Some("mission reporting window ended".into());
+        game.audit.pending.push(sim_core::audit::Event {
+            physical: None,
+            kind: sim_core::audit::Kind::ReportingEnded,
+            at_ns: tick_time_ns(game.simulation.radio_tick()),
+            packet_id: record.packet_id,
+            bytes: 0,
+            context: sim_core::audit::Context {
+                message_id: Some(id.to_string()),
+                ..Default::default()
+            },
+            terminal: Some(record.message.header.origin_entity_id),
+            reason: Some("mission reporting window ended".into()),
+        });
         if !record_transition(game, record) {
             abort_pending(game, "network event store write failed");
             return;

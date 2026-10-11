@@ -649,9 +649,11 @@ struct CommunicationsRuntime {
     radio_channels: BTreeMap<ChannelId, FrequencyBand>,
 }
 
+pub mod audit;
 pub mod snapshot;
 
 pub struct Simulation {
+    audit: audit::Audit,
     #[cfg(test)]
     compact_network_history: bool,
     world: World,
@@ -952,6 +954,7 @@ impl Simulation {
             campaign_mode: false,
             pending_network_events: Vec::new(),
             pending_fragment_events: Vec::new(),
+            audit: audit::Audit::default(),
             communications: CommunicationsRuntime {
                 simulator,
                 entity_devices,
@@ -1432,13 +1435,22 @@ impl Simulation {
                 to: to_entity_id,
             })?;
         let at = self.network_time();
+        let bytes = payload.len();
         let packet_id = self.communications.simulator.schedule_send(
             at,
             link.source_device_id,
             link.destination_device_id,
             payload,
         )?;
+        self.audit_scheduled(
+            packet_id.get(),
+            from_entity_id,
+            to_entity_id,
+            bytes,
+            at.as_nanos(),
+        );
         while let Some(event) = self.communications.simulator.step()? {
+            self.audit_network_event(&event);
             match event {
                 NetworkEvent::PacketDelivered { at, packet, .. } if packet.id() == packet_id => {
                     return Ok(CommunicationOutcome::Delivered {
@@ -1475,12 +1487,21 @@ impl Simulation {
                 from: from_entity_id,
                 to: to_entity_id,
             })?;
-        Ok(self.communications.simulator.schedule_send(
+        let bytes = payload.len();
+        let packet = self.communications.simulator.schedule_send(
             self.network_time(),
             link.source_device_id.clone(),
             link.destination_device_id.clone(),
             payload,
-        )?)
+        )?;
+        self.audit_scheduled(
+            packet.get(),
+            from_entity_id,
+            to_entity_id,
+            bytes,
+            self.network_time().as_nanos(),
+        );
+        Ok(packet)
     }
 
     /// Queues endpoint scheduling metadata and a forwarding-hop budget without advancing time.
@@ -1501,7 +1522,8 @@ impl Simulation {
                 from: from_entity_id,
                 to: to_entity_id,
             })?;
-        Ok(self
+        let bytes = payload.len();
+        let packet = self
             .communications
             .simulator
             .schedule_send_with_hop_limit_and_metadata(
@@ -1511,7 +1533,15 @@ impl Simulation {
                 payload,
                 hop_limit,
                 metadata,
-            )?)
+            )?;
+        self.audit_scheduled(
+            packet.get(),
+            from_entity_id,
+            to_entity_id,
+            bytes,
+            self.network_time().as_nanos(),
+        );
+        Ok(packet)
     }
 
     /// Advances pending network traffic to the current ECS tick boundary.

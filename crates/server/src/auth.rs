@@ -655,6 +655,7 @@ pub(super) async fn login(
 mod tests {
     include!("observer_auth_tests.rs");
     include!("persistence_tests.rs");
+    include!("audit_auth_tests.rs");
     use super::*;
     use axum::body::{to_bytes, Body};
     use serde_json::{json, Value};

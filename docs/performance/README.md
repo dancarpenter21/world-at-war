@@ -1,5 +1,9 @@
 # Performance measurements
 
+The [October 11 communications audit checkpoint](2026-10-11-audit-results.md)
+records functional validation and the cost of durable metadata history. Regional
+PostgreSQL maximum-cycle acceptance remains open; no long soak was run.
+
 The [October 11 persistence checkpoint](2026-10-11-results.md) records a fresh
 volatile/PostgreSQL baseline and two optimized repetitions, with full committed
 cycle timing, storage/resource growth and all 18 short runs validated. Long-soak

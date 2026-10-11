@@ -1,5 +1,34 @@
 # World At War Implementation Plan
 
+## Communications metadata audit checkpoint — 2026-10-11
+
+C2, internal knowledge reports, reliable fragments, acknowledgements and IFTU
+traffic now have transactional communications metadata history. Capture precedes
+transport consumption; independent packet correlations survive restart without
+rewriting history or changing canonical snapshot schemas/hashes. A new authenticated
+`/network/audit` API exposes terminal-local observations with role-local pagination,
+coverage boundaries and explicit truncation. Remote reception and receiver-side
+acknowledgement retries do not become sender knowledge.
+
+`COMMUNICATIONS_ARCHIVE_RETENTION_DAYS` enables optional age-based PostgreSQL
+communications cleanup; the default remains indefinite. Bounded transactions
+protect pending traffic, shared message bodies and every recovery/idempotency
+record. Partially covered legacy games defer cleanup while their physical network
+is active. Maintenance failure rolls back cleanup and retries; required audit-write
+failure retains the existing fail-closed gameplay boundary.
+
+Functional validation passes 213 fast Rust, 13 PostgreSQL, 45 frontend, 61 browser
+and 14 harness tests. Core projection hashes remain unchanged. Regional durable
+performance acceptance remains open: the short profile stayed below the p95
+budget but exceeded the maximum-cycle budget. See the
+[measurements and artifacts](docs/performance/2026-10-11-audit-results.md) and
+[coverage, API and retention operation](docs/COMMUNICATIONS_AUDIT.md).
+This supersedes older statements that internal report/fragment metadata auditing
+and configurable communications archive retention are unimplemented. Raw packet
+payload export, interactive historical replay, full information-management policy
+fidelity, roadmap-scale loads and long-soak acceptance remain open. No long soak
+is authorized or executed for this increment.
+
 ## Persistence performance checkpoint — 2026-10-11
 
 The full-server harness now measures committed cycles, durability waits and SQL

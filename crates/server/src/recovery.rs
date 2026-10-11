@@ -270,7 +270,11 @@ async fn transaction_boundary(
     let mut games = state.games.write().await;
     let mut changes = Vec::new();
     for game in games.values_mut() {
-        let changed = encode(game).map(|bytes| before.get(&game.id) != Some(&bytes));
+        let changed = encode(game).map(|bytes| {
+            before.get(&game.id) != Some(&bytes)
+                || !game.audit.pending.is_empty()
+                || game.simulation.has_pending_audit()
+        });
         match changed {
             Ok(false) => continue,
             Ok(true) => match Boundary::new(game, None, actor, &operation) {
@@ -366,6 +370,7 @@ pub(super) async fn load(state: &AppState) -> anyhow::Result<()> {
             "snapshot scenario or catalog incompatible"
         );
         game.network_message_events.clear();
+        store.load_audit(&mut game).await?;
         if game.status == GameStatus::Running {
             game.status = GameStatus::Paused;
         }

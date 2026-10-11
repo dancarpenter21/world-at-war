@@ -728,3 +728,83 @@ fn snapshots_preserve_weapon_handoff_fragments_and_future_updates() {
         .unwrap();
     assert_eq!(live.retention_statistics().transport_messages, 0);
 }
+
+#[test]
+fn audit_captures_consumed_iftu_packets_without_changing_canonical_state() {
+    let mut observed = fixture();
+    let mut control = fixture();
+    observed.enable_audit();
+    assert_eq!(launch(&mut observed), launch(&mut control));
+    for _ in 0..15 {
+        observed.step();
+        control.step();
+    }
+    assert_eq!(
+        serde_json::to_value(observed.snapshot()).unwrap(),
+        serde_json::to_value(control.snapshot()).unwrap()
+    );
+    let events = observed.drain_audit();
+    let iftu: Vec<_> = events
+        .iter()
+        .filter(|e| {
+            e.context
+                .message_id
+                .as_ref()
+                .is_some_and(|m| m.starts_with("iftu:"))
+        })
+        .collect();
+    assert!(iftu.iter().any(|e| e.kind == audit::Kind::Received));
+    assert!(iftu.iter().any(|e| e.kind == audit::Kind::Delivered));
+    assert!(iftu.iter().any(|e| e.kind == audit::Kind::Reassembled));
+    let mut unique = BTreeSet::new();
+    for e in iftu.iter().filter(|e| e.kind == audit::Kind::Delivered) {
+        assert!(unique.insert((e.packet_id, e.at_ns)));
+    }
+    assert!(iftu
+        .iter()
+        .filter(|e| e.kind == audit::Kind::Reassembled)
+        .all(|e| e.terminal == e.context.to));
+    assert!(observed.drain_audit().is_empty());
+}
+
+#[test]
+fn reliable_audit_does_not_reveal_remote_reassembly_or_receiver_acknowledgement_retries() {
+    let mut sim = fixture();
+    sim.enable_audit();
+    sim.communications
+        .simulator
+        .set_channel_state("link-1", CommunicationChannelState::Severed)
+        .unwrap();
+    let message = Uuid::from_u128(77221);
+    sim.send_message(message, SENSOR, RELAY, vec![8; 600], 50)
+        .unwrap();
+    let mut events = Vec::new();
+    for _ in 0..25 {
+        sim.step();
+        events.extend(sim.drain_audit());
+    }
+    let message = message.to_string();
+    let ours: Vec<_> = events
+        .iter()
+        .filter(|e| e.context.message_id.as_deref() == Some(&message))
+        .collect();
+    assert!(ours
+        .iter()
+        .any(|e| e.kind == audit::Kind::Reassembled && e.terminal == Some(RELAY)));
+    let sender: Vec<_> = ours.iter().filter(|e| e.terminal == Some(SENSOR)).collect();
+    assert!(
+        sender.iter().all(|e| !matches!(
+            e.kind,
+            audit::Kind::Delivered | audit::Kind::Reassembled | audit::Kind::Acknowledged
+        )),
+        "{sender:?}"
+    );
+    assert_eq!(
+        sender
+            .iter()
+            .filter(|e| e.kind == audit::Kind::Attempt)
+            .count(),
+        1
+    );
+    assert!(sender.iter().any(|e| e.kind == audit::Kind::Unacknowledged));
+}

@@ -97,7 +97,7 @@ export async function runSoak(values, harness = path.join(root, 'web/scripts/per
         state: !interrupted && !timedOut && result.code === 0 && summary?.valid === true && metadata?.measurement_completed === true && (!values['check-budgets'] || misses.length === 0) ? 'passed' : 'failed',
         errors: [spawnError, artifactError, timedOut ? 'Watchdog timeout' : undefined, interrupted ? 'Run interrupted' : undefined, ...(summary?.errors ?? [])].filter(Boolean), budget_misses: misses,
         cycle: summary?.metrics?.server?.cycle_duration_ms, trace: summary?.trace,
-        reconnect_clients: summary?.budgets?.reconnect?.length ?? 0, resources: summary?.resources, database: summary?.database, retention: summary?.retention,
+        reconnect_clients: summary?.budgets?.reconnect?.length ?? 0, resources: summary?.resources, database: summary?.database, retention: summary?.retention, audit: summary?.audit,
       });
       await save(); log(`END ${storage}: ${run.state}; cycle p95=${run.cycle?.p95 ?? 'missing'} ms; budget misses=${misses.length}`);
       // An invalid measurement does not prevent the other independent mode running.

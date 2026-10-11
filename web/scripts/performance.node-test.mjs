@@ -93,7 +93,7 @@ test('durable cycle analysis excludes idle cycles, retains stages, and rejects f
       { kind: 'trace_start', unix_ms: 1000, elapsed_ms: 0 },
       { kind: 'server_cycle', success: true, running_games: [], duration_ms: 1, elapsed_ms: 100 },
       { kind: 'server_cycle', success: true, running_games: ['a'], duration_ms: 85, scheduled_to_committed_ms: 95, elapsed_ms: 200 },
-      { kind: 'persistence_commit', success: true, duration_ms: 70, snapshot_submitted_bytes: 400, elapsed_ms: 190 },
+      { kind: 'persistence_commit', success: true, duration_ms: 70, snapshot_submitted_bytes: 400, audit_events: 9, audit_bytes: 700, elapsed_ms: 190 },
       { kind: 'trace_end', written: 4, dropped: 0 },
     ];
     const save = () => writeFile(path.join(directory, 'server.jsonl'), server.map(JSON.stringify).join('\n'));
@@ -107,6 +107,8 @@ test('durable cycle analysis excludes idle cycles, retains stages, and rejects f
     assert.equal(result.metrics.server.cycle_duration_ms.p95, 85);
     assert.equal(result.metrics.server.persistence_commit_duration_ms.max, 70);
     assert.equal(result.committed_games.a, 1);
+    assert.equal(result.audit.events, 9);
+    assert.equal(result.audit.bytes, 700);
     server[3].success = false; await save();
     result = await analyze(directory, 1050, 1300); validateRun(result, metadata);
     assert.equal(result.valid, false);
