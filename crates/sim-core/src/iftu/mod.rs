@@ -178,6 +178,8 @@ pub(super) struct WeaponSystem {
     flights: BTreeMap<Uuid, Flight>,
     packets: BTreeMap<u64, Datagram>,
     trace: VecDeque<MessageTrace>,
+    #[serde(skip)]
+    audit_events: Vec<audit::Event>,
     pub(super) designations: BTreeMap<Uuid, Track>,
     #[serde(with = "crate::snapshot::entries")]
     pub(super) provenance: BTreeMap<(Uuid, Uuid), (Uuid, Uuid)>,
@@ -197,6 +199,7 @@ impl Default for WeaponSystem {
             flights: BTreeMap::new(),
             packets: BTreeMap::new(),
             trace: VecDeque::new(),
+            audit_events: Vec::new(),
             designations: BTreeMap::new(),
             provenance: BTreeMap::new(),
             sequence: 0,
@@ -253,6 +256,43 @@ impl WeaponSystem {
         state: &str,
         detail: impl Into<String>,
     ) {
+        let detail = detail.into();
+        let kind = match state {
+            "queued" => Some(audit::Kind::Accepted),
+            "accepted" => Some(audit::Kind::Reassembled),
+            "rejected" => Some(audit::Kind::Rejected),
+            "expired" if detail == "Expired on receipt" => Some(audit::Kind::Expired),
+            _ => None,
+        };
+        if let Some(kind) = kind {
+            self.audit_events.push(audit::Event {
+                physical: None,
+                kind,
+                at_ns: self.clock_ns,
+                packet_id: None,
+                bytes: serde_json::to_vec(payload).map_or(0, |b| b.len()),
+                context: audit::Context {
+                    message_id: Some(format!("iftu:{id}")),
+                    from: Some(from),
+                    to: Some(to),
+                    ..Default::default()
+                },
+                terminal: Some(
+                    if matches!(kind, audit::Kind::Reassembled | audit::Kind::Rejected)
+                        || (kind == audit::Kind::Expired && detail == "Expired on receipt")
+                    {
+                        to
+                    } else {
+                        from
+                    },
+                ),
+                reason: matches!(
+                    kind,
+                    audit::Kind::Rejected | audit::Kind::Expired | audit::Kind::Dropped
+                )
+                .then(|| "application_failure".into()),
+            });
+        }
         let weapon_id = match payload {
             Payload::Update(u) => Some(u.weapon_id),
             Payload::Assignment { weapon, .. }
@@ -267,7 +307,7 @@ impl WeaponSystem {
             to,
             kind: payload.name().into(),
             state: state.into(),
-            detail: detail.into(),
+            detail,
             weapon_id,
             fields: serde_json::to_value(payload).expect("finite message"),
         });
@@ -564,6 +604,14 @@ impl Simulation {
                 self.queue_iftu_hop(s, d);
             }
         } else {
+            self.audit_application(
+                audit::Kind::Dropped,
+                format!("iftu:{id}"),
+                from,
+                0,
+                None,
+                Some("no_configured_route".into()),
+            );
             s.trace(id, from, to, &payload, "dropped", "No configured route");
         }
     }
@@ -574,6 +622,14 @@ impl Simulation {
             .iter()
             .any(|id| positions.get(id).is_some_and(|p| p.2))
         {
+            self.audit_application(
+                audit::Kind::Dropped,
+                format!("iftu:{}", d.id),
+                link.from_entity_id,
+                0,
+                None,
+                Some("endpoint_destroyed".into()),
+            );
             s.trace(
                 d.id,
                 d.from,
@@ -585,6 +641,14 @@ impl Simulation {
             return;
         }
         if s.clock_ns >= d.expires || d.hop >= 32 {
+            self.audit_application(
+                audit::Kind::Expired,
+                format!("iftu:{}", d.id),
+                link.from_entity_id,
+                0,
+                None,
+                Some("expiry_or_hop_limit".into()),
+            );
             s.trace(
                 d.id,
                 d.from,
@@ -596,6 +660,7 @@ impl Simulation {
             return;
         }
         let bytes = serde_json::to_vec(&d.payload).expect("finite IFTU payload");
+        let byte_count = bytes.len();
         let result = self
             .communications
             .simulator
@@ -614,6 +679,23 @@ impl Simulation {
             );
         match result {
             Ok(packet) => {
+                self.audit_scheduled(
+                    packet.get(),
+                    link.from_entity_id,
+                    link.to_entity_id,
+                    byte_count,
+                    s.clock_ns,
+                );
+                self.annotate_audit_packet(
+                    packet.get(),
+                    audit::Context {
+                        message_id: Some(format!("iftu:{}", d.id)),
+                        hop: Some(d.hop),
+                        from: Some(link.from_entity_id),
+                        to: Some(link.to_entity_id),
+                        ..Default::default()
+                    },
+                );
                 s.trace(
                     d.id,
                     link.from_entity_id,
@@ -624,7 +706,17 @@ impl Simulation {
                 );
                 s.packets.insert(packet.get(), d);
             }
-            Err(e) => s.trace(d.id, d.from, d.to, &d.payload, "dropped", e.to_string()),
+            Err(e) => {
+                self.audit_application(
+                    audit::Kind::Dropped,
+                    format!("iftu:{}", d.id),
+                    link.from_entity_id,
+                    byte_count,
+                    None,
+                    Some("scheduling_failed".into()),
+                );
+                s.trace(d.id, d.from, d.to, &d.payload, "dropped", e.to_string());
+            }
         }
     }
     fn process_iftu_event(
@@ -1416,6 +1508,21 @@ impl Simulation {
             }
         }
     }
+    pub(super) fn seed_iftu_audit(&mut self) {
+        for (packet, d) in &self.world.resource::<WeaponSystem>().packets {
+            let link = &d.route[d.hop];
+            self.audit
+                .packets
+                .entry(*packet)
+                .or_insert_with(|| audit::Context {
+                    message_id: Some(format!("iftu:{}", d.id)),
+                    hop: Some(d.hop),
+                    from: Some(link.from_entity_id),
+                    to: Some(link.to_entity_id),
+                    ..Default::default()
+                });
+        }
+    }
     pub(super) fn advance_iftu_network(
         &mut self,
         boundary: NetworkTime,
@@ -1446,7 +1553,11 @@ impl Simulation {
                 .subscriptions
                 .is_empty()
         {
-            return self.communications.simulator.advance_to(boundary);
+            let events = self.communications.simulator.advance_to(boundary)?;
+            for event in &events {
+                self.audit_network_event(event);
+            }
+            return Ok(events);
         }
         let mut s = self
             .world
@@ -1480,6 +1591,9 @@ impl Simulation {
                     .communications
                     .simulator
                     .advance_to(NetworkTime::from_nanos(next))?;
+                for event in &events {
+                    self.audit_network_event(event);
+                }
                 self.move_iftu_weapons(&mut s, next);
                 for event in events {
                     if let Some(e) = self.process_iftu_event(&mut s, event) {
@@ -1490,6 +1604,10 @@ impl Simulation {
             self.prepare_iftu(&mut s);
             Ok(external)
         })();
+        let observations = std::mem::take(&mut s.audit_events);
+        if self.audit.enabled {
+            self.audit.events.extend(observations);
+        }
         self.world.insert_resource(s);
         result
     }

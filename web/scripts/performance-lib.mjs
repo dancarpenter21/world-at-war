@@ -47,7 +47,8 @@ export async function* records(file) {
 }
 export async function analyze(directory, start, end) {
   const groups = new Map(); const errors = []; let traceEnd, serverEpoch, written = 0;
-  const resources = []; const database = []; const committedGames = {}; const retention = {}; const outcomes = {}; const traffic = new Map();
+  const resources = []; const database = []; const committedGames = {}; const retention = {}; const outcomes = {};
+  const audit = { events: 0, bytes: 0, cleanup: [] }; const traffic = new Map();
   const add = (group, name, value) => {
     if (value === undefined || value === null) return;
     if (!groups.has(group)) groups.set(group, new Map());
@@ -89,12 +90,15 @@ export async function analyze(directory, start, end) {
     if (row.kind.startsWith('persistence_') || ['mutation_boundary', 'durability_gate'].includes(row.kind)) {
       if (row.success) {
         const stage = `${row.kind}${row.source ? `:${row.source}` : ''}`;
-        for (const key of ['duration_ms', 'bytes', 'boundaries', 'checkpoints', 'journal_bytes', 'snapshot_submitted_bytes', 'archived_events']) {
+        for (const key of ['duration_ms', 'bytes', 'boundaries', 'checkpoints', 'journal_bytes', 'snapshot_submitted_bytes', 'archived_events', 'audit_events', 'audit_bytes']) {
           add('server', `${stage}_${key}`, row[key]);
           if (row.game_id) add(group, `${stage}_${key}`, row[key]);
         }
       }
     }
+    if (row.kind === 'persistence_commit' && row.success) { audit.events += row.audit_events ?? 0; audit.bytes += row.audit_bytes ?? 0; }
+    if (row.kind === 'audit_cleanup') add('server', 'audit_cleanup_duration_ms', row.duration_ms);
+    if (row.kind === 'audit_cleanup_result') audit.cleanup.push({ time, deleted_rows: row.deleted_rows ?? 0, failed: row.failed, eligible_backlog_rows: row.eligible_backlog_rows, oldest_eligible_age_seconds: row.oldest_eligible_age_seconds });
     if (row.kind === 'tick') for (const name of ['duration_ms', 'schedule_delay_ms']) add(group, `tick_${name}`, row[name]);
     if (row.kind === 'game_lock') for (const name of ['wait_ms', 'hold_ms']) {
       add('server', `lock_${name}`, row[name]); add(`lock:${row.caller}:${row.mode}`, name, row[name]);
@@ -125,7 +129,7 @@ export async function analyze(directory, start, end) {
     }
   }
   for (const [key, bytes] of traffic) add(`client:${key.split(':')[0]}`, 'received_bytes_per_active_second', bytes);
-  return { valid: errors.length === 0, errors, trace: traceEnd, measured_seconds: (end - start) / 1000, intent_observations: outcomes, resources, database, committed_games: committedGames, retention,
+  return { valid: errors.length === 0, errors, trace: traceEnd, measured_seconds: (end - start) / 1000, intent_observations: outcomes, resources, database, committed_games: committedGames, retention, audit,
     metrics: Object.fromEntries([...groups].map(([group, metrics]) => [group, Object.fromEntries([...metrics].map(([name, metric]) => [name, metric.summary()]))])) };
 }
 

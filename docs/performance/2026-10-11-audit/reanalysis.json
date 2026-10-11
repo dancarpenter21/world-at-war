@@ -1,0 +1,115 @@
+[
+  {
+    "name": "regional-volatile",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 26196
+    },
+    "audit": {
+      "events": 0,
+      "bytes": 0,
+      "cleanup": []
+    }
+  },
+  {
+    "name": "global-volatile",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 34097
+    },
+    "audit": {
+      "events": 0,
+      "bytes": 0,
+      "cleanup": []
+    }
+  },
+  {
+    "name": "mixed-volatile",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 121014
+    },
+    "audit": {
+      "events": 0,
+      "bytes": 0,
+      "cleanup": []
+    }
+  },
+  {
+    "name": "regional-postgres",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 40636
+    },
+    "audit": {
+      "events": 236692,
+      "bytes": 174001460,
+      "cleanup": []
+    }
+  },
+  {
+    "name": "global-postgres",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 53302
+    },
+    "audit": {
+      "events": 19,
+      "bytes": 6608,
+      "cleanup": []
+    }
+  },
+  {
+    "name": "mixed-postgres",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 188795
+    },
+    "audit": {
+      "events": 711640,
+      "bytes": 523136465,
+      "cleanup": []
+    }
+  },
+  {
+    "name": "retention-smoke",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 1840
+    },
+    "audit": {
+      "events": 57010,
+      "bytes": 41670722,
+      "cleanup": [
+        {
+          "time": 1791756798974.997,
+          "deleted_rows": 0,
+          "failed": false,
+          "eligible_backlog_rows": 0,
+          "oldest_eligible_age_seconds": 0
+        }
+      ]
+    }
+  }
+]

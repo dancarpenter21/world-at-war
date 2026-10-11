@@ -72,6 +72,14 @@ test("plays the command exercise without a catalog and retains a congested radio
   const pause = await request.post(`${backend.url}/v1/games/${gameId}/pause`, { data: { player_id: playerId } });
   expect(pause.ok()).toBe(true);
   await expect(page.getByText("Scenario paused", { exact: true })).toBeVisible();
+  const audit = await (await request.get(`${backend.url}/v1/games/${gameId}/network/audit?${authorization}`)).json();
+  expect(audit.events.some((event: { kind: string }) => event.kind === "scheduled")).toBe(true);
+  expect(audit.events.every((event: Record<string, unknown>) => !["payload", "route", "from", "to"].some(key => key in event))).toBe(true);
+  const scheduled = await (await request.get(`${backend.url}/v1/games/${gameId}/network/audit?${authorization}&kind=scheduled&limit=1`)).json();
+  expect(scheduled.events).toHaveLength(1);
+  expect(scheduled.next_cursor).not.toBeNull();
+  const nextAudit = await (await request.get(`${backend.url}/v1/games/${gameId}/network/audit?${authorization}&kind=scheduled&cursor=${scheduled.next_cursor}`)).json();
+  expect(nextAudit.events.every((event: { sequence: number }) => event.sequence > scheduled.next_cursor)).toBe(true);
   const paused = await (await request.get(networkUrl)).json();
   expect(paused.links.some((link: { queued_packets: number }) => link.queued_packets > 0)).toBe(true);
   expect(paused.links.every((link: { queued_packets: number }) => link.queued_packets <= 4)).toBe(true);

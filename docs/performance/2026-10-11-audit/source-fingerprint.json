@@ -1,0 +1,26 @@
+{
+  "base_revision": "764523c523c33955f89b691064f013fdc3cce844",
+  "files": {
+    "crates/server/migrations/006_communications_audit.sql": "573f0d88c97b9a10c3f8f5e17a565049a70d08ac0e295c9c30eb262a7c0fda2d",
+    "crates/server/src/audit.rs": "3ecdc54e4aa185454180060e5b35b657d2cde6365402a744decb9cc49774441e",
+    "crates/server/src/audit_auth_tests.rs": "2ba5d9b546bd34fa219adc01e75989f63610f0b30db38c902e77f0d6ca31d396",
+    "crates/server/src/auth.rs": "0939d0fee2a5d64671762eac86d949b5e02517bff1e888698562c678799efc55",
+    "crates/server/src/intents.rs": "318cd3b613d4ab6887d0bbdb2f5026f3fd5548f24f3d51f8733e1f733f231c84",
+    "crates/server/src/main.rs": "f650e014cdd6fd775d21c6757ed7954e56d6c233796c78b19154552110d13da9",
+    "crates/server/src/performance.rs": "bec56f9f33976513b05256bf9ea5b117f4430cce5cf47bd8b995a0db4f13e036",
+    "crates/server/src/recovery.rs": "24972d605654d91dc72a5baa4c16f8d164b857dd3d2455258072ab3f9a3b34ef",
+    "crates/server/src/storage.rs": "ebe568910ed5dc8b24f9dafa4f58d21aa9d1b00951694e14d961f37e538adcf2",
+    "crates/server/src/transport.rs": "8c460ee66fb4e9219db63564aa2f2f94c848051811f9b415ea09c3907c5b86f9",
+    "crates/sim-core/src/audit.rs": "b0198d3092cc1ef83df63af255b4f39cc5da205dd229bd916135181bdfc0e4cb",
+    "crates/sim-core/src/iftu/mod.rs": "eaa400256b4060c716cd0dce746fccd45a783de446094426e562655c47e92217",
+    "crates/sim-core/src/iftu/tests.rs": "c05c8f46a2c0c334e652ed07e9676b0a647f1679f7588783e2f93052a4dbf937",
+    "crates/sim-core/src/lib.rs": "d8166b2f85960aea5600b9d9313ca9303c740c60e26788a5c9f5683e10c5f2ba",
+    "crates/sim-core/src/snapshot.rs": "302bc4a3600509b42b9c36bcecd3240b658452dbfb3af8be0044682bab6ddcbd",
+    "crates/sim-core/src/transport.rs": "b27dcb26fde627d123a9f4777220eab08193335d881001836fe672231c15cbbb",
+    "web/scripts/performance-lib.mjs": "3cb49a31e38af631328543adf53f9113a364933aa18f6723c52b283c64a30e07",
+    "web/scripts/performance-server.mjs": "1af5b26dcd643a247576f9d03639c4b21c5892e678431e9328c37994ee09aa3f",
+    "web/scripts/performance-soak.mjs": "dcd845c7961c3ac7c60b5f59d96744e81e2c9a48b12b409b32734dfaa6e23339",
+    "web/scripts/performance.node-test.mjs": "5061485117c2574cbcab10afab24d0a94b3d5d8cf1c5f68a2b64134df1c455b5"
+  },
+  "binary_sha256": "d608e4ffa070ba07eca25fbd3ae94f9af69a284f602dc7e802bc3c97d49105eb"
+}

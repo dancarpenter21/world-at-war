@@ -77,7 +77,25 @@ pub(super) fn submit_player_intent(
                 "this order ID has already been used for a different command",
             ));
         }
-        return existing.result.clone();
+        let result = existing.result.clone();
+        game.audit.pending.push(sim_core::audit::Event {
+            physical: None,
+            kind: sim_core::audit::Kind::DuplicateSuppressed,
+            at_ns: game
+                .simulation
+                .radio_tick()
+                .saturating_mul(sim_core::TICK_SECONDS)
+                .saturating_mul(1_000_000_000),
+            packet_id: None,
+            bytes: 0,
+            context: sim_core::audit::Context {
+                message_id: Some(format!("intent:{}", request.intent.intent_id)),
+                ..Default::default()
+            },
+            terminal: Some(game.roles[&role_id].location_unit_id),
+            reason: None,
+        });
+        return result;
     }
     if game.status != GameStatus::Running || game.simulation.mission_complete() {
         return Err(api_error(

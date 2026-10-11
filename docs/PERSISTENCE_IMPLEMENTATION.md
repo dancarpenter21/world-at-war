@@ -65,9 +65,12 @@ lifecycle records. Committed lifecycle history is removed from the live event
 buffer. Existing event pagination, profile/state filters and role visibility
 rules apply when reading PostgreSQL history. Current message states, receipts,
 authority records and duplicate-suppression IDs remain available in game snapshots.
-The archive retains history indefinitely; it does not yet implement a retention
-policy or a complete audit of every internal knowledge-report/fragment packet.
-It also does not claim bounded total application memory.
+Communications metadata now records internal knowledge reports, fragments,
+acknowledgements and IFTU traffic alongside the C2 lifecycle archive. Terminal-local
+queries expose only locally observable metadata. Optional age-based cleanup
+preserves active traffic and recovery state; retention defaults to indefinite.
+Raw packet payload export, interactive replay and bounded total application memory
+remain outside this increment. See [audit API, migration and retention operation](COMMUNICATIONS_AUDIT.md).
 
 ## Running and recovering
 

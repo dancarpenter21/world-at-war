@@ -180,7 +180,13 @@ gate waits (HTTP, simulation and streams), storage-lock waits, SQL execution and
 transaction commit. These spans nest: their durations must not be summed as if
 independent. Cancelled/failed durable boundaries are not successful cycles.
 Aggregate counts include journal bytes, submitted snapshot bytes, checkpoints and
-archived events. No message or snapshot bodies are recorded.
+archived events. No message or snapshot bodies are recorded. Communications audit capture adds
+aggregate event and metadata-byte counts. Retention samples include audit buffer
+and packet-correlation counts. Cleanup spans/results report duration, deleted
+rows, failures, eligible backlog and oldest eligible age; the analyzer preserves
+these in `summary.json.audit` and timing metrics. The short harness's
+`--archive-retention-days N` configures and records the opt-in PostgreSQL policy;
+the default is 0.
 
 Five-second database samples contain database/table/index sizes, WAL growth since
 container readiness, and Docker container CPU/memory/block-I/O measurements.

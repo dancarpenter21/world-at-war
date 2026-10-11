@@ -149,6 +149,7 @@ impl Simulation {
             deliver_reports.after(detect_contacts),
         ));
         Ok(Self {
+            audit: audit::Audit::default(),
             #[cfg(test)]
             compact_network_history: true,
             world,

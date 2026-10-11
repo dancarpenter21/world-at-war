@@ -21,6 +21,7 @@ const { values } = parseArgs({ options: {
   storage: { type: 'string', default: 'volatile' }, 'postgres-image': { type: 'string', default: 'postgres:17-alpine' },
   profile: { type: 'string', default: 'mixed' }, clients: { type: 'string' },
   warmup: { type: 'string', default: '60' }, duration: { type: 'string', default: '300' },
+  'archive-retention-days': { type: 'string', default: '0' },
   seed: { type: 'string', default: '12787750' }, output: { type: 'string' },
   'reconnect-every': { type: 'string', default: '300' },
   'check-budgets': { type: 'boolean', default: false },
@@ -31,6 +32,7 @@ const numeric = (key, min, max) => {
 };
 const warmup = numeric('warmup', 0, 3600), duration = numeric('duration', 1, 86400);
 const seed = numeric('seed', 0, Number.MAX_SAFE_INTEGER), reconnectEvery = numeric('reconnect-every', 15, 86400);
+const archiveRetentionDays = numeric('archive-retention-days', 0, 4294967295);
 const layout = profiles(values.profile, values.clients === undefined ? undefined : Number(values.clients));
 const output = path.resolve(values.output ?? path.join(root, 'tmp/performance', `${new Date().toISOString().replaceAll(':', '-')}-${values.profile}`));
 await mkdir(path.dirname(output), { recursive: true });
@@ -46,7 +48,7 @@ function emit(row) {
 function fail(error) { const message = String(error?.message ?? error); errors.push(message); emit({ kind: 'error', message }); stopping = true; }
 process.on('SIGINT', () => { fail(new Error('Run interrupted')); });
 process.on('SIGTERM', () => { fail(new Error('Run terminated')); });
-const metadata = { schema_version: 2, measurement_version: 3, clock: 'epoch anchored to monotonic process time', storage: values.storage, retention_sample_seconds: 5, profile: values.profile, layout, seed, warmup_seconds: warmup, measured_seconds: duration,
+const metadata = { schema_version: 2, measurement_version: 3, clock: 'epoch anchored to monotonic process time', storage: values.storage, archive_retention_days: archiveRetentionDays, retention_sample_seconds: 5, profile: values.profile, layout, seed, warmup_seconds: warmup, measured_seconds: duration,
   reconnect_every_seconds: reconnectEvery, started_at: new Date().toISOString(),
   revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
   dirty: execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim().length > 0,
@@ -201,7 +203,7 @@ try {
   await writeFile(path.join(runtime, 'airports/latest.json'), JSON.stringify({ schema_version: 1, synced_unix: Math.floor(clock.now() / 1000), checksum: 'performance-fixture', sources: [], degraded_sources: [], airports }));
   serverLog = createWriteStream(path.join(output, 'server.log'), { flags: 'wx' });
   backend = spawn(path.join(root, 'target/release/world-at-war-server'), [], { cwd: runtime,
-    env: { PATH: process.env.PATH, DATABASE_URL: database?.url ?? '', BIND_ADDR: `127.0.0.1:${port}`, APP_ALLOWED_ORIGINS: base,
+    env: { PATH: process.env.PATH, COMMUNICATIONS_ARCHIVE_RETENTION_DAYS: String(archiveRetentionDays), DATABASE_URL: database?.url ?? '', BIND_ADDR: `127.0.0.1:${port}`, APP_ALLOWED_ORIGINS: base,
       COOKIE_SECURE: 'false', ADMIN_SETUP_TOKEN: '', PERFORMANCE_TRACE_DIR: output,
       SPACETRACK_USERNAME: '', SPACETRACK_PASSWORD: '', SPACETRACK_LOGIN_URL: `${providerBase}/login`, SPACETRACK_GP_URL: `${providerBase}/gp`,
       AIRPORT_CACHE_DIR: path.join(runtime, 'airports'), AIRPORT_REFRESH_MAX_AGE_SECONDS: '86400',

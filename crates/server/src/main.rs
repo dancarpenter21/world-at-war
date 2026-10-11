@@ -1,6 +1,7 @@
 mod ai_orders;
 mod airport_catalog;
 mod airspace_import;
+mod audit;
 mod auth;
 mod benchmark;
 mod credential_cookie;
@@ -96,6 +97,8 @@ struct AppState {
 
 #[derive(Serialize, Deserialize)]
 struct Game {
+    #[serde(skip)]
+    audit: audit::Runtime,
     persistence_sequence: u64,
     next_identifier: u64,
     members: BTreeSet<Uuid>,
@@ -178,6 +181,7 @@ struct NetworkProjection {
 
 #[derive(Serialize)]
 struct NetworkEventsPage {
+    truncated: bool,
     events: Vec<NetworkMessageRecord>,
     next_cursor: Option<u64>,
 }
@@ -526,6 +530,11 @@ async fn main() -> anyhow::Result<()> {
     if args.first().is_some_and(|arg| arg == "--benchmark") {
         return benchmark::run(&args[1..]);
     }
+    let retention_days = audit::retention_days(
+        std::env::var("COMMUNICATIONS_ARCHIVE_RETENTION_DAYS")
+            .ok()
+            .as_deref(),
+    )?;
     let performance_writer = performance::start()?;
     let scenarios = [
         regional_campaign_scenario(),
@@ -571,6 +580,7 @@ async fn main() -> anyhow::Result<()> {
     };
     recovery::load(&state).await?;
     let simulation_task = tokio::spawn(run_simulation_loop(state.clone()));
+    let audit_task = tokio::spawn(audit::maintenance(state.clone(), retention_days));
     let airport_catalog = state.airport_catalog.clone();
     tokio::spawn(async move {
         airport_catalog.refresh_if_stale().await;
@@ -586,6 +596,8 @@ async fn main() -> anyhow::Result<()> {
         () = shutdown_signal() => Ok(()),
     };
     let checkpoint = recovery::shutdown(&state).await;
+    audit_task.abort();
+    let _ = audit_task.await;
     simulation_task.abort();
     let _ = simulation_task.await;
     if let Some(writer) = performance_writer {
@@ -708,6 +720,7 @@ fn router(state: AppState) -> Router {
             "/v1/games/{game_id}/roles/{role_id}/debrief",
             get(intents::get_mission_debrief),
         )
+        .route("/v1/games/{game_id}/network/audit", get(audit::list))
         .route("/v1/games/{game_id}/network", get(get_network_projection))
         .route(
             "/v1/games/{game_id}/network/events",
@@ -911,7 +924,7 @@ async fn create_game(
                 )
             })?;
     }
-    let game = Game {
+    let mut game = Game {
         persistence_sequence: 0,
         next_identifier: 0,
         participant_names: BTreeMap::from([(request.host_player_id, "Host".into())]),
@@ -935,6 +948,7 @@ async fn create_game(
         diagnostics: diagnostics::Diagnostics::default(),
         planning: planning::PlanningState::new(scenario.campaign.clone()),
         network_message_events: Vec::new(),
+        audit: audit::Runtime::default(),
         message_profiles: state
             .communications_catalog
             .messages
@@ -972,6 +986,7 @@ async fn create_game(
         network_seed,
         operational_error: None,
     };
+    game.simulation.enable_audit();
     let summary = game_summary(&game);
     state.games.write().await.insert(game_id, game);
     Ok(Json(CreateGameResponse {
@@ -2072,6 +2087,11 @@ async fn list_network_events(
     let role = authorized_role(game, &query.authorization())?;
     let limit = query.limit.unwrap_or(100).clamp(1, 500);
     if let Some(store) = &state.durability.store {
+        let truncated = query.cursor.unwrap_or(0)
+            < store
+                .lifecycle_floor(game_id, role.id)
+                .await
+                .map_err(|_| storage::unavailable())?;
         let mut events = Vec::new();
         let mut cursor = query.cursor.unwrap_or(0);
         loop {
@@ -2087,6 +2107,7 @@ async fn list_network_events(
                     if events.len() > limit {
                         events.pop();
                         return Ok(Json(NetworkEventsPage {
+                            truncated,
                             next_cursor: events.last().map(|record| record.sequence),
                             events,
                         }));
@@ -2095,6 +2116,7 @@ async fn list_network_events(
             }
             if exhausted {
                 return Ok(Json(NetworkEventsPage {
+                    truncated,
                     events,
                     next_cursor: None,
                 }));
@@ -2120,6 +2142,7 @@ async fn list_network_events(
         .filter(|_| matching.next().is_some())
         .map(|record| record.sequence);
     Ok(Json(NetworkEventsPage {
+        truncated: false,
         events,
         next_cursor,
     }))
@@ -3145,7 +3168,13 @@ async fn run_simulation_loop(state: AppState) {
             let mut failed = false;
             for game in games.values_mut() {
                 match recovery::encode(game) {
-                    Ok(bytes) if before.get(&game.id) == Some(&bytes) => continue,
+                    Ok(bytes)
+                        if before.get(&game.id) == Some(&bytes)
+                            && game.audit.pending.is_empty()
+                            && !game.simulation.has_pending_audit() =>
+                    {
+                        continue
+                    }
                     Ok(_) => match recovery::Boundary::new(
                         game,
                         inputs.remove(&game.id),
@@ -3177,6 +3206,11 @@ async fn run_simulation_loop(state: AppState) {
             {
                 recovery::rollback(&state, &mut games, before);
                 continue;
+            }
+        }
+        if state.durability.store.is_none() {
+            for game in games.values_mut() {
+                audit::flush_volatile(game);
             }
         }
         cycle.set(
@@ -3335,6 +3369,7 @@ mod authority_tests {
             diagnostics: diagnostics::Diagnostics::default(),
             planning: planning::PlanningState::new(scenario.campaign.clone()),
             network_message_events: Vec::new(),
+            audit: audit::Runtime::default(),
             message_profiles: CommunicationsCatalog::load(
                 PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                     .join("../../data/communications/catalog.yaml"),

@@ -25,7 +25,7 @@ pub struct DeliveryEvent {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-struct Message {
+pub(super) struct Message {
     from: Uuid,
     to: Uuid,
     payload: Vec<u8>,
@@ -37,18 +37,18 @@ struct Message {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-struct Fragment {
-    message: Uuid,
-    index: usize,
-    route: Vec<Uuid>,
-    hop: usize,
-    ack: bool,
+pub(super) struct Fragment {
+    pub(super) message: Uuid,
+    pub(super) index: usize,
+    pub(super) route: Vec<Uuid>,
+    pub(super) hop: usize,
+    pub(super) ack: bool,
 }
 
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub(super) struct Transport {
-    messages: BTreeMap<Uuid, Message>,
-    packets: BTreeMap<u64, Fragment>,
+    pub(super) messages: BTreeMap<Uuid, Message>,
+    pub(super) packets: BTreeMap<u64, Fragment>,
     pub(super) events: Vec<DeliveryEvent>,
     finished: BTreeSet<Uuid>,
 }
@@ -96,17 +96,57 @@ impl Simulation {
         expires: u64,
     ) -> Result<(), String> {
         if self.transport.finished.contains(&id) || self.transport.messages.contains_key(&id) {
+            self.audit_application(
+                audit::Kind::DuplicateSuppressed,
+                id.to_string(),
+                from,
+                payload.len(),
+                None,
+                None,
+            );
             return Ok(());
         }
         if payload.len() > 1_048_576 {
+            self.audit_application(
+                audit::Kind::Rejected,
+                id.to_string(),
+                from,
+                payload.len(),
+                None,
+                Some("message exceeds 1 MiB".into()),
+            );
             return Err("message exceeds 1 MiB".into());
         }
         if expires <= self.tick() {
+            self.audit_application(
+                audit::Kind::Rejected,
+                id.to_string(),
+                from,
+                payload.len(),
+                None,
+                Some("message already expired".into()),
+            );
             return Err("message already expired".into());
         }
         if self.message_route(from, to).is_none() {
+            self.audit_application(
+                audit::Kind::Rejected,
+                id.to_string(),
+                from,
+                payload.len(),
+                None,
+                Some("no configured communication route".into()),
+            );
             return Err("no configured communication route".into());
         }
+        self.audit_application(
+            audit::Kind::Accepted,
+            id.to_string(),
+            from,
+            payload.len(),
+            None,
+            None,
+        );
         self.transport.messages.insert(
             id,
             Message {
@@ -215,7 +255,29 @@ impl Simulation {
             fragment.route[fragment.hop + 1],
             bytes,
         ) {
+            let attempt = self.transport.messages[&fragment.message].attempts;
+            self.annotate_audit_packet(
+                packet.get(),
+                audit::Context {
+                    message_id: Some(fragment.message.to_string()),
+                    fragment: Some(fragment.index),
+                    attempt: Some(attempt),
+                    hop: Some(fragment.hop),
+                    acknowledgement: fragment.ack,
+                    from: fragment.route.get(fragment.hop).copied(),
+                    to: fragment.route.get(fragment.hop + 1).copied(),
+                },
+            );
             self.transport.packets.insert(packet.get(), fragment);
+        } else {
+            self.audit_application(
+                audit::Kind::Dropped,
+                fragment.message.to_string(),
+                fragment.route[fragment.hop],
+                0,
+                None,
+                Some("scheduling_failed".into()),
+            );
         }
     }
 
@@ -233,6 +295,18 @@ impl Simulation {
             let m = &self.transport.messages[&id];
             if tick >= m.expires || (m.attempts >= MAX_ATTEMPTS && tick >= m.next_attempt) {
                 let m = self.transport.messages.remove(&id).unwrap();
+                self.audit_application(
+                    if tick >= m.expires {
+                        audit::Kind::Expired
+                    } else {
+                        audit::Kind::Unacknowledged
+                    },
+                    id.to_string(),
+                    m.from,
+                    0,
+                    Some(m.attempts),
+                    None,
+                );
                 self.transport.events.push(DeliveryEvent {
                     id,
                     state: if m.delivered {
@@ -259,8 +333,34 @@ impl Simulation {
             let m = self.transport.messages.get_mut(&id).unwrap();
             m.attempts += 1;
             m.next_attempt = tick + RETRY_TICKS;
+            let attempt = m.attempts;
+            let bytes = m.payload.len();
+            self.audit_application(
+                audit::Kind::Attempt,
+                id.to_string(),
+                if delivered { to } else { from },
+                if delivered { 32 } else { bytes },
+                Some(attempt),
+                None,
+            );
             if from == to {
                 let m = self.transport.messages.remove(&id).unwrap();
+                self.audit_application(
+                    audit::Kind::Reassembled,
+                    id.to_string(),
+                    to,
+                    m.payload.len(),
+                    Some(m.attempts),
+                    None,
+                );
+                self.audit_application(
+                    audit::Kind::Acknowledged,
+                    id.to_string(),
+                    from,
+                    0,
+                    Some(m.attempts),
+                    None,
+                );
                 self.transport.events.push(DeliveryEvent {
                     id,
                     state: DeliveryState::Delivered,
@@ -329,6 +429,14 @@ impl Simulation {
             }
             if f.ack {
                 let m = self.transport.messages.remove(&f.message).unwrap();
+                self.audit_application(
+                    audit::Kind::Acknowledged,
+                    f.message.to_string(),
+                    m.from,
+                    0,
+                    Some(m.attempts),
+                    None,
+                );
                 self.transport.events.push(DeliveryEvent {
                     id: f.message,
                     state: DeliveryState::Acknowledged,
@@ -338,8 +446,21 @@ impl Simulation {
                 self.transport.finished.insert(f.message);
                 retired = true;
             } else {
+                let (duplicate, terminal, attempt) = {
+                    let m = self.transport.messages.get_mut(&f.message).unwrap();
+                    (!m.received.insert(f.index), m.to, m.attempts)
+                };
+                if duplicate {
+                    self.audit_application(
+                        audit::Kind::DuplicateSuppressed,
+                        f.message.to_string(),
+                        terminal,
+                        0,
+                        Some(attempt),
+                        None,
+                    );
+                }
                 let m = self.transport.messages.get_mut(&f.message).unwrap();
-                m.received.insert(f.index);
                 if !m.delivered
                     && m.received.len() == m.payload.len().div_ceil(FRAGMENT_BYTES).max(1)
                 {
@@ -350,7 +471,15 @@ impl Simulation {
                         recipient: m.to,
                         payload: m.payload.clone(),
                     });
-                    let (from, to) = (m.from, m.to);
+                    let (from, to, bytes, attempt) = (m.from, m.to, m.payload.len(), m.attempts);
+                    self.audit_application(
+                        audit::Kind::Reassembled,
+                        f.message.to_string(),
+                        to,
+                        bytes,
+                        Some(attempt),
+                        None,
+                    );
                     if let Some(route) = routes.get(&(to, from)).cloned() {
                         self.send_fragment(Fragment {
                             message: f.message,
