@@ -678,3 +678,53 @@ fn truth_inspection_includes_live_weapon_endpoints_and_removes_retired_ones() {
         .iter()
         .any(|l| l.from_entity_id == weapon || l.to_entity_id == weapon));
 }
+
+#[test]
+fn snapshots_preserve_weapon_handoff_fragments_and_future_updates() {
+    let mut live = fixture();
+    let weapon = launch(&mut live);
+    live.world
+        .resource_mut::<WeaponSystem>()
+        .flights
+        .get_mut(&weapon)
+        .unwrap()
+        .profile
+        .handoff = true;
+    jam(
+        &mut live,
+        FrequencyBand::new(8_000_000_000, 9_000_000_000),
+        12,
+    );
+    let message = Uuid::from_u128(995001);
+    live.send_message(message, SENSOR, SHOOTER, vec![42; 1600], 50)
+        .unwrap();
+    live.world.resource_mut::<WeaponSystem>().commands.push((
+        SHOOTER,
+        weapon,
+        Command::AssignProvider {
+            provider_id: BACKUP,
+        },
+    ));
+    for _ in 0..35 {
+        let bytes = serde_json::to_vec(&live.snapshot()).unwrap();
+        let mut recovered = Simulation::restore(serde_json::from_slice(&bytes).unwrap()).unwrap();
+        assert_eq!(bytes, serde_json::to_vec(&recovered.snapshot()).unwrap());
+        live.step();
+        recovered.step();
+        assert_eq!(
+            serde_json::to_vec(&live.snapshot()).unwrap(),
+            serde_json::to_vec(&recovered.snapshot()).unwrap()
+        );
+        for role in [SHOOTER, SENSOR, BACKUP, RELAY] {
+            assert_eq!(
+                serde_json::to_value(live.projection_for(role, Side::Blue)).unwrap(),
+                serde_json::to_value(recovered.projection_for(role, Side::Blue)).unwrap()
+            );
+        }
+        live = recovered;
+    }
+    assert!(live.retention_statistics().transport_completed_ids > 0);
+    live.send_message(message, SENSOR, SHOOTER, vec![42; 1600], 500)
+        .unwrap();
+    assert_eq!(live.retention_statistics().transport_messages, 0);
+}

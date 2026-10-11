@@ -4,9 +4,10 @@ use sim_scenario::SensorReportRoute;
 
 pub(super) const TRACK_REPORT_PROFILE: &str = "public-safe.jseries.track-report.v1";
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub(super) struct SensorReportState {
     routes: Vec<SensorReportRoute>,
+    #[serde(with = "sim_core::snapshot::entries")]
     last_attempt: BTreeMap<(Uuid, Uuid, Uuid), u64>,
 }
 

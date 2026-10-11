@@ -573,12 +573,12 @@ impl Default for CombatProfile {
         }
     }
 }
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct CombatState {
     pub profile: CombatProfile,
     pub destroyed: bool,
 }
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 struct Execution {
     plan_id: Uuid,
     task: MissionTask,
@@ -590,12 +590,13 @@ struct Execution {
     fired: bool,
     detail: String,
 }
+#[derive(Clone, Serialize, Deserialize)]
 struct Weapon {
     target: Uuid,
     impact_tick: u64,
     hit: bool,
 }
-#[derive(Resource, Default)]
+#[derive(Resource, Default, Clone, Serialize, Deserialize)]
 pub(super) struct Operations {
     missions: BTreeMap<Uuid, Execution>,
     airspaces: BTreeMap<Uuid, Vec<AirspaceVolume>>,
@@ -605,6 +606,7 @@ pub(super) struct Operations {
     pub(super) launches: Vec<crate::iftu::Launch>,
     pub seed: u64,
     known_completions: BTreeMap<Uuid, BTreeSet<Uuid>>,
+    #[serde(with = "crate::snapshot::entries")]
     revisions: BTreeMap<(Uuid, Uuid), u64>,
 }
 impl Operations {

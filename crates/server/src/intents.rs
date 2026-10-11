@@ -3,11 +3,13 @@ use sim_core::{OrderKind, OrderStatus};
 
 pub(super) type SubmissionResult = Result<SubmissionOutcome, (StatusCode, Json<ErrorResponse>)>;
 
+#[derive(Serialize, Deserialize)]
 pub(super) struct IntentSubmission {
     player_id: Uuid,
     role_id: Uuid,
     intent: PlayerIntent,
     submitted_tick: u64,
+    #[serde(with = "super::recovery::submission_result")]
     result: SubmissionResult,
 }
 

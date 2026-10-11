@@ -86,6 +86,7 @@ pub struct CombatProjection {
     pub received_impacts: Vec<ReceivedImpactReport>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 struct Flight {
     intent_id: Uuid,
     attacker: Uuid,
@@ -98,7 +99,7 @@ struct Flight {
     damage: u32,
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource, Default, Clone, Serialize, Deserialize)]
 pub(super) struct CombatState {
     health: BTreeMap<Uuid, u32>,
     sides: BTreeMap<Uuid, Side>,

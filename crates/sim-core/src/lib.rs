@@ -132,7 +132,7 @@ pub struct CyclicFlightPath {
     pub waypoints: Vec<FlightWaypoint>,
 }
 
-#[derive(Component, Debug, Clone, Copy)]
+#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
 struct GeodesicMotionState {
     origin: GeoPose,
     started_at_tick: u64,
@@ -151,7 +151,7 @@ struct CommandableUnit {
     flight_path: Option<&'static mut CyclicFlightPathState>,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
 struct CyclicFlightPathState {
     path: CyclicFlightPath,
     active: bool,
@@ -469,7 +469,7 @@ pub struct Contact {
     pub observed_domain: Option<Domain>,
 }
 
-#[derive(Resource, Debug, Default)]
+#[derive(Resource, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Observations(pub Vec<Contact>);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -486,12 +486,13 @@ pub struct Track {
     pub observed_domain: Option<Domain>,
 }
 
-#[derive(Resource, Debug, Default)]
+#[derive(Resource, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct KnowledgeBases(pub BTreeMap<Uuid, Vec<Track>>);
 
-#[derive(Resource, Default)]
+#[derive(Resource, Default, Clone, Serialize, Deserialize)]
 struct ReportKnowledge {
     friendly: BTreeMap<Uuid, BTreeMap<Uuid, VisibleUnit>>,
+    #[serde(with = "crate::snapshot::entries")]
     targets: BTreeMap<(Uuid, Uuid), Uuid>,
     messages: BTreeSet<Uuid>,
     sequence: u128,
@@ -505,7 +506,7 @@ struct KnowledgeReport {
     contacts: Vec<(Uuid, Track)>,
 }
 
-#[derive(Resource)]
+#[derive(Resource, Clone, Serialize, Deserialize)]
 struct KnowledgeNamespace(Uuid);
 
 fn scoped_track_id(namespace: Uuid, observer: Uuid, subject: Uuid) -> Uuid {
@@ -587,12 +588,12 @@ pub struct OrderResult {
     pub status: OrderStatus,
 }
 
-#[derive(Resource, Debug, Default)]
+#[derive(Resource, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct PendingIntents(pub VecDeque<AuthorizedIntent>);
 
-#[derive(Resource, Debug, Default)]
+#[derive(Resource, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct OrderResults(pub Vec<OrderResult>);
-#[derive(Resource, Default)]
+#[derive(Resource, Default, Clone, Serialize, Deserialize)]
 struct AppliedIntents(BTreeMap<Uuid, OrderStatus>);
 
 #[derive(Debug, Error)]
@@ -632,7 +633,9 @@ pub struct CommunicationLinkStatus {
     pub queued_bytes: usize,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 struct CommunicationsRuntime {
+    #[serde(with = "snapshot::network")]
     simulator: NetworkSimulator,
     entity_devices: BTreeMap<Uuid, Vec<DeviceId>>,
     baseline_interference: BTreeMap<DeviceId, Vec<ReceiverInterference>>,
@@ -640,15 +643,19 @@ struct CommunicationsRuntime {
     outgoing_links: BTreeMap<Uuid, Vec<usize>>,
     incoming_links: BTreeMap<Uuid, Vec<usize>>,
     receiver_links: BTreeMap<DeviceId, Vec<usize>>,
+    #[serde(with = "crate::snapshot::entries")]
     first_link: BTreeMap<(Uuid, Uuid), usize>,
     jamming_regions: Vec<JammingRegion>,
     radio_channels: BTreeMap<ChannelId, FrequencyBand>,
 }
 
+pub mod snapshot;
+
 pub struct Simulation {
     #[cfg(test)]
     compact_network_history: bool,
     world: World,
+    snapshot_query: std::sync::Mutex<QueryState<(Entity, &'static SimEntityId)>>,
     schedule: Schedule,
     communications: CommunicationsRuntime,
     transport: transport::Transport,
@@ -932,10 +939,12 @@ impl Simulation {
             detect_contacts.after(combat::resolve_impacts),
             deliver_reports.after(detect_contacts),
         ));
+        let snapshot_query = world.query::<(Entity, &SimEntityId)>();
         let mut simulation = Self {
             #[cfg(test)]
             compact_network_history: true,
             world,
+            snapshot_query: std::sync::Mutex::new(snapshot_query),
             schedule,
             transport: transport::Transport::default(),
             last_step_timings: performance::StepTimings::default(),

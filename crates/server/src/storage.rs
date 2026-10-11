@@ -1,0 +1,374 @@
+//! Durable records for the single authoritative runtime. No connection URL or
+//! credential is included in operational errors.
+use super::*;
+use anyhow::Context;
+use sha2::{Digest, Sha256};
+use tokio::sync::Mutex;
+use tokio_postgres::{Client, NoTls};
+
+const MIGRATIONS: &[&str] = &[
+    include_str!("../migrations/001_identity.sql"),
+    include_str!("../migrations/002_games.sql"),
+    include_str!("../migrations/003_network_audit.sql"),
+    include_str!("../migrations/004_game_metadata.sql"),
+    include_str!("../migrations/005_event_version.sql"),
+];
+const RUNTIME_LOCK: i64 = 0x57415752554e;
+
+pub(super) struct Store {
+    client: Mutex<Client>,
+}
+
+pub(super) struct StoredSession {
+    pub token_hash: String,
+    pub player_id: Uuid,
+    pub display_name: String,
+    pub username: Option<String>,
+    pub csrf_token: String,
+    pub expires_unix: u64,
+}
+
+pub(super) struct Account {
+    pub player_id: Uuid,
+    pub display_name: String,
+    pub username: String,
+    pub password_hash: String,
+}
+
+pub(super) struct StoredEvent {
+    pub sequence: u64,
+    pub kind: String,
+    pub payload: Vec<u8>,
+    pub hash: String,
+}
+pub(super) struct StoredRun {
+    pub id: Uuid,
+    pub sequence: u64,
+    pub snapshot_sequence: u64,
+    pub snapshot: Vec<u8>,
+    pub snapshot_hash: String,
+    pub hash: String,
+    pub events: Vec<StoredEvent>,
+}
+
+impl Store {
+    pub async fn runs(&self) -> anyhow::Result<Vec<StoredRun>> {
+        let client = self.client.lock().await;
+        let rows = client.query("SELECT id, sequence, snapshot_sequence, snapshot, snapshot_sha256, current_sha256 FROM games ORDER BY id", &[]).await?;
+        let mut runs = Vec::new();
+        for row in rows {
+            let id: Uuid = row.get(0);
+            let snapshot_sequence: i64 = row.get(2);
+            let events = client.query("SELECT sequence, kind, payload, state_sha256, schema_version FROM game_events WHERE game_id = $1 AND sequence > $2 ORDER BY sequence", &[&id, &snapshot_sequence]).await?
+                .into_iter().map(|row| { anyhow::ensure!(row.get::<_, i32>(4) == 1, "unsupported game event schema"); Ok(StoredEvent { sequence: u64::try_from(row.get::<_, i64>(0))?, kind: row.get(1), payload: row.get(2), hash: row.get(3) }) }).collect::<anyhow::Result<_>>()?;
+            runs.push(StoredRun {
+                id,
+                sequence: u64::try_from(row.get::<_, i64>(1))?,
+                snapshot_sequence: u64::try_from(snapshot_sequence)?,
+                snapshot: row.get(3),
+                snapshot_hash: row.get(4),
+                hash: row.get(5),
+                events,
+            });
+        }
+        Ok(runs)
+    }
+
+    pub async fn commit(
+        &self,
+        changes: &[recovery::Boundary],
+        games: &mut BTreeMap<Uuid, Game>,
+        identity: Option<&auth::SessionUpdate>,
+    ) -> anyhow::Result<()> {
+        let mut client = self.client.lock().await;
+        let transaction = client.transaction().await?;
+        if let Some(identity) = identity {
+            if let Some(previous) = &identity.previous {
+                transaction
+                    .execute(
+                        "DELETE FROM browser_sessions WHERE token_hash = $1",
+                        &[previous],
+                    )
+                    .await?;
+            }
+            if let Some(session) = &identity.session {
+                let session = auth::stored(session);
+                transaction.execute(
+                    "INSERT INTO browser_sessions(token_hash, player_id, csrf_token, expires_unix) VALUES ($1, $2, $3, $4)",
+                    &[&session.token_hash, &session.player_id, &session.csrf_token, &i64::try_from(session.expires_unix)?],
+                ).await?;
+            }
+        }
+        for change in changes {
+            let count = if change.sequence == 1 {
+                transaction.execute("INSERT INTO games(id, sequence, snapshot_sequence, snapshot, snapshot_sha256, current_sha256) VALUES ($1, $2, $2, $3, $4, $4)",
+                    &[&change.id, &change.sequence, &change.state, &change.hash]).await?
+            } else {
+                transaction.execute("UPDATE games SET sequence = $2, current_sha256 = $3, snapshot_sequence = CASE WHEN $4 THEN $2 ELSE snapshot_sequence END, snapshot = CASE WHEN $4 THEN $5 ELSE snapshot END, snapshot_sha256 = CASE WHEN $4 THEN $3 ELSE snapshot_sha256 END WHERE id = $1 AND sequence = $2::BIGINT - 1",
+                    &[&change.id, &change.sequence, &change.hash, &change.checkpoint, &change.state]).await?
+            };
+            anyhow::ensure!(count == 1, "stale game journal sequence");
+            transaction.execute("INSERT INTO game_events(game_id, sequence, kind, actor, operation, payload, state_sha256) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                &[&change.id, &change.sequence, &change.kind, &change.actor, &change.operation, &change.payload, &change.hash]).await?;
+            let game = &games[&change.id];
+            let status = match game.status {
+                GameStatus::Lobby => "lobby",
+                GameStatus::Running => "running",
+                GameStatus::Paused => "paused",
+            };
+            transaction.execute(
+                "INSERT INTO game_metadata(game_id,title,host_id,scenario_id,scenario_version,scenario_checksum,status,tick) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(game_id) DO UPDATE SET title=EXCLUDED.title,status=EXCLUDED.status,tick=EXCLUDED.tick",
+                &[&game.id, &game.title, &game.host, &game.scenario_id, &i64::from(game.scenario_version), &game.scenario_checksum, &status, &i64::try_from(game.simulation.tick())?],
+            ).await?;
+            for record in &game.network_message_events {
+                let message = &record.message;
+                transaction.execute(
+                    "INSERT INTO network_messages(game_id, message_id, profile_id, origin_role, origin_entity, recipient_entity, content, encoded) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(game_id,message_id) DO NOTHING",
+                    &[&game.id, &message.id, &message.profile_id, &message.header.origin_role_id,
+                      &message.header.origin_entity_id, &message.header.recipient_entity_id,
+                      &serde_json::to_value(message)?, &record.encoded_bytes],
+                ).await?;
+                let mut detail = serde_json::to_value(record)?;
+                let object = detail.as_object_mut().unwrap();
+                object.remove("message");
+                object.remove("encoded_bytes");
+                transaction.execute(
+                    "INSERT INTO network_events(game_id, sequence, message_id, detail) VALUES ($1,$2,$3,$4)",
+                    &[&game.id, &i64::try_from(record.sequence)?, &message.id, &detail],
+                ).await?;
+            }
+            // Membership and seat ownership commit with the checkpoint/journal.
+            // Runtime fencing plus the sequence compare prevents stale writers.
+            for player in &game.members {
+                let name = game
+                    .participant_names
+                    .get(player)
+                    .map(String::as_str)
+                    .unwrap_or("Guest");
+                transaction.execute("INSERT INTO game_memberships(game_id, player_id, display_name) VALUES ($1, $2, $3) ON CONFLICT(game_id, player_id) DO UPDATE SET display_name = EXCLUDED.display_name", &[&game.id, player, &name]).await?;
+            }
+            for (id, occupancy, grant) in game
+                .roles
+                .iter()
+                .map(|(id, role)| (id, &role.occupancy, None))
+                .chain(
+                    game.observers
+                        .iter()
+                        .map(|(id, seat)| (id, &seat.occupancy, seat.granted_player)),
+                )
+            {
+                let generation = i64::try_from(occupancy.lease_generation)?;
+                let lease = occupancy
+                    .lease
+                    .as_ref()
+                    .map(serde_json::to_value)
+                    .transpose()?;
+                transaction.execute("INSERT INTO game_seats(game_id, seat_id, owner_id, grant_id, generation, lease) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT(game_id, seat_id) DO UPDATE SET owner_id = EXCLUDED.owner_id, grant_id = EXCLUDED.grant_id, generation = EXCLUDED.generation, lease = EXCLUDED.lease", &[&game.id, id, &occupancy.owner, &grant, &generation, &lease]).await?;
+            }
+        }
+        transaction.commit().await?;
+        for change in changes {
+            // Historical lifecycle records now live in the archive. Current
+            // message states and duplicate-suppression IDs remain in snapshots.
+            games
+                .get_mut(&change.id)
+                .unwrap()
+                .network_message_events
+                .clear();
+        }
+        Ok(())
+    }
+
+    pub async fn network_events(
+        &self,
+        game: Uuid,
+        cursor: u64,
+        role: &Role,
+        query: &NetworkEventsQuery,
+    ) -> anyhow::Result<Vec<NetworkMessageRecord>> {
+        let state = query.state.map(|state| {
+            serde_json::to_value(state)
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_owned()
+        });
+        let rows = self.client.lock().await.query(
+            "SELECT m.content, m.encoded, e.detail FROM network_events e JOIN network_messages m USING(game_id,message_id) WHERE e.game_id=$1 AND e.sequence>$2 AND (m.origin_role=$3 OR m.recipient_entity=$4 OR m.origin_entity=$4) AND ($5::TEXT IS NULL OR m.profile_id=$5) AND ($6::TEXT IS NULL OR e.detail->>'state'=$6) ORDER BY e.sequence LIMIT 500",
+            &[&game, &i64::try_from(cursor).unwrap_or(i64::MAX), &role.id, &role.location_unit_id, &query.profile_id, &state],
+        ).await?;
+        rows.into_iter()
+            .map(|row| {
+                let mut detail: serde_json::Value = row.get(2);
+                let object = detail
+                    .as_object_mut()
+                    .ok_or_else(|| anyhow::anyhow!("invalid network event"))?;
+                object.insert("message".into(), row.get(0));
+                object.insert(
+                    "encoded_bytes".into(),
+                    serde_json::to_value(row.get::<_, Vec<u8>>(1))?,
+                );
+                Ok(serde_json::from_value(detail)?)
+            })
+            .collect()
+    }
+
+    pub async fn from_environment() -> anyhow::Result<Option<Arc<Self>>> {
+        let Some(url) = std::env::var("DATABASE_URL")
+            .ok()
+            .filter(|s| !s.trim().is_empty())
+        else {
+            return Ok(None);
+        };
+        Self::connect(&url).await.map(|s| Some(Arc::new(s)))
+    }
+
+    pub async fn connect(url: &str) -> anyhow::Result<Self> {
+        let (mut client, connection) = tokio_postgres::connect(url, NoTls)
+            .await
+            .map_err(|_| anyhow::anyhow!("PostgreSQL connection failed"))?;
+        tokio::spawn(async move {
+            if connection.await.is_err() {
+                eprintln!("PostgreSQL connection lost; durable mutations are unavailable");
+            }
+        });
+        // Keep this session-level lock for the lifetime of the connection. A
+        // second process must never advance another copy of the same runtime.
+        let held: bool = client
+            .query_one("SELECT pg_try_advisory_lock($1)", &[&RUNTIME_LOCK])
+            .await?
+            .get(0);
+        anyhow::ensure!(held, "another server owns this database's game runtime");
+        let transaction = client.transaction().await?;
+        transaction.batch_execute("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, checksum TEXT NOT NULL, applied_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP)").await?;
+        let versions = transaction
+            .query(
+                "SELECT version, checksum FROM schema_migrations ORDER BY version",
+                &[],
+            )
+            .await?;
+        anyhow::ensure!(
+            versions.len() <= MIGRATIONS.len(),
+            "database schema is newer than this server"
+        );
+        for (index, migration) in MIGRATIONS.iter().enumerate() {
+            let version = (index + 1) as i32;
+            let checksum = format!("{:x}", Sha256::digest(migration.as_bytes()));
+            if let Some(row) = versions.get(index) {
+                anyhow::ensure!(
+                    row.get::<_, i32>(0) == version && row.get::<_, String>(1) == checksum,
+                    "database schema migration is incompatible"
+                );
+            } else {
+                transaction
+                    .batch_execute(migration)
+                    .await
+                    .context("apply database schema")?;
+                transaction
+                    .execute(
+                        "INSERT INTO schema_migrations(version, checksum) VALUES ($1, $2)",
+                        &[&version, &checksum],
+                    )
+                    .await?;
+            }
+        }
+        transaction.commit().await?;
+        Ok(Self {
+            client: Mutex::new(client),
+        })
+    }
+
+    pub async fn sessions(&self, now: u64) -> anyhow::Result<Vec<StoredSession>> {
+        let client = self.client.lock().await;
+        client
+            .execute(
+                "DELETE FROM browser_sessions WHERE expires_unix <= $1",
+                &[&i64::try_from(now)?],
+            )
+            .await?;
+        let rows = client.query(
+            "SELECT s.token_hash, s.player_id, p.display_name, p.username, s.csrf_token, s.expires_unix FROM browser_sessions s JOIN players p ON p.id = s.player_id WHERE s.expires_unix > $1",
+            &[&i64::try_from(now)?],
+        ).await?;
+        rows.into_iter()
+            .map(|row| {
+                Ok(StoredSession {
+                    token_hash: row.get(0),
+                    player_id: row.get(1),
+                    display_name: row.get(2),
+                    username: row.get(3),
+                    csrf_token: row.get(4),
+                    expires_unix: u64::try_from(row.get::<_, i64>(5))?,
+                })
+            })
+            .collect()
+    }
+
+    pub async fn insert_session(&self, session: &StoredSession, guest: bool) -> anyhow::Result<()> {
+        let mut client = self.client.lock().await;
+        let transaction = client.transaction().await?;
+        if guest {
+            transaction
+                .execute(
+                    "INSERT INTO players(id, display_name) VALUES ($1, $2)",
+                    &[&session.player_id, &session.display_name],
+                )
+                .await?;
+        }
+        transaction.execute(
+            "INSERT INTO browser_sessions(token_hash, player_id, csrf_token, expires_unix) VALUES ($1, $2, $3, $4)",
+            &[&session.token_hash, &session.player_id, &session.csrf_token, &i64::try_from(session.expires_unix)?],
+        ).await?;
+        transaction.commit().await?;
+        Ok(())
+    }
+
+    pub async fn account(&self, username: &str) -> anyhow::Result<Option<Account>> {
+        Ok(self
+            .client
+            .lock()
+            .await
+            .query_opt(
+                "SELECT id, display_name, username, password_hash FROM players WHERE username = $1",
+                &[&username],
+            )
+            .await?
+            .map(|row| Account {
+                player_id: row.get(0),
+                display_name: row.get(1),
+                username: row.get(2),
+                password_hash: row.get(3),
+            }))
+    }
+
+    /// Register the authenticated guest without changing player identity. The
+    /// unique username and guest-only update are enforced by the transaction.
+    pub async fn register(
+        &self,
+        player: Uuid,
+        username: &str,
+        password_hash: &str,
+    ) -> anyhow::Result<bool> {
+        let changed = self.client.lock().await.execute(
+            "UPDATE players SET username = $2, password_hash = $3 WHERE id = $1 AND username IS NULL",
+            &[&player, &username, &password_hash],
+        ).await;
+        match changed {
+            Ok(count) => Ok(count == 1),
+            Err(error)
+                if error.code() == Some(&tokio_postgres::error::SqlState::UNIQUE_VIOLATION) =>
+            {
+                Ok(false)
+            }
+            Err(error) => Err(error.into()),
+        }
+    }
+}
+
+pub(super) fn unavailable() -> (StatusCode, Json<ErrorResponse>) {
+    api_error(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "storage_unavailable",
+        "Durable storage is unavailable; retry when the server recovers",
+    )
+}

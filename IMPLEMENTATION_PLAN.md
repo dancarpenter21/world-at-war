@@ -1,5 +1,29 @@
 # World At War Implementation Plan
 
+## Persistence checkpoint — 2026-10-10
+
+Optional PostgreSQL storage now preserves guest/account sessions, memberships,
+observer grants, role generations/deadlines, game metadata and complete simulation
+snapshots. Registration retains the guest player ID; login rotates browser
+credentials. Session revocation and seat releases commit together. A single-runtime
+fence, checksummed transactional migrations and fail-closed mutation boundaries
+protect the durable game state.
+
+Recovery verifies the snapshot, schema/dependency/scenario/catalog pins and every
+replayed state hash. Running games return paused. Queued commands, duplicate
+suppression, pending receptions, IFTU state and post-mission reports survive
+recovery. C2 lifecycle history is archived in PostgreSQL with the existing role
+filters; current message/receipt and duplicate-suppression state remain live.
+The c3mesh source pin now includes versioned runtime snapshots; v0.4.0 registry
+publication remains separate.
+
+See [implementation, operation and test commands](docs/PERSISTENCE_IMPLEMENTATION.md).
+This supersedes the older checkpoints' statements that persistence and restart
+recovery are unimplemented. Full internal packet/fragment audit, interactive
+historical replay, configurable archival retention, password reset, distributed
+runtime authority and persistence performance/soak acceptance remain open.
+No long soak was run for this increment.
+
 ## Implementation checkpoint — 2026-10-08
 
 The sections below remain the target architecture, not a declaration of completed release phases. The communications checkpoint is recorded in `plans/fdffd4709ad9bdb1717bb4035a45af51ed346695.md` (implementation commit `fdffd47`). This checkpoint builds on merge commit `855c7b2`, which merged [PR #4](https://github.com/dancarpenter21/world-at-war/pull/4) for fictional in-flight target updates (IFTU) and the published c3mesh dependency. The earlier campaign increment provides an offline Regional Joint Campaign: versioned collaborative plans, two courses of action, delivered air tasking/airspace orders, clearances and handoffs, basic mission execution/combat, role-owned reports, and a Cesium planning workspace/overlays.

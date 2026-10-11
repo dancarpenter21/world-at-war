@@ -3,7 +3,7 @@ export class ApiError extends Error {
     super(message); this.name = "ApiError";
   }
 }
-export type GuestSession = { player_id: string; display_name: string; csrf_token: string; expires_unix: number };
+export type GuestSession = { player_id: string; display_name: string; csrf_token: string; expires_unix: number; username?: string | null; accounts_available?: boolean };
 let guest: GuestSession | undefined;
 let bootstrap: Promise<GuestSession> | undefined;
 let authRevision = 0;

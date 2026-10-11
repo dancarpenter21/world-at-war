@@ -4,11 +4,12 @@ use sim_core::{Domain, OrderKind};
 
 const RETRY_TICKS: u64 = 10;
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub(super) struct AiPlannerState {
     attempts: BTreeMap<Uuid, Attempt>,
 }
 
+#[derive(Serialize, Deserialize)]
 struct Attempt {
     role_id: Uuid,
     tick: u64,
@@ -63,7 +64,7 @@ pub(super) fn process_ai_orders(game: &mut Game) {
             {
                 continue;
             }
-            let Some(intent) = choose_patrol_intent(role.id, unit_id, &projection) else {
+            let Some(mut intent) = choose_patrol_intent(role.id, unit_id, &projection) else {
                 continue;
             };
             if order_is_pending(game, unit_id) {
@@ -77,6 +78,7 @@ pub(super) fn process_ai_orders(game: &mut Game) {
             }) {
                 continue;
             }
+            intent.intent_id = game.next_id("ai-intent");
             let attempt = Attempt {
                 role_id: role.id,
                 tick,

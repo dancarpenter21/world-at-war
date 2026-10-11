@@ -343,3 +343,8 @@ select, textarea { width: 100%; padding: 9px; color: #eef7fa; background: #0e171
 @media (max-width: 700px) { .truth-workspace { grid-template-columns: 1fr; grid-template-rows: minmax(200px, 40%) minmax(0, 1fr); } }
 
 .truth-links th:nth-child(2), .truth-links td:nth-child(2) { min-width: 68px; overflow-wrap: normal; }
+ .account-dialog { width: min(28rem, calc(100vw - 2rem)); max-height: 90vh; padding: 0; color: inherit; border: 1px solid #52667a; border-radius: .75rem; background: #101c2a; }
+.account-dialog::backdrop { background: #000a; }
+.account-dialog form { padding: 1.5rem; }
+.account-dialog label { display: grid; gap: .4rem; margin: 1rem 0; }
+.account-actions { display: flex; justify-content: flex-end; gap: .75rem; margin-top: 1rem; }
