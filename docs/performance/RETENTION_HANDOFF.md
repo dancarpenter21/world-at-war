@@ -1,7 +1,9 @@
 # Memory retention implementation handoff — 2026-10-09
 
 Work was committed and pushed for continuation at home. The implementation is
-complete; post-change reference measurements and registry publication remain open.
+complete. Core and five-minute post-change measurements are now recorded in the
+[October 10 report](2026-10-10-results.md); a completed post-change long soak and
+registry publication remain open.
 
 ## Branches and dependency
 
@@ -44,7 +46,19 @@ source revision; `sh scripts/setup-c3mesh.sh --verify-only` verifies it.
   into production/development build stages. Rebuild verification is tracked in
   [production-container CI](https://github.com/dancarpenter21/world-at-war/actions/runs/37979752984).
 
-## Remaining measurements
+## Measurement status — reconciled 2026-10-10
+
+Existing outputs under `tmp/performance/retention-reference-2026-10-10` were
+reanalyzed and preserved with metadata in `docs/performance/2026-10-10/`.
+Core projection hashes match the baseline; regional, global and mixed five-minute
+runs are valid and meet applicable tick budgets. The `soak` directory is an
+interrupted run with only 1,124 measured ticks per game, not one-hour evidence.
+Its invalid status is preserved. Hardware differs from the October 9 baseline.
+
+No new soak was run. Repository policy requires an explicit user request for
+long soaks; the historical commands below do not authorize one.
+
+## Measurement commands (core/short runs complete; long soak pending)
 
 Run without competing builds, browser suites or other benchmarks. Use the same
 reference hardware for a direct before/after timing comparison; if using different

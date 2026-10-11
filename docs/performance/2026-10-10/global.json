@@ -1,0 +1,3641 @@
+{
+  "metadata": {
+    "schema_version": 1,
+    "retention_sample_seconds": 5,
+    "profile": "global",
+    "layout": [
+      [
+        "global-crisis.v2",
+        13
+      ]
+    ],
+    "seed": 12787750,
+    "warmup_seconds": 60,
+    "measured_seconds": 300,
+    "reconnect_every_seconds": 300,
+    "started_at": "2026-10-10T04:36:25.178Z",
+    "revision": "094b1c0a4f9a62fb7410c0080151e879ab357f06",
+    "dirty": false,
+    "c3mesh_revision": "f1f716c42c0f5cde2e16eb64e6350e4313b76a7d",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "node": "v24.15.0",
+    "os": "linux",
+    "os_release": "6.6.87.2-microsoft-standard-WSL2",
+    "cpu": "AMD Ryzen 7 9800X3D 8-Core Processor",
+    "logical_cpus": 16,
+    "memory_bytes": 25199570944,
+    "binary_sha256": "67b6c3d6e7390c9662cac6664f2cefbbd749dadab2481d7b341e5b8c16abf478",
+    "protocol": "1 Hz full snapshots; state/planning HTTP plus network WebSocket, no browser rendering; encoded HTTP body bytes when Content-Length is present, otherwise decoded bytes",
+    "clock_ticks_per_second": 100,
+    "catalog": {
+      "checksum": "921b372e7d355a3eec9b42a1fb6ba66bb05321c8aafc2a57b6e0a72bccfd138d",
+      "object_count": 2
+    },
+    "games": [
+      {
+        "id": "7431462c-c051-49f1-8d7b-fbe19dfc5af1",
+        "title": "Performance 0",
+        "status": "lobby",
+        "host_player_id": "9156f2e6-46d5-4efe-8e62-7c1781362b60",
+        "player_roles_available": 13,
+        "space_catalog_enabled": true,
+        "scenario_id": "global-crisis.v2",
+        "scenario_version": 2,
+        "communications_catalog_checksum": "b8b62fadfef0c2445462e73d6b3cc964ba42bc59d07a30a60276e3d16e1df583",
+        "message_pack_checksum": "0fac91603a24eb07c7586f3e005b02dc36fb2cebc99d020020e05d98b9f78ba4",
+        "network_policy_id": "fifo.v1",
+        "network_seed": 12787750,
+        "operational_error": null,
+        "mission_complete": false,
+        "settling_reports": false
+      }
+    ],
+    "clients": [
+      {
+        "index": 0,
+        "game_id": "7431462c-c051-49f1-8d7b-fbe19dfc5af1",
+        "role_id": "00000000-0000-0000-0000-00000000006f"
+      },
+      {
+        "index": 1,
+        "game_id": "7431462c-c051-49f1-8d7b-fbe19dfc5af1",
+        "role_id": "00000000-0000-0000-0000-000000000065"
+      },
+      {
+        "index": 2,
+        "game_id": "7431462c-c051-49f1-8d7b-fbe19dfc5af1",
+        "role_id": "00000000-0000-0000-0000-000000000066"
+      },
+      {
+        "index": 3,
+        "game_id": "7431462c-c051-49f1-8d7b-fbe19dfc5af1",
+        "role_id": "00000000-0000-0000-0000-000000000067"
+      },
+      {
+        "index": 4,
+        "game_id": "7431462c-c051-49f1-8d7b-fbe19dfc5af1",
+        "role_id": "00000000-0000-0000-0000-000000000068"
+      },
+      {
+        "index": 5,
+        "game_id": "7431462c-c051-49f1-8d7b-fbe19dfc5af1",
+        "role_id": "00000000-0000-0000-0000-000000000069"
+      },
+      {
+        "index": 6,
+        "game_id": "7431462c-c051-49f1-8d7b-fbe19dfc5af1",
+        "role_id": "00000000-0000-0000-0000-00000000006a"
+      },
+      {
+        "index": 7,
+        "game_id": "7431462c-c051-49f1-8d7b-fbe19dfc5af1",
+        "role_id": "00000000-0000-0000-0000-00000000006b"
+      },
+      {
+        "index": 8,
+        "game_id": "7431462c-c051-49f1-8d7b-fbe19dfc5af1",
+        "role_id": "00000000-0000-0000-0000-00000000006c"
+      },
+      {
+        "index": 9,
+        "game_id": "7431462c-c051-49f1-8d7b-fbe19dfc5af1",
+        "role_id": "00000000-0000-0000-0000-00000000006d"
+      },
+      {
+        "index": 10,
+        "game_id": "7431462c-c051-49f1-8d7b-fbe19dfc5af1",
+        "role_id": "00000000-0000-0000-0000-00000000006e"
+      },
+      {
+        "index": 11,
+        "game_id": "7431462c-c051-49f1-8d7b-fbe19dfc5af1",
+        "role_id": "00000000-0000-0000-0000-000000000070"
+      },
+      {
+        "index": 12,
+        "game_id": "7431462c-c051-49f1-8d7b-fbe19dfc5af1",
+        "role_id": "00000000-0000-0000-0000-000000000071"
+      }
+    ],
+    "measurement_start_unix_ms": 1791607045815,
+    "measurement_end_unix_ms": 1791607345815
+  },
+  "summary": {
+    "valid": true,
+    "errors": [],
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 29151
+    },
+    "measured_seconds": 300,
+    "intent_observations": {
+      "executed": 10,
+      "queued": 10,
+      "awaiting_execution": 10
+    },
+    "resources": [
+      {
+        "time": 1791607046854,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71536640,
+        "server_cpu_seconds": 6.65,
+        "audit_bytes": 56194,
+        "generator_rss_bytes": 235851776,
+        "generator_cpu": {
+          "user": 7243715,
+          "system": 2650764
+        }
+      },
+      {
+        "time": 1791607051858,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71536640,
+        "server_cpu_seconds": 7.19,
+        "audit_bytes": 56194,
+        "generator_rss_bytes": 233496576,
+        "generator_cpu": {
+          "user": 7788488,
+          "system": 2831012
+        }
+      },
+      {
+        "time": 1791607056862,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71536640,
+        "server_cpu_seconds": 7.72,
+        "audit_bytes": 56194,
+        "generator_rss_bytes": 236408832,
+        "generator_cpu": {
+          "user": 8263661,
+          "system": 3009631
+        }
+      },
+      {
+        "time": 1791607061864,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71536640,
+        "server_cpu_seconds": 8.24,
+        "audit_bytes": 56194,
+        "generator_rss_bytes": 259907584,
+        "generator_cpu": {
+          "user": 8793900,
+          "system": 3182676
+        }
+      },
+      {
+        "time": 1791607066867,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71536640,
+        "server_cpu_seconds": 8.76,
+        "audit_bytes": 56194,
+        "generator_rss_bytes": 247021568,
+        "generator_cpu": {
+          "user": 9236772,
+          "system": 3395183
+        }
+      },
+      {
+        "time": 1791607071871,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71536640,
+        "server_cpu_seconds": 9.31,
+        "audit_bytes": 56194,
+        "generator_rss_bytes": 247910400,
+        "generator_cpu": {
+          "user": 9741268,
+          "system": 3614176
+        }
+      },
+      {
+        "time": 1791607076876,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71536640,
+        "server_cpu_seconds": 9.81,
+        "audit_bytes": 61735,
+        "generator_rss_bytes": 268201984,
+        "generator_cpu": {
+          "user": 10238312,
+          "system": 3812182
+        }
+      },
+      {
+        "time": 1791607081879,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71536640,
+        "server_cpu_seconds": 10.34,
+        "audit_bytes": 61735,
+        "generator_rss_bytes": 253513728,
+        "generator_cpu": {
+          "user": 10748000,
+          "system": 4048612
+        }
+      },
+      {
+        "time": 1791607086882,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71536640,
+        "server_cpu_seconds": 10.86,
+        "audit_bytes": 61735,
+        "generator_rss_bytes": 261255168,
+        "generator_cpu": {
+          "user": 11253056,
+          "system": 4257335
+        }
+      },
+      {
+        "time": 1791607091886,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71536640,
+        "server_cpu_seconds": 11.4,
+        "audit_bytes": 61735,
+        "generator_rss_bytes": 268201984,
+        "generator_cpu": {
+          "user": 11751785,
+          "system": 4422348
+        }
+      },
+      {
+        "time": 1791607096890,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71536640,
+        "server_cpu_seconds": 11.92,
+        "audit_bytes": 61735,
+        "generator_rss_bytes": 273694720,
+        "generator_cpu": {
+          "user": 12255712,
+          "system": 4584717
+        }
+      },
+      {
+        "time": 1791607101892,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71536640,
+        "server_cpu_seconds": 12.46,
+        "audit_bytes": 61735,
+        "generator_rss_bytes": 253775872,
+        "generator_cpu": {
+          "user": 12790565,
+          "system": 4758192
+        }
+      },
+      {
+        "time": 1791607106894,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71536640,
+        "server_cpu_seconds": 13.01,
+        "audit_bytes": 67297,
+        "generator_rss_bytes": 260685824,
+        "generator_cpu": {
+          "user": 13279778,
+          "system": 4970880
+        }
+      },
+      {
+        "time": 1791607111897,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 13.56,
+        "audit_bytes": 67297,
+        "generator_rss_bytes": 255168512,
+        "generator_cpu": {
+          "user": 13787237,
+          "system": 5150013
+        }
+      },
+      {
+        "time": 1791607116899,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 14.08,
+        "audit_bytes": 67297,
+        "generator_rss_bytes": 255848448,
+        "generator_cpu": {
+          "user": 14284205,
+          "system": 5372490
+        }
+      },
+      {
+        "time": 1791607121902,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 14.59,
+        "audit_bytes": 67297,
+        "generator_rss_bytes": 259211264,
+        "generator_cpu": {
+          "user": 14780099,
+          "system": 5577556
+        }
+      },
+      {
+        "time": 1791607126904,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 15.11,
+        "audit_bytes": 67297,
+        "generator_rss_bytes": 273731584,
+        "generator_cpu": {
+          "user": 15216479,
+          "system": 5769281
+        }
+      },
+      {
+        "time": 1791607131909,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 15.61,
+        "audit_bytes": 67297,
+        "generator_rss_bytes": 268185600,
+        "generator_cpu": {
+          "user": 15698912,
+          "system": 5944824
+        }
+      },
+      {
+        "time": 1791607136912,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 16.14,
+        "audit_bytes": 72870,
+        "generator_rss_bytes": 274341888,
+        "generator_cpu": {
+          "user": 16153178,
+          "system": 6156489
+        }
+      },
+      {
+        "time": 1791607141915,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 16.68,
+        "audit_bytes": 72870,
+        "generator_rss_bytes": 275136512,
+        "generator_cpu": {
+          "user": 16657389,
+          "system": 6315397
+        }
+      },
+      {
+        "time": 1791607146918,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 17.2,
+        "audit_bytes": 72870,
+        "generator_rss_bytes": 273788928,
+        "generator_cpu": {
+          "user": 17183047,
+          "system": 6479202
+        }
+      },
+      {
+        "time": 1791607151921,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 17.73,
+        "audit_bytes": 72870,
+        "generator_rss_bytes": 266612736,
+        "generator_cpu": {
+          "user": 17709002,
+          "system": 6676468
+        }
+      },
+      {
+        "time": 1791607156925,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 18.23,
+        "audit_bytes": 72870,
+        "generator_rss_bytes": 283836416,
+        "generator_cpu": {
+          "user": 18161805,
+          "system": 6855274
+        }
+      },
+      {
+        "time": 1791607161928,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 18.77,
+        "audit_bytes": 72870,
+        "generator_rss_bytes": 290279424,
+        "generator_cpu": {
+          "user": 18590055,
+          "system": 7086182
+        }
+      },
+      {
+        "time": 1791607166930,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 19.33,
+        "audit_bytes": 78451,
+        "generator_rss_bytes": 289763328,
+        "generator_cpu": {
+          "user": 19100617,
+          "system": 7274807
+        }
+      },
+      {
+        "time": 1791607171934,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 19.85,
+        "audit_bytes": 78451,
+        "generator_rss_bytes": 278192128,
+        "generator_cpu": {
+          "user": 19551335,
+          "system": 7489011
+        }
+      },
+      {
+        "time": 1791607176937,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 20.38,
+        "audit_bytes": 78451,
+        "generator_rss_bytes": 286547968,
+        "generator_cpu": {
+          "user": 19977314,
+          "system": 7685876
+        }
+      },
+      {
+        "time": 1791607181940,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 20.93,
+        "audit_bytes": 78451,
+        "generator_rss_bytes": 278294528,
+        "generator_cpu": {
+          "user": 20472924,
+          "system": 7899136
+        }
+      },
+      {
+        "time": 1791607186943,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 21.47,
+        "audit_bytes": 78451,
+        "generator_rss_bytes": 292663296,
+        "generator_cpu": {
+          "user": 20893318,
+          "system": 8106197
+        }
+      },
+      {
+        "time": 1791607191947,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 22.02,
+        "audit_bytes": 78451,
+        "generator_rss_bytes": 297377792,
+        "generator_cpu": {
+          "user": 21291270,
+          "system": 8329322
+        }
+      },
+      {
+        "time": 1791607196952,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 22.54,
+        "audit_bytes": 84027,
+        "generator_rss_bytes": 301867008,
+        "generator_cpu": {
+          "user": 21742525,
+          "system": 8538649
+        }
+      },
+      {
+        "time": 1791607201955,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 23.08,
+        "audit_bytes": 84027,
+        "generator_rss_bytes": 302555136,
+        "generator_cpu": {
+          "user": 22239174,
+          "system": 8704705
+        }
+      },
+      {
+        "time": 1791607206957,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 23.62,
+        "audit_bytes": 84027,
+        "generator_rss_bytes": 295051264,
+        "generator_cpu": {
+          "user": 22667225,
+          "system": 8903299
+        }
+      },
+      {
+        "time": 1791607211961,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 24.17,
+        "audit_bytes": 84027,
+        "generator_rss_bytes": 292196352,
+        "generator_cpu": {
+          "user": 23157525,
+          "system": 9087021
+        }
+      },
+      {
+        "time": 1791607216963,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 24.7,
+        "audit_bytes": 84027,
+        "generator_rss_bytes": 296554496,
+        "generator_cpu": {
+          "user": 23560782,
+          "system": 9303246
+        }
+      },
+      {
+        "time": 1791607221965,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 25.17,
+        "audit_bytes": 84027,
+        "generator_rss_bytes": 291500032,
+        "generator_cpu": {
+          "user": 23953387,
+          "system": 9463860
+        }
+      },
+      {
+        "time": 1791607226968,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71667712,
+        "server_cpu_seconds": 25.71,
+        "audit_bytes": 89594,
+        "generator_rss_bytes": 310185984,
+        "generator_cpu": {
+          "user": 24420261,
+          "system": 9657415
+        }
+      },
+      {
+        "time": 1791607231971,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 26.24,
+        "audit_bytes": 89594,
+        "generator_rss_bytes": 293564416,
+        "generator_cpu": {
+          "user": 24856255,
+          "system": 9850410
+        }
+      },
+      {
+        "time": 1791607236973,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 26.74,
+        "audit_bytes": 89594,
+        "generator_rss_bytes": 294133760,
+        "generator_cpu": {
+          "user": 25285339,
+          "system": 10004928
+        }
+      },
+      {
+        "time": 1791607241976,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 27.27,
+        "audit_bytes": 89594,
+        "generator_rss_bytes": 304586752,
+        "generator_cpu": {
+          "user": 25748354,
+          "system": 10217600
+        }
+      },
+      {
+        "time": 1791607246980,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 27.79,
+        "audit_bytes": 89594,
+        "generator_rss_bytes": 296333312,
+        "generator_cpu": {
+          "user": 26223444,
+          "system": 10386203
+        }
+      },
+      {
+        "time": 1791607252981,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 28.39,
+        "audit_bytes": 89594,
+        "generator_rss_bytes": 309645312,
+        "generator_cpu": {
+          "user": 26809714,
+          "system": 10601886
+        }
+      },
+      {
+        "time": 1791607257986,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 28.93,
+        "audit_bytes": 95169,
+        "generator_rss_bytes": 298524672,
+        "generator_cpu": {
+          "user": 27319820,
+          "system": 10836761
+        }
+      },
+      {
+        "time": 1791607263988,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 29.55,
+        "audit_bytes": 95169,
+        "generator_rss_bytes": 298524672,
+        "generator_cpu": {
+          "user": 27965220,
+          "system": 11034042
+        }
+      },
+      {
+        "time": 1791607268991,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 30.07,
+        "audit_bytes": 95169,
+        "generator_rss_bytes": 306077696,
+        "generator_cpu": {
+          "user": 28468126,
+          "system": 11206132
+        }
+      },
+      {
+        "time": 1791607273996,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 30.57,
+        "audit_bytes": 95169,
+        "generator_rss_bytes": 313786368,
+        "generator_cpu": {
+          "user": 28899170,
+          "system": 11423955
+        }
+      },
+      {
+        "time": 1791607278999,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 31.08,
+        "audit_bytes": 95169,
+        "generator_rss_bytes": 312651776,
+        "generator_cpu": {
+          "user": 29362113,
+          "system": 11592905
+        }
+      },
+      {
+        "time": 1791607284002,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 31.62,
+        "audit_bytes": 95169,
+        "generator_rss_bytes": 296796160,
+        "generator_cpu": {
+          "user": 29880513,
+          "system": 11761478
+        }
+      },
+      {
+        "time": 1791607290005,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 32.27,
+        "audit_bytes": 100742,
+        "generator_rss_bytes": 303681536,
+        "generator_cpu": {
+          "user": 30484846,
+          "system": 11992911
+        }
+      },
+      {
+        "time": 1791607295007,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 32.81,
+        "audit_bytes": 100742,
+        "generator_rss_bytes": 308379648,
+        "generator_cpu": {
+          "user": 30980731,
+          "system": 12192943
+        }
+      },
+      {
+        "time": 1791607300014,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 33.35,
+        "audit_bytes": 100742,
+        "generator_rss_bytes": 306872320,
+        "generator_cpu": {
+          "user": 31448626,
+          "system": 12412687
+        }
+      },
+      {
+        "time": 1791607305017,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 33.87,
+        "audit_bytes": 100742,
+        "generator_rss_bytes": 311025664,
+        "generator_cpu": {
+          "user": 32051887,
+          "system": 12554906
+        }
+      },
+      {
+        "time": 1791607311019,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 34.52,
+        "audit_bytes": 100742,
+        "generator_rss_bytes": 324812800,
+        "generator_cpu": {
+          "user": 32584285,
+          "system": 12806032
+        }
+      },
+      {
+        "time": 1791607317021,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 35.18,
+        "audit_bytes": 106308,
+        "generator_rss_bytes": 323588096,
+        "generator_cpu": {
+          "user": 33227906,
+          "system": 13049833
+        }
+      },
+      {
+        "time": 1791607322025,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 35.72,
+        "audit_bytes": 106308,
+        "generator_rss_bytes": 322297856,
+        "generator_cpu": {
+          "user": 33676381,
+          "system": 13249020
+        }
+      },
+      {
+        "time": 1791607327028,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 36.28,
+        "audit_bytes": 106308,
+        "generator_rss_bytes": 323502080,
+        "generator_cpu": {
+          "user": 34157106,
+          "system": 13431123
+        }
+      },
+      {
+        "time": 1791607332032,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 36.81,
+        "audit_bytes": 106308,
+        "generator_rss_bytes": 316211200,
+        "generator_cpu": {
+          "user": 34591449,
+          "system": 13633176
+        }
+      },
+      {
+        "time": 1791607337034,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 37.31,
+        "audit_bytes": 106308,
+        "generator_rss_bytes": 320569344,
+        "generator_cpu": {
+          "user": 35027157,
+          "system": 13816792
+        }
+      },
+      {
+        "time": 1791607342037,
+        "phase": "measurement",
+        "kind": "resource",
+        "server_rss_bytes": 71798784,
+        "server_cpu_seconds": 37.85,
+        "audit_bytes": 106308,
+        "generator_rss_bytes": 329150464,
+        "generator_cpu": {
+          "user": 35433178,
+          "system": 14035833
+        }
+      }
+    ],
+    "retention": {
+      "game:7431462c-c051-49f1-8d7b-fbe19dfc5af1": {
+        "samples": 54,
+        "first": {
+          "time": 1791607046250.2456,
+          "tick": 61,
+          "radio_tick": 61,
+          "counts": {
+            "simulation.network.devices": 4992,
+            "simulation.network.interference_contributions": 0,
+            "simulation.network.interference_entries": 4992,
+            "simulation.network.mobility_entries": 4992,
+            "simulation.network.pending_events": 0,
+            "simulation.network.pending_receptions": 0,
+            "simulation.network.retained_from_ns": 61000000000,
+            "simulation.pending_fragment_events": 0,
+            "simulation.pending_network_events": 0,
+            "simulation.transport_completed_ids": 0,
+            "simulation.transport_events": 0,
+            "simulation.transport_fragments": 0,
+            "simulation.transport_messages": 0,
+            "simulation.transport_payload_bytes": 0,
+            "server.authority_events": 0,
+            "server.authority_requests": 0,
+            "server.intent_receipts": 3,
+            "server.network_encoded_payload_bytes": 18318,
+            "server.network_message_events": 21,
+            "server.network_messages": 11,
+            "server.packet_messages": 0,
+            "server.pending_deliveries": 0
+          }
+        },
+        "last": {
+          "time": 1791607341250.8145,
+          "tick": 356,
+          "radio_tick": 356,
+          "counts": {
+            "simulation.network.devices": 4992,
+            "simulation.network.interference_contributions": 0,
+            "simulation.network.interference_entries": 4992,
+            "simulation.network.mobility_entries": 4992,
+            "simulation.network.pending_events": 0,
+            "simulation.network.pending_receptions": 0,
+            "simulation.network.retained_from_ns": 356000000000,
+            "simulation.pending_fragment_events": 0,
+            "simulation.pending_network_events": 0,
+            "simulation.transport_completed_ids": 0,
+            "simulation.transport_events": 0,
+            "simulation.transport_fragments": 0,
+            "simulation.transport_messages": 0,
+            "simulation.transport_payload_bytes": 0,
+            "server.authority_events": 0,
+            "server.authority_requests": 0,
+            "server.intent_receipts": 12,
+            "server.network_encoded_payload_bytes": 39640,
+            "server.network_message_events": 39,
+            "server.network_messages": 29,
+            "server.packet_messages": 0,
+            "server.pending_deliveries": 0
+          }
+        },
+        "peak": {
+          "simulation.network.devices": 4992,
+          "simulation.network.interference_contributions": 0,
+          "simulation.network.interference_entries": 4992,
+          "simulation.network.mobility_entries": 4992,
+          "simulation.network.pending_events": 0,
+          "simulation.network.pending_receptions": 0,
+          "simulation.network.retained_from_ns": 356000000000,
+          "simulation.pending_fragment_events": 0,
+          "simulation.pending_network_events": 0,
+          "simulation.transport_completed_ids": 0,
+          "simulation.transport_events": 0,
+          "simulation.transport_fragments": 0,
+          "simulation.transport_messages": 0,
+          "simulation.transport_payload_bytes": 0,
+          "server.authority_events": 0,
+          "server.authority_requests": 0,
+          "server.intent_receipts": 12,
+          "server.network_encoded_payload_bytes": 39640,
+          "server.network_message_events": 39,
+          "server.network_messages": 29,
+          "server.packet_messages": 0,
+          "server.pending_deliveries": 0
+        },
+        "series": [
+          {
+            "time": 1791607046250.2456,
+            "tick": 61,
+            "radio_tick": 61,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 61000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 3,
+              "server.network_encoded_payload_bytes": 18318,
+              "server.network_message_events": 21,
+              "server.network_messages": 11,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607051251.2502,
+            "tick": 66,
+            "radio_tick": 66,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 66000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 3,
+              "server.network_encoded_payload_bytes": 18318,
+              "server.network_message_events": 21,
+              "server.network_messages": 11,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607057249.8413,
+            "tick": 72,
+            "radio_tick": 72,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 72000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 3,
+              "server.network_encoded_payload_bytes": 18318,
+              "server.network_message_events": 21,
+              "server.network_messages": 11,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607062250.635,
+            "tick": 77,
+            "radio_tick": 77,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 77000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 3,
+              "server.network_encoded_payload_bytes": 18318,
+              "server.network_message_events": 21,
+              "server.network_messages": 11,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607068250.6746,
+            "tick": 83,
+            "radio_tick": 83,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 83000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 3,
+              "server.network_encoded_payload_bytes": 18318,
+              "server.network_message_events": 21,
+              "server.network_messages": 11,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607073250.8218,
+            "tick": 88,
+            "radio_tick": 88,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 88000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 3,
+              "server.network_encoded_payload_bytes": 18318,
+              "server.network_message_events": 21,
+              "server.network_messages": 11,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607079250.4758,
+            "tick": 94,
+            "radio_tick": 94,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 94000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 4,
+              "server.network_encoded_payload_bytes": 20680,
+              "server.network_message_events": 23,
+              "server.network_messages": 13,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607085250.3018,
+            "tick": 100,
+            "radio_tick": 100,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 100000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 4,
+              "server.network_encoded_payload_bytes": 20680,
+              "server.network_message_events": 23,
+              "server.network_messages": 13,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607091250.3347,
+            "tick": 106,
+            "radio_tick": 106,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 106000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 4,
+              "server.network_encoded_payload_bytes": 20680,
+              "server.network_message_events": 23,
+              "server.network_messages": 13,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607097250.4604,
+            "tick": 112,
+            "radio_tick": 112,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 112000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 4,
+              "server.network_encoded_payload_bytes": 20680,
+              "server.network_message_events": 23,
+              "server.network_messages": 13,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607103250.3372,
+            "tick": 118,
+            "radio_tick": 118,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 118000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 4,
+              "server.network_encoded_payload_bytes": 20680,
+              "server.network_message_events": 23,
+              "server.network_messages": 13,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607109250.1863,
+            "tick": 124,
+            "radio_tick": 124,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 124000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 5,
+              "server.network_encoded_payload_bytes": 23050,
+              "server.network_message_events": 25,
+              "server.network_messages": 15,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607114250.5461,
+            "tick": 129,
+            "radio_tick": 129,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 129000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 5,
+              "server.network_encoded_payload_bytes": 23050,
+              "server.network_message_events": 25,
+              "server.network_messages": 15,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607120249.0693,
+            "tick": 135,
+            "radio_tick": 135,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 135000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 5,
+              "server.network_encoded_payload_bytes": 23050,
+              "server.network_message_events": 25,
+              "server.network_messages": 15,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607125250.1277,
+            "tick": 140,
+            "radio_tick": 140,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 140000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 5,
+              "server.network_encoded_payload_bytes": 23050,
+              "server.network_message_events": 25,
+              "server.network_messages": 15,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607131250.0703,
+            "tick": 146,
+            "radio_tick": 146,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 146000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 5,
+              "server.network_encoded_payload_bytes": 23050,
+              "server.network_message_events": 25,
+              "server.network_messages": 15,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607136251.053,
+            "tick": 151,
+            "radio_tick": 151,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 151000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 6,
+              "server.network_encoded_payload_bytes": 25420,
+              "server.network_message_events": 27,
+              "server.network_messages": 17,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607142250.4265,
+            "tick": 157,
+            "radio_tick": 157,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 157000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 6,
+              "server.network_encoded_payload_bytes": 25420,
+              "server.network_message_events": 27,
+              "server.network_messages": 17,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607148250.4553,
+            "tick": 163,
+            "radio_tick": 163,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 163000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 6,
+              "server.network_encoded_payload_bytes": 25420,
+              "server.network_message_events": 27,
+              "server.network_messages": 17,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607154249.705,
+            "tick": 169,
+            "radio_tick": 169,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 169000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 6,
+              "server.network_encoded_payload_bytes": 25420,
+              "server.network_message_events": 27,
+              "server.network_messages": 17,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607160249.9407,
+            "tick": 175,
+            "radio_tick": 175,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 175000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 6,
+              "server.network_encoded_payload_bytes": 25420,
+              "server.network_message_events": 27,
+              "server.network_messages": 17,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607165250.9622,
+            "tick": 180,
+            "radio_tick": 180,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 180000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 6,
+              "server.network_encoded_payload_bytes": 25420,
+              "server.network_message_events": 27,
+              "server.network_messages": 17,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607171249.534,
+            "tick": 186,
+            "radio_tick": 186,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 186000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 7,
+              "server.network_encoded_payload_bytes": 27790,
+              "server.network_message_events": 29,
+              "server.network_messages": 19,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607176250.4705,
+            "tick": 191,
+            "radio_tick": 191,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 191000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 7,
+              "server.network_encoded_payload_bytes": 27790,
+              "server.network_message_events": 29,
+              "server.network_messages": 19,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607182250.3281,
+            "tick": 197,
+            "radio_tick": 197,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 197000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 7,
+              "server.network_encoded_payload_bytes": 27790,
+              "server.network_message_events": 29,
+              "server.network_messages": 19,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607188250.3005,
+            "tick": 203,
+            "radio_tick": 203,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 203000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 7,
+              "server.network_encoded_payload_bytes": 27790,
+              "server.network_message_events": 29,
+              "server.network_messages": 19,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607193250.362,
+            "tick": 208,
+            "radio_tick": 208,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 208000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 7,
+              "server.network_encoded_payload_bytes": 27790,
+              "server.network_message_events": 29,
+              "server.network_messages": 19,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607198251.1733,
+            "tick": 213,
+            "radio_tick": 213,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 213000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 8,
+              "server.network_encoded_payload_bytes": 30160,
+              "server.network_message_events": 31,
+              "server.network_messages": 21,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607204249.8794,
+            "tick": 219,
+            "radio_tick": 219,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 219000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 8,
+              "server.network_encoded_payload_bytes": 30160,
+              "server.network_message_events": 31,
+              "server.network_messages": 21,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607209250.3643,
+            "tick": 224,
+            "radio_tick": 224,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 224000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 8,
+              "server.network_encoded_payload_bytes": 30160,
+              "server.network_message_events": 31,
+              "server.network_messages": 21,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607214251.0168,
+            "tick": 229,
+            "radio_tick": 229,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 229000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 8,
+              "server.network_encoded_payload_bytes": 30160,
+              "server.network_message_events": 31,
+              "server.network_messages": 21,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607220251.1047,
+            "tick": 235,
+            "radio_tick": 235,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 235000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 8,
+              "server.network_encoded_payload_bytes": 30160,
+              "server.network_message_events": 31,
+              "server.network_messages": 21,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607225251.5198,
+            "tick": 240,
+            "radio_tick": 240,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 240000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 8,
+              "server.network_encoded_payload_bytes": 30160,
+              "server.network_message_events": 31,
+              "server.network_messages": 21,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607231250.0823,
+            "tick": 246,
+            "radio_tick": 246,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 246000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 9,
+              "server.network_encoded_payload_bytes": 32530,
+              "server.network_message_events": 33,
+              "server.network_messages": 23,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607236251.1892,
+            "tick": 251,
+            "radio_tick": 251,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 251000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 9,
+              "server.network_encoded_payload_bytes": 32530,
+              "server.network_message_events": 33,
+              "server.network_messages": 23,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607242250.7083,
+            "tick": 257,
+            "radio_tick": 257,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 257000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 9,
+              "server.network_encoded_payload_bytes": 32530,
+              "server.network_message_events": 33,
+              "server.network_messages": 23,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607248250.0833,
+            "tick": 263,
+            "radio_tick": 263,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 263000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 9,
+              "server.network_encoded_payload_bytes": 32530,
+              "server.network_message_events": 33,
+              "server.network_messages": 23,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607253250.7026,
+            "tick": 268,
+            "radio_tick": 268,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 268000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 9,
+              "server.network_encoded_payload_bytes": 32530,
+              "server.network_message_events": 33,
+              "server.network_messages": 23,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607259250.3545,
+            "tick": 274,
+            "radio_tick": 274,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 274000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 10,
+              "server.network_encoded_payload_bytes": 34900,
+              "server.network_message_events": 35,
+              "server.network_messages": 25,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607264250.829,
+            "tick": 279,
+            "radio_tick": 279,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 279000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 10,
+              "server.network_encoded_payload_bytes": 34900,
+              "server.network_message_events": 35,
+              "server.network_messages": 25,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607270248.9915,
+            "tick": 285,
+            "radio_tick": 285,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 285000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 10,
+              "server.network_encoded_payload_bytes": 34900,
+              "server.network_message_events": 35,
+              "server.network_messages": 25,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607275249.908,
+            "tick": 290,
+            "radio_tick": 290,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 290000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 10,
+              "server.network_encoded_payload_bytes": 34900,
+              "server.network_message_events": 35,
+              "server.network_messages": 25,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607280249.9905,
+            "tick": 295,
+            "radio_tick": 295,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 295000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 10,
+              "server.network_encoded_payload_bytes": 34900,
+              "server.network_message_events": 35,
+              "server.network_messages": 25,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607286250.8645,
+            "tick": 301,
+            "radio_tick": 301,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 301000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 11,
+              "server.network_encoded_payload_bytes": 37270,
+              "server.network_message_events": 37,
+              "server.network_messages": 27,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607292250.1646,
+            "tick": 307,
+            "radio_tick": 307,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 307000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 11,
+              "server.network_encoded_payload_bytes": 37270,
+              "server.network_message_events": 37,
+              "server.network_messages": 27,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607298250.452,
+            "tick": 313,
+            "radio_tick": 313,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 313000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 11,
+              "server.network_encoded_payload_bytes": 37270,
+              "server.network_message_events": 37,
+              "server.network_messages": 27,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607303250.855,
+            "tick": 318,
+            "radio_tick": 318,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 318000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 11,
+              "server.network_encoded_payload_bytes": 37270,
+              "server.network_message_events": 37,
+              "server.network_messages": 27,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607308251.367,
+            "tick": 323,
+            "radio_tick": 323,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 323000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 11,
+              "server.network_encoded_payload_bytes": 37270,
+              "server.network_message_events": 37,
+              "server.network_messages": 27,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607314251.568,
+            "tick": 329,
+            "radio_tick": 329,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 329000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 11,
+              "server.network_encoded_payload_bytes": 37270,
+              "server.network_message_events": 37,
+              "server.network_messages": 27,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607320251.0408,
+            "tick": 335,
+            "radio_tick": 335,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 335000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 12,
+              "server.network_encoded_payload_bytes": 39640,
+              "server.network_message_events": 39,
+              "server.network_messages": 29,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607325251.1296,
+            "tick": 340,
+            "radio_tick": 340,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 340000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 12,
+              "server.network_encoded_payload_bytes": 39640,
+              "server.network_message_events": 39,
+              "server.network_messages": 29,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607331250.2998,
+            "tick": 346,
+            "radio_tick": 346,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 346000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 12,
+              "server.network_encoded_payload_bytes": 39640,
+              "server.network_message_events": 39,
+              "server.network_messages": 29,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607336250.677,
+            "tick": 351,
+            "radio_tick": 351,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 351000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 12,
+              "server.network_encoded_payload_bytes": 39640,
+              "server.network_message_events": 39,
+              "server.network_messages": 29,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          },
+          {
+            "time": 1791607341250.8145,
+            "tick": 356,
+            "radio_tick": 356,
+            "counts": {
+              "simulation.network.devices": 4992,
+              "simulation.network.interference_contributions": 0,
+              "simulation.network.interference_entries": 4992,
+              "simulation.network.mobility_entries": 4992,
+              "simulation.network.pending_events": 0,
+              "simulation.network.pending_receptions": 0,
+              "simulation.network.retained_from_ns": 356000000000,
+              "simulation.pending_fragment_events": 0,
+              "simulation.pending_network_events": 0,
+              "simulation.transport_completed_ids": 0,
+              "simulation.transport_events": 0,
+              "simulation.transport_fragments": 0,
+              "simulation.transport_messages": 0,
+              "simulation.transport_payload_bytes": 0,
+              "server.authority_events": 0,
+              "server.authority_requests": 0,
+              "server.intent_receipts": 12,
+              "server.network_encoded_payload_bytes": 39640,
+              "server.network_message_events": 39,
+              "server.network_messages": 29,
+              "server.packet_messages": 0,
+              "server.pending_deliveries": 0
+            }
+          }
+        ]
+      }
+    },
+    "metrics": {
+      "server": {
+        "lock_wait_ms": {
+          "samples": 16012,
+          "mean": 0.030292835748188973,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 5.924996,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "lock_hold_ms": {
+          "samples": 16012,
+          "mean": 1.3701105913065128,
+          "p50": 1.7000000000000002,
+          "p95": 2.3000000000000003,
+          "max": 5.212534,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/planning.rs:221:write": {
+        "wait_ms": {
+          "samples": 3896,
+          "mean": 0.056683360882957126,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 5.924996,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 3896,
+          "mean": 1.6405106085728955,
+          "p50": 1.7000000000000002,
+          "p95": 2,
+          "max": 3.6427590000000003,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/main.rs:1058:read": {
+        "wait_ms": {
+          "samples": 1941,
+          "mean": 0.017635833075734256,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 3.493284,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 1941,
+          "mean": 0.007564217413704293,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.042221,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/main.rs:1171:read": {
+        "wait_ms": {
+          "samples": 1941,
+          "mean": 0.030457755795981572,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 4.950118,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 1941,
+          "mean": 0.002576772797527048,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.03045,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "game:7431462c-c051-49f1-8d7b-fbe19dfc5af1": {
+        "http_build_ms": {
+          "samples": 3874,
+          "mean": 1.6002442496128015,
+          "p50": 1.6,
+          "p95": 2,
+          "max": 2.5634759999999996,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "http_serialization_ms": {
+          "samples": 3874,
+          "mean": 0.39284744166236385,
+          "p50": 0.4,
+          "p95": 0.5,
+          "max": 0.761497,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "http_bytes": {
+          "samples": 3874,
+          "mean": 684009.6050593702,
+          "p50": 684022,
+          "p95": 684027,
+          "max": 684029,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "tick_duration_ms": {
+          "samples": 300,
+          "mean": 4.118184173333334,
+          "p50": 4.1000000000000005,
+          "p95": 4.7,
+          "max": 5.174543,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "tick_schedule_delay_ms": {
+          "samples": 300,
+          "mean": 0.8802161200000003,
+          "p50": 0.9,
+          "p95": 1.4000000000000001,
+          "max": 3.379625,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "websocket_build_including_lock_ms": {
+          "samples": 3900,
+          "mean": 1.6324752489743595,
+          "p50": 1.7000000000000002,
+          "p95": 2,
+          "max": 6.207229,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "websocket_serialization_ms": {
+          "samples": 3900,
+          "mean": 0.39141892410256424,
+          "p50": 0.4,
+          "p95": 0.5,
+          "max": 0.816918,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "websocket_bytes": {
+          "samples": 3900,
+          "mean": 687222.3097435897,
+          "p50": 684030,
+          "p95": 717323,
+          "max": 750766,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "request_ms": {
+          "samples": 11812,
+          "mean": 3.456631698526868,
+          "p50": 2.3000000000000003,
+          "p95": 8.1,
+          "max": 14.929028000013204,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 11812,
+          "mean": 229394.61962411107,
+          "p50": 470,
+          "p95": 684025,
+          "max": 684029,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 1941,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "lock:crates/server/src/main.rs:1982:write": {
+        "wait_ms": {
+          "samples": 3874,
+          "mean": 0.03835666391326849,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 4.871297,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 3874,
+          "mean": 2.070732335312337,
+          "p50": 2.1,
+          "p95": 2.5,
+          "max": 3.337095,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/main.rs:2986:write": {
+        "wait_ms": {
+          "samples": 300,
+          "mean": 0.00019527333333333298,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.0005700000000000001,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 300,
+          "mean": 4.1597904099999985,
+          "p50": 4.2,
+          "p95": 4.800000000000001,
+          "max": 5.212534,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/main.rs:2807:write": {
+        "wait_ms": {
+          "samples": 3900,
+          "mean": 0.0031627517948717952,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 3.960379,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 3900,
+          "mean": 1.6041271292307693,
+          "p50": 1.7000000000000002,
+          "p95": 1.9000000000000001,
+          "max": 2.7363299999999997,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/intents.rs:313:read": {
+        "wait_ms": {
+          "samples": 20,
+          "mean": 0.10122674999999999,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 2.0203249999999997,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 20,
+          "mean": 0.004252550000000001,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.007611,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/leases.rs:227:write": {
+        "wait_ms": {
+          "samples": 130,
+          "mean": 0.060363161538461524,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 2.221726,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 130,
+          "mean": 0.0029745307692307685,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.0055899999999999995,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/main.rs:1046:write": {
+        "wait_ms": {
+          "samples": 10,
+          "mean": 0.00020800000000000001,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.00026,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 10,
+          "mean": 0.05760609999999999,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.081851,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "client:4": {
+        "request_ms": {
+          "samples": 906,
+          "mean": 3.489726934877474,
+          "p50": 2.3000000000000003,
+          "p95": 8.200000000000001,
+          "max": 12.841623000014806,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 906,
+          "mean": 230056.5728476821,
+          "p50": 2023,
+          "p95": 684025,
+          "max": 684029,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9966666666667,
+          "p50": 1000,
+          "p95": 1001,
+          "max": 1005,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1378788.41,
+          "p50": 1370207,
+          "p95": 1398638,
+          "max": 1400656,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/planning": {
+        "request_ms": {
+          "samples": 3896,
+          "mean": 2.510259264117171,
+          "p50": 2.3000000000000003,
+          "p95": 4.2,
+          "max": 9.533656999992672,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 3896,
+          "mean": 132.8675564681725,
+          "p50": 133,
+          "p95": 133,
+          "max": 133,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:9": {
+        "request_ms": {
+          "samples": 908,
+          "mean": 3.427022052863418,
+          "p50": 2.3000000000000003,
+          "p95": 8.1,
+          "max": 14.929028000013204,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 908,
+          "mean": 229565.8513215859,
+          "p50": 432,
+          "p95": 684025,
+          "max": 684029,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 150,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 1000,
+          "p50": 1000,
+          "p95": 1001,
+          "max": 1003,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1378836.87,
+          "p50": 1368624,
+          "p95": 1398637,
+          "max": 1398644,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/authority": {
+        "request_ms": {
+          "samples": 1941,
+          "mean": 1.0345332091702923,
+          "p50": 0.9,
+          "p95": 2.4000000000000004,
+          "max": 7.777820999996038,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 1941,
+          "mean": 30443,
+          "p50": 30443,
+          "p95": 30443,
+          "max": 30443,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/authority/requests": {
+        "request_ms": {
+          "samples": 1941,
+          "mean": 0.5007248042247865,
+          "p50": 0.4,
+          "p95": 0.8,
+          "max": 8.395620000024792,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 1941,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 1941,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:5": {
+        "request_ms": {
+          "samples": 906,
+          "mean": 3.4268610419426966,
+          "p50": 2.3000000000000003,
+          "p95": 7.800000000000001,
+          "max": 14.711957999970764,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 906,
+          "mean": 230056.51214128034,
+          "p50": 2017,
+          "p95": 684025,
+          "max": 684029,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 1000.0033333333333,
+          "p50": 1000,
+          "p95": 1001,
+          "max": 1003,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1378788.2266666666,
+          "p50": 1370200,
+          "p95": 1398638,
+          "max": 1400650,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:10": {
+        "request_ms": {
+          "samples": 908,
+          "mean": 3.4316032268725234,
+          "p50": 2.3000000000000003,
+          "p95": 8.4,
+          "max": 13.005856000003405,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 908,
+          "mean": 229564.90528634362,
+          "p50": 346,
+          "p95": 684025,
+          "max": 684029,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 150,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9966666666667,
+          "p50": 1000,
+          "p95": 1001,
+          "max": 1003,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1378834.0066666666,
+          "p50": 1368538,
+          "p95": 1398637,
+          "max": 1398644,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:6": {
+        "request_ms": {
+          "samples": 906,
+          "mean": 3.4101508962478735,
+          "p50": 2.3000000000000003,
+          "p95": 8.1,
+          "max": 12.084150000009686,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 906,
+          "mean": 230046.73620309052,
+          "p50": 1132,
+          "p95": 684025,
+          "max": 684029,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 1000.0033333333333,
+          "p50": 1000,
+          "p95": 1001,
+          "max": 1003,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1378758.7033333334,
+          "p50": 1369315,
+          "p95": 1398638,
+          "max": 1399765,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "generator": {
+        "schedule_lag_ms": {
+          "samples": 300,
+          "mean": 0.2966666666666667,
+          "p50": 0,
+          "p95": 1,
+          "max": 1,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "client:11": {
+        "request_ms": {
+          "samples": 908,
+          "mean": 3.3750606751090375,
+          "p50": 2.3000000000000003,
+          "p95": 8.200000000000001,
+          "max": 14.40286199998809,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 908,
+          "mean": 229566.2896475771,
+          "p50": 471,
+          "p95": 684025,
+          "max": 684029,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 150,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 1000.0066666666667,
+          "p50": 1000,
+          "p95": 1001,
+          "max": 1003,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1378838.1966666668,
+          "p50": 1368657,
+          "p95": 1398637,
+          "max": 1398644,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:12": {
+        "request_ms": {
+          "samples": 908,
+          "mean": 3.4323162566081713,
+          "p50": 2.3000000000000003,
+          "p95": 8.700000000000001,
+          "max": 12.522775000019465,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 908,
+          "mean": 229566.27312775332,
+          "p50": 470,
+          "p95": 684025,
+          "max": 684029,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 150,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9966666666667,
+          "p50": 1000,
+          "p95": 1001,
+          "max": 1003,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1378838.1466666667,
+          "p50": 1368658,
+          "p95": 1398637,
+          "max": 1398644,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:7": {
+        "request_ms": {
+          "samples": 906,
+          "mean": 3.4087407097131392,
+          "p50": 2.3000000000000003,
+          "p95": 8.200000000000001,
+          "max": 12.332800000003772,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 906,
+          "mean": 230043.78035320088,
+          "p50": 864,
+          "p95": 684025,
+          "max": 684029,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9966666666667,
+          "p50": 1000,
+          "p95": 1001,
+          "max": 1003,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1378749.7766666666,
+          "p50": 1369050,
+          "p95": 1398637,
+          "max": 1398644,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:8": {
+        "request_ms": {
+          "samples": 906,
+          "mean": 3.439601438190149,
+          "p50": 2.3000000000000003,
+          "p95": 8.3,
+          "max": 12.579896000010194,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 906,
+          "mean": 230041.59602649006,
+          "p50": 665,
+          "p95": 684025,
+          "max": 684029,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 1000,
+          "p50": 1000,
+          "p95": 1001,
+          "max": 1004,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1378743.18,
+          "p50": 1368849,
+          "p95": 1398637,
+          "max": 1398644,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:0": {
+        "request_ms": {
+          "samples": 935,
+          "mean": 3.521967603208545,
+          "p50": 2.5,
+          "p95": 8,
+          "max": 10.224413999996614,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 935,
+          "mean": 222913.45775401068,
+          "p50": 336,
+          "p95": 684025,
+          "max": 684029,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 1000.0033333333333,
+          "p50": 1000,
+          "p95": 1001,
+          "max": 1003,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1420426.2366666666,
+          "p50": 1423783,
+          "p95": 1459801,
+          "max": 1465367,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/state": {
+        "request_ms": {
+          "samples": 3874,
+          "mean": 7.204685536654416,
+          "p50": 7.1000000000000005,
+          "p95": 9.600000000000001,
+          "max": 14.929028000013204,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 3874,
+          "mean": 684009.6050593702,
+          "p50": 684022,
+          "p95": 684027,
+          "max": 684029,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:1": {
+        "request_ms": {
+          "samples": 905,
+          "mean": 3.590933704972471,
+          "p50": 2.5,
+          "p95": 8,
+          "max": 11.802613999985624,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 905,
+          "mean": 230312.7624309392,
+          "p50": 2216,
+          "p95": 684025,
+          "max": 684029,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 1000,
+          "p50": 1000,
+          "p95": 1001,
+          "max": 1004,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1378794.4066666667,
+          "p50": 1370400,
+          "p95": 1398638,
+          "max": 1400849,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:2": {
+        "request_ms": {
+          "samples": 905,
+          "mean": 3.4994029966850224,
+          "p50": 2.4000000000000004,
+          "p95": 7.800000000000001,
+          "max": 13.723371000000043,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 905,
+          "mean": 230312.2276243094,
+          "p50": 2168,
+          "p95": 684025,
+          "max": 684029,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 1000,
+          "p50": 1000,
+          "p95": 1001,
+          "max": 1003,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1378792.78,
+          "p50": 1370354,
+          "p95": 1398638,
+          "max": 1400801,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:3": {
+        "request_ms": {
+          "samples": 905,
+          "mean": 3.4813102607733235,
+          "p50": 2.4000000000000004,
+          "p95": 7.7,
+          "max": 11.391873000000487,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 905,
+          "mean": 230292.0497237569,
+          "p50": 341,
+          "p95": 684025,
+          "max": 684029,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 1000,
+          "p50": 1000,
+          "p95": 1001,
+          "max": 1004,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1378731.91,
+          "p50": 1368527,
+          "p95": 1398638,
+          "max": 1398974,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/roles/:id/intents/:id": {
+        "request_ms": {
+          "samples": 20,
+          "mean": 1.1047312499944382,
+          "p50": 0.7000000000000001,
+          "p95": 2.8000000000000003,
+          "max": 4.804669999983162,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 20,
+          "mean": 352.5,
+          "p50": 336,
+          "p95": 370,
+          "max": 370,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/roles/:id/renew": {
+        "request_ms": {
+          "samples": 130,
+          "mean": 0.9717743230768694,
+          "p50": 0.8,
+          "p95": 3.2,
+          "max": 6.1949049999821,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 130,
+          "mean": 1049,
+          "p50": 665,
+          "p95": 2216,
+          "max": 2216,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/roles/:id/intent": {
+        "request_ms": {
+          "samples": 10,
+          "mean": 1.0450669999932871,
+          "p50": 0.8,
+          "p95": 3,
+          "max": 2.935914999980014,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 10,
+          "mean": 122,
+          "p50": 122,
+          "p95": 122,
+          "max": 122,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      }
+    },
+    "budgets": {
+      "regional": [],
+      "reconnect": []
+    }
+  }
+}
