@@ -211,3 +211,54 @@ WSL wall-clock adjustments previously produced negative gaps in several version 
 reference attempts; those runs remain invalid evidence and are not repaired into
 acceptance results. Version 3 preserves ordinary epoch-shaped timestamps for
 trace analysis while making elapsed intervals independent of wall corrections.
+
+## Unattended soak runner
+
+`performance-soak.mjs` runs independently of an agent. By default it runs mixed
+50-client loads sequentially: one measured hour in volatile mode, then one in
+fresh Docker PostgreSQL, each with 60 seconds warmup. Total runtime is a little
+over two hours. It uses the same harness, measurements and cleanup as short runs.
+Prepare the dependency, release server and npm dependencies using the commands
+above, start Docker Desktop, then run from the repository root:
+
+```sh
+node web/scripts/performance-soak.mjs --output tmp/performance/soak-reference
+```
+
+To keep it running after closing the terminal on Linux/WSL:
+
+```sh
+mkdir -p tmp/performance
+nohup node web/scripts/performance-soak.mjs \
+  --output tmp/performance/soak-reference \
+  > tmp/performance/soak-launch.log 2>&1 < /dev/null &
+echo $! > tmp/performance/soak-runner.pid
+```
+
+Keep the computer awake and Docker/WSL running; `nohup` survives terminal closure,
+not a machine restart or WSL shutdown. Choose a new output directory for each run.
+For a single 24-hour durable run, add `--storage postgres --duration 86400`.
+Use `--postgres-image postgres@sha256:...` to pin the image for comparisons.
+`--check-budgets` makes applicable timing misses fail the run; otherwise they are
+reported findings. `--help` lists profile, player-count and scheduling options.
+`npm run perf:soak --prefix web -- ...` is also available; npm runs from `web/`,
+so supply an absolute output path or account for that directory. The runner does not rebuild binaries or install dependencies.
+
+Afterward, examine `report.md` for outcomes, cycle timing, resource first/last/peak
+values and errors. `report.json` preserves aggregate resource and retention series;
+each mode’s directory contains the complete metadata, raw traces and summary.
+`runner.log` records starts, minute heartbeats and completion; `volatile.log` and
+`postgres.log` contain harness progress. `status.json` is atomically updated at
+mode boundaries and final completion. A final report is written even when a mode
+fails; the other independent mode still runs. There are no automatic retries.
+The runner exits zero only when all requested runs are valid and completed.
+
+Stop gracefully with Ctrl-C in the foreground or `kill -TERM` using the saved
+runner PID in the background. It forwards termination and waits for cleanup.
+Each mode has a watchdog of warmup + duration + ten minutes (configurable via
+`--timeout-grace`), followed by up to two minutes for cleanup before forced exit.
+Timeouts and interruptions fail the run. Forced exit, power loss or shutdown may
+leave named Docker resources; use the affected run’s metadata for targeted cleanup.
+Missing final reports or a remaining `running` status indicate incomplete execution.
+Neither passing nor a quiet log establishes bounded memory or full-roadmap scale;
+inspect retention, RSS/storage growth and actual reconnect coverage in the results.
