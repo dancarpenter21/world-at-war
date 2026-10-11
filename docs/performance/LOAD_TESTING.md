@@ -202,3 +202,12 @@ machine-dependent timing.
 checks real-container interruption cleanup. The ignored Rust persistence tests
 include an injected database delay and failure to verify that full-cycle timing
 includes commits and never reports a rolled-back tick as committed.
+
+### Monotonic harness clock (measurement version 3)
+
+Client timestamps, deadlines, stream gaps, reconnect scheduling and measurement
+windows advance from a single epoch anchor using the monotonic process clock.
+WSL wall-clock adjustments previously produced negative gaps in several version 2
+reference attempts; those runs remain invalid evidence and are not repaired into
+acceptance results. Version 3 preserves ordinary epoch-shaped timestamps for
+trace analysis while making elapsed intervals independent of wall corrections.

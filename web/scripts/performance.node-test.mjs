@@ -178,3 +178,15 @@ test('interrupted PostgreSQL runs remove their container and volume and preserve
     assert.ok(!JSON.stringify(metadata).includes('postgres://'));
   } finally { clearTimeout(timeout); child.kill('SIGTERM'); await rm(directory, { recursive: true, force: true }); }
 });
+
+test('performance clock preserves stream gaps and deadlines across wall-clock corrections', async () => {
+  const { createClock } = await import('./performance-clock.mjs');
+  let wall = 10_000, mono = 100;
+  const clock = createClock(() => wall, () => mono);
+  const before = clock.now(), deadline = before + 300_000;
+  wall -= 1000; mono += 250;
+  assert.equal(clock.now() - before, 250);
+  assert.ok(clock.now() < deadline);
+  wall += 60_000; mono += 299_750;
+  assert.equal(clock.now(), deadline);
+});

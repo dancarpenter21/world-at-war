@@ -40,10 +40,10 @@ export class PerformancePostgres {
       '--publish', '127.0.0.1::5432', '--mount', `type=volume,source=${this.volume},target=/var/lib/postgresql/data`,
       '--env', 'POSTGRES_USER=waw_perf', '--env', 'POSTGRES_DB=waw_perf', '--env', 'POSTGRES_PASSWORD', this.imageId],
     { env: { ...process.env, POSTGRES_PASSWORD: this.password } });
-    const deadline = Date.now() + 60_000;
+    const deadline = performance.now() + 60_000;
     while (true) {
       try { await this.sql('SELECT 1;'); break; }
-      catch { if (Date.now() >= deadline) throw new Error('Performance PostgreSQL readiness timed out'); await new Promise(r => setTimeout(r, 250)); }
+      catch { if (performance.now() >= deadline) throw new Error('Performance PostgreSQL readiness timed out'); await new Promise(r => setTimeout(r, 250)); }
     }
     const port = await this.run(['port', this.name, '5432/tcp']);
     if (!/^127\.0\.0\.1:\d+$/.test(port)) throw new Error('Performance PostgreSQL is not loopback-only');
