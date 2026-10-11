@@ -1,5 +1,25 @@
 # World At War Implementation Plan
 
+## Persistence performance checkpoint — 2026-10-11
+
+The full-server harness now measures committed cycles, durability waits and SQL
+work in both volatile and isolated Docker PostgreSQL modes. One baseline matrix
+and two optimized matrices completed all 18 independent five-minute runs without
+client errors, failed durable operations or dropped samples. Regional cycle and
+sampled reconnect budgets pass. Prepared and batched writes, unchanged-row
+suppression and omission of unused ordinary-tick snapshot arguments preserve
+transaction, checkpoint, fencing and rollback behavior.
+
+PostgreSQL cycle p95 changed from 45.3 to 26.0–27.7 ms for regional, from 110.7
+to 62.7–71.2 ms for global, and from 243.6 to 180.8–191.0 ms for five games/50
+clients. Current-baseline core projection hashes match. See the
+[measurements, validation and artifacts](docs/performance/2026-10-11-results.md).
+This completes the short persistence performance baseline and optimization step;
+long-soak acceptance, roadmap-scale loads, retention, browser rendering, delta
+bandwidth, full packet/fragment audit and interactive replay remain open. No long
+soak was run. This supersedes earlier statements that durable short-run performance
+and storage-growth measurements are pending.
+
 ## Persistence checkpoint — 2026-10-10
 
 Optional PostgreSQL storage now preserves guest/account sessions, memberships,

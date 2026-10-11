@@ -124,6 +124,7 @@ PERSISTENCE_E2E_DATABASE_URL=postgres://test_user:test_password@127.0.0.1:5432/w
 The test kills its own server, checks restored game/role/tick state, and covers
 registration, invalid login, valid login and shared-tab logout. Other browser
 fixtures explicitly disable persistence. CI supplies both test databases and
-runs production Compose checks. No long soak is part of this increment; previous
-performance measurements describe the earlier volatile runtime, and persistence
-throughput/storage growth need separate measurement.
+runs production Compose checks. The [October 11 persistence performance checkpoint](performance/2026-10-11-results.md)
+records isolated five-minute durable and volatile profiles, two optimized repeats,
+and sampled storage/resource growth. Long-soak acceptance remains open; no long
+soak was run for this increment.

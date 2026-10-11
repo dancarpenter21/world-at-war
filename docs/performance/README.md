@@ -1,5 +1,10 @@
 # Performance measurements
 
+The [October 11 persistence checkpoint](2026-10-11-results.md) records a fresh
+volatile/PostgreSQL baseline and two optimized repetitions, with full committed
+cycle timing, storage/resource growth and all 18 short runs validated. Long-soak
+acceptance remains open.
+
 The [October 10 post-compaction checkpoint](2026-10-10-results.md) records
 validated core and five-minute full-server results. The existing post-change
 soak was interrupted and is excluded from acceptance. See the
