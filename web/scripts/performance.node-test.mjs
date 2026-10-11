@@ -84,3 +84,110 @@ test('interrupted runs stop their isolated server and retain invalid evidence', 
     assert.equal(summary.trace.dropped, 0);
   } finally { clearTimeout(timeout); child.kill('SIGTERM'); await rm(directory, { recursive: true, force: true }); }
 });
+
+test('durable cycle analysis excludes idle cycles, retains stages, and rejects failed commits', async () => {
+  const { validateRun } = await import('./performance-lib.mjs');
+  const directory = await mkdtemp(path.join(tmpdir(), 'waw-durable-metrics-'));
+  try {
+    const server = [
+      { kind: 'trace_start', unix_ms: 1000, elapsed_ms: 0 },
+      { kind: 'server_cycle', success: true, running_games: [], duration_ms: 1, elapsed_ms: 100 },
+      { kind: 'server_cycle', success: true, running_games: ['a'], duration_ms: 85, scheduled_to_committed_ms: 95, elapsed_ms: 200 },
+      { kind: 'persistence_commit', success: true, duration_ms: 70, snapshot_submitted_bytes: 400, elapsed_ms: 190 },
+      { kind: 'trace_end', written: 4, dropped: 0 },
+    ];
+    const save = () => writeFile(path.join(directory, 'server.jsonl'), server.map(JSON.stringify).join('\n'));
+    await save();
+    await writeFile(path.join(directory, 'clients.jsonl'), JSON.stringify({ kind: 'database_resource', time: 1150, database_bytes: 1234 }));
+    const metadata = { measurement_version: 2, storage: 'postgres', games: [{ id: 'a' }], measurement_completed: true };
+    let result = await analyze(directory, 1050, 1300);
+    validateRun(result, metadata);
+    assert.equal(result.valid, true);
+    assert.equal(result.metrics.server.cycle_duration_ms.samples, 1);
+    assert.equal(result.metrics.server.cycle_duration_ms.p95, 85);
+    assert.equal(result.metrics.server.persistence_commit_duration_ms.max, 70);
+    assert.equal(result.committed_games.a, 1);
+    server[3].success = false; await save();
+    result = await analyze(directory, 1050, 1300); validateRun(result, metadata);
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.includes('Failed server operation: persistence_commit'));
+    assert.ok(result.errors.includes('Missing PostgreSQL commit telemetry'));
+    result = await analyze(directory, 1050, 1300);
+    validateRun(result, { ...metadata, measurement_completed: false, games: [{ id: 'missing' }] });
+    assert.ok(result.errors.includes('Measurement window did not complete'));
+    assert.ok(result.errors.includes('Missing committed progress: missing'));
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('PostgreSQL startup failure cleans up only owned resources and does not expose credentials', async () => {
+  const { PerformancePostgres } = await import('./performance-postgres.mjs');
+  const calls = [];
+  const db = new PerformancePostgres('test-image', async (args, options) => {
+    calls.push({ args, options });
+    if (args[0] === 'image') return JSON.stringify([{ Id: 'sha256:test', RepoDigests: ['test@sha256:test'] }]);
+    if (args[0] === 'run') throw new Error('Docker run failed');
+    if (args[0] === 'ps') return '';
+    if (args[0] === 'volume' && args[1] === 'ls') return db.volume;
+    return '';
+  });
+  await assert.rejects(db.start(), { message: 'Docker run failed' });
+  await db.stop();
+  assert.ok(calls.some(c => c.args[0] === 'volume' && c.args[1] === 'rm' && c.args[2] === db.volume));
+  assert.ok(!JSON.stringify(calls.map(c => c.args)).includes(db.password));
+  assert.ok(!calls.some(c => c.args.includes('prune')));
+});
+
+test('PostgreSQL cleanup preserves the volume if its container cannot be removed', async () => {
+  const { PerformancePostgres } = await import('./performance-postgres.mjs');
+  const calls = [];
+  const db = new PerformancePostgres('test-image', async args => {
+    calls.push(args);
+    if (args[0] === 'ps') return 'owned-container';
+    if (args[0] === 'rm') throw new Error('Docker rm failed');
+    return '';
+  });
+  db.containerAttempted = true; db.volumeCreated = true;
+  await assert.rejects(db.stop(), { message: 'Docker rm failed' });
+  assert.ok(!calls.some(args => args[0] === 'volume'));
+});
+
+test('interrupted PostgreSQL runs remove their container and volume and preserve invalid evidence', { timeout: 240_000 }, async t => {
+  if (process.env.PERFORMANCE_POSTGRES_TESTS !== '1') { t.skip('set PERFORMANCE_POSTGRES_TESTS=1 with Docker and a release server'); return; }
+  const { spawn } = await import('node:child_process');
+  const { once } = await import('node:events');
+  const { readFile } = await import('node:fs/promises');
+  const { docker } = await import('./performance-postgres.mjs');
+  const directory = await mkdtemp(path.join(tmpdir(), 'waw-pg-cleanup-'));
+  const output = path.join(directory, 'run');
+  const script = new URL('./performance-server.mjs', import.meta.url);
+  const child = spawn(process.execPath, [script.pathname, '--storage', 'postgres', '--profile', 'regional',
+    '--clients', '1', '--warmup', '0', '--duration', '60', '--output', output], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const exited = once(child, 'exit');
+  let text = '', started = false;
+  child.stdout.on('data', chunk => { text += chunk; if (!started && text.includes('Performance regional:')) { started = true; child.kill('SIGTERM'); } });
+  child.stderr.on('data', chunk => { text += chunk; });
+  const timeout = setTimeout(() => child.kill('SIGTERM'), 200_000);
+  try {
+    const [code] = await exited;
+    assert.equal(started, true, text); assert.equal(code, 1, text);
+    const summary = JSON.parse(await readFile(path.join(output, 'summary.json'), 'utf8'));
+    const metadata = JSON.parse(await readFile(path.join(output, 'metadata.json'), 'utf8'));
+    assert.equal(summary.valid, false);
+    assert.ok(summary.errors.includes('Run terminated'));
+    assert.equal(await docker(['ps', '-aq', '--filter', `name=^/${metadata.postgres.container_name}$`]), '');
+    await assert.rejects(docker(['volume', 'inspect', metadata.postgres.volume_name]));
+    assert.ok(!JSON.stringify(metadata).includes('postgres://'));
+  } finally { clearTimeout(timeout); child.kill('SIGTERM'); await rm(directory, { recursive: true, force: true }); }
+});
+
+test('performance clock preserves stream gaps and deadlines across wall-clock corrections', async () => {
+  const { createClock } = await import('./performance-clock.mjs');
+  let wall = 10_000, mono = 100;
+  const clock = createClock(() => wall, () => mono);
+  const before = clock.now(), deadline = before + 300_000;
+  wall -= 1000; mono += 250;
+  assert.equal(clock.now() - before, 250);
+  assert.ok(clock.now() < deadline);
+  wall += 60_000; mono += 299_750;
+  assert.equal(clock.now(), deadline);
+});

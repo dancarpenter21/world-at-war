@@ -379,3 +379,44 @@ For Compose-only validation:
 ```sh
 docker compose -f docker-compose.yml -f docker-compose.dev.yml config
 ```
+
+## Unattended soak tests
+
+The standalone runner needs no agent to monitor it. From the repository root,
+verify the dependency pin, build the release server, install web dependencies and
+start Docker Desktop (or a local Docker engine):
+
+```sh
+sh scripts/setup-c3mesh.sh --verify-only
+cargo build --release --locked -p world-at-war-server
+npm ci --prefix web
+node web/scripts/performance-soak.mjs --output tmp/performance/soak-reference
+```
+
+The default runs mixed workloads with 50 clients across five games for one measured
+hour in volatile mode, then one hour in isolated PostgreSQL, with 60 seconds warmup
+per mode. It creates fresh games and its own database; it does not use the
+development database. Use a new output directory for each run.
+
+For unattended Linux/WSL execution after closing the terminal:
+
+```sh
+mkdir -p tmp/performance
+nohup node web/scripts/performance-soak.mjs \
+  --output tmp/performance/soak-reference \
+  > tmp/performance/soak-launch.log 2>&1 < /dev/null &
+echo $! > tmp/performance/soak-runner.pid
+```
+
+Keep the machine awake and Docker/WSL running. Examine `report.md` and `report.json`
+afterward for results, cycle timing, errors and resource growth. `runner.log`
+contains minute heartbeats; each storage mode has a progress log and complete
+trace/summary artifacts. The runner enforces timeouts, cleans up its services and
+returns nonzero for failed or incomplete runs. Stop gracefully with Ctrl-C or
+send SIGTERM to the saved runner PID.
+
+Use `--storage postgres --duration 86400` for a single 24-hour durable run;
+`--check-budgets` makes applicable timing misses failures. `--help` lists all
+options. See [load-testing instructions](docs/performance/LOAD_TESTING.md) for
+image pinning, cleanup after forced shutdown and measurement limits. Long soaks
+are manually initiated; implementing or validating changes does not start them.

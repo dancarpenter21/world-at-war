@@ -61,7 +61,7 @@ export function DiagnosticsPanel({ apiBase, gameId, playerId, roleId, client, on
       <dt>Last map update received</dt><dd>{client.lastReceivedAt === null ? "Waiting for sample" : `${Math.max(0, now - client.lastReceivedAt).toFixed(0)} ms ago`}</dd>
       <dt>State request</dt><dd>{ms(client.requestMs)}</dd>
       <dt>Map update processing</dt><dd>{ms(client.mapUpdateMs)}</dd>
-      <dt>Server tick, latest / p95</dt><dd>{ms(data?.server_tick_ms.last)} / {ms(data?.server_tick_ms.p95)}</dd>
+      <dt>Tick processing, latest / p95</dt><dd>{ms(data?.server_tick_ms.last)} / {ms(data?.server_tick_ms.p95)}</dd>
       <dt>Ticks over one second</dt><dd>{data ? `${data.server_tick_overruns} / ${data.server_tick_ms.samples}` : "Waiting for sample"}</dd>
       <dt>Role projection, latest / p95</dt><dd>{ms(data?.projection?.build_ms.last)} / {ms(data?.projection?.build_ms.p95)}</dd>
       <dt>Snapshot size</dt><dd>{data?.projection ? `${(data.projection.snapshot_bytes / 1024).toFixed(1)} KiB (uncompressed)` : "Waiting for sample"}</dd>
@@ -69,6 +69,6 @@ export function DiagnosticsPanel({ apiBase, gameId, playerId, roleId, client, on
     </dl>
     {data?.status === "paused" && <p>Simulation is paused; a stationary tick is expected.</p>}
     {data?.status === "running" && data.last_tick_age_ms !== null && data.last_tick_age_ms > 3000 && <p>Simulation progress is delayed.</p>}
-    <small>Server timings cover up to {data?.window_capacity ?? 120} recent samples. Queue totals use only this role’s visible links. Map processing excludes GPU rendering.</small>
+    <small>Tick processing excludes persistence. Server timings cover up to {data?.window_capacity ?? 120} recent samples. Queue totals use only this role’s visible links. Map processing excludes GPU rendering.</small>
   </section>;
 }

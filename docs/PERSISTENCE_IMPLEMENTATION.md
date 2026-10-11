@@ -54,6 +54,12 @@ corrupt or incompatible run makes startup fail explicitly, without resetting an
 existing game ID to tick zero. Running games recover paused; the host resumes
 using the existing controls. Lobby games remain in the lobby.
 
+The durable writer reuses prepared statements and batches memberships, seats and
+archive records within the same transaction. Unchanged memberships and seats do
+not create new row versions. Only checkpoint writes submit the complete snapshot
+to PostgreSQL; ordinary ticks still encode and hash complete state for deterministic
+verification and retain the existing checkpoint cadence and rollback boundaries.
+
 The archive stores each C2 message body once and references it from ordered
 lifecycle records. Committed lifecycle history is removed from the live event
 buffer. Existing event pagination, profile/state filters and role visibility
@@ -118,6 +124,7 @@ PERSISTENCE_E2E_DATABASE_URL=postgres://test_user:test_password@127.0.0.1:5432/w
 The test kills its own server, checks restored game/role/tick state, and covers
 registration, invalid login, valid login and shared-tab logout. Other browser
 fixtures explicitly disable persistence. CI supplies both test databases and
-runs production Compose checks. No long soak is part of this increment; previous
-performance measurements describe the earlier volatile runtime, and persistence
-throughput/storage growth need separate measurement.
+runs production Compose checks. The [October 11 persistence performance checkpoint](performance/2026-10-11-results.md)
+records isolated five-minute durable and volatile profiles, two optimized repeats,
+and sampled storage/resource growth. Long-soak acceptance remains open; no long
+soak was run for this increment.

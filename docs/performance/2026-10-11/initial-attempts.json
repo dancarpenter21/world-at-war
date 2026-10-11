@@ -1,0 +1,231 @@
+{
+  "acceptance": false,
+  "reason": "Measurement version 2 used wall-clock stream gaps; four attempts failed analysis with negative intervals.",
+  "runs": [
+    {
+      "profile": "regional",
+      "storage": "volatile",
+      "code": 0,
+      "valid": true,
+      "errors": [],
+      "cycle": {
+        "samples": 300,
+        "mean": 2.1797966466666665,
+        "p50": 1.4000000000000001,
+        "p95": 7.300000000000001,
+        "max": 8.894933,
+        "histogram_resolution": 0.1,
+        "histogram_ceiling": 10000
+      },
+      "budgets": {
+        "regional": [
+          {
+            "game_id": "d95e9cd8-64fa-49d4-8b70-dc8b1d1e9699",
+            "p95_ms": 7.300000000000001,
+            "max_ms": 8.894933,
+            "met": true
+          }
+        ],
+        "reconnect": [
+          {
+            "client": "client:7",
+            "max_ms": 3.9954559999750927,
+            "met": true
+          },
+          {
+            "client": "client:0",
+            "max_ms": 5.991036999999778,
+            "met": true
+          },
+          {
+            "client": "client:1",
+            "max_ms": 4.752406999992672,
+            "met": true
+          },
+          {
+            "client": "client:2",
+            "max_ms": 6.032620999991195,
+            "met": true
+          },
+          {
+            "client": "client:3",
+            "max_ms": 5.877525999996578,
+            "met": true
+          },
+          {
+            "client": "client:4",
+            "max_ms": 5.3198799999954645,
+            "met": true
+          },
+          {
+            "client": "client:5",
+            "max_ms": 5.474285999982385,
+            "met": true
+          },
+          {
+            "client": "client:6",
+            "max_ms": 4.405642999976408,
+            "met": true
+          }
+        ]
+      }
+    },
+    {
+      "profile": "regional",
+      "storage": "postgres",
+      "code": 1,
+      "valid": false,
+      "errors": [
+        "Analysis failed: Invalid metric: -216"
+      ]
+    },
+    {
+      "profile": "global",
+      "storage": "volatile",
+      "code": 1,
+      "valid": false,
+      "errors": [
+        "Analysis failed: Invalid metric: -332"
+      ]
+    },
+    {
+      "profile": "global",
+      "storage": "postgres",
+      "code": 1,
+      "valid": false,
+      "errors": [
+        "Analysis failed: Invalid metric: -358"
+      ]
+    },
+    {
+      "profile": "mixed",
+      "storage": "volatile",
+      "code": 0,
+      "valid": true,
+      "errors": [],
+      "cycle": {
+        "samples": 300,
+        "mean": 13.728420660000001,
+        "p50": 10.9,
+        "p95": 28.900000000000002,
+        "max": 31.925164,
+        "histogram_resolution": 0.1,
+        "histogram_ceiling": 10000
+      },
+      "budgets": {
+        "regional": [],
+        "reconnect": [
+          {
+            "client": "client:0",
+            "max_ms": 8.901527000009082,
+            "met": true
+          },
+          {
+            "client": "client:1",
+            "max_ms": 8.49526799999876,
+            "met": true
+          },
+          {
+            "client": "client:2",
+            "max_ms": 8.155170000012731,
+            "met": true
+          },
+          {
+            "client": "client:3",
+            "max_ms": 8.361677999986568,
+            "met": true
+          },
+          {
+            "client": "client:4",
+            "max_ms": 7.476285000011558,
+            "met": true
+          },
+          {
+            "client": "client:6",
+            "max_ms": 6.145999000000302,
+            "met": true
+          },
+          {
+            "client": "client:5",
+            "max_ms": 7.1606510000128765,
+            "met": true
+          },
+          {
+            "client": "client:7",
+            "max_ms": 6.967340000002878,
+            "met": true
+          },
+          {
+            "client": "client:8",
+            "max_ms": 7.707949000003282,
+            "met": true
+          },
+          {
+            "client": "client:11",
+            "max_ms": 12.897781999985455,
+            "met": true
+          },
+          {
+            "client": "client:12",
+            "max_ms": 9.434346000023652,
+            "met": true
+          },
+          {
+            "client": "client:13",
+            "max_ms": 9.445736000023317,
+            "met": true
+          },
+          {
+            "client": "client:14",
+            "max_ms": 7.637822000018787,
+            "met": true
+          },
+          {
+            "client": "client:15",
+            "max_ms": 5.779497999988962,
+            "met": true
+          },
+          {
+            "client": "client:16",
+            "max_ms": 6.383345999987796,
+            "met": true
+          },
+          {
+            "client": "client:17",
+            "max_ms": 6.135435000003781,
+            "met": true
+          },
+          {
+            "client": "client:9",
+            "max_ms": 6.006616999977268,
+            "met": true
+          },
+          {
+            "client": "client:18",
+            "max_ms": 6.461903999967035,
+            "met": true
+          },
+          {
+            "client": "client:10",
+            "max_ms": 10.443515000020852,
+            "met": true
+          },
+          {
+            "client": "client:19",
+            "max_ms": 9.498292999982368,
+            "met": true
+          }
+        ]
+      }
+    },
+    {
+      "profile": "mixed",
+      "storage": "postgres",
+      "code": 1,
+      "valid": false,
+      "errors": [
+        "Analysis failed: Invalid metric: -9"
+      ]
+    }
+  ]
+}

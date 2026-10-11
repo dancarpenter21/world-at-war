@@ -260,7 +260,9 @@ pub(super) async fn stream(
             loop {
                 interval.tick().await;
                 let bytes = {
+                    let wait = performance::Span::new("durability_gate", || serde_json::json!({"source": "observer"}));
                     let _gate = state.durability.gate.lock().await;
+                    wait.finish();
                     let mut games = state.games.write().await;
                     games
                         .get_mut(&id)

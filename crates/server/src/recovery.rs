@@ -3,6 +3,7 @@
 //! through the same AI and simulation schedule used by the live server.
 use super::*;
 use axum::{extract::Request, middleware::Next, response::Response};
+use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -33,11 +34,15 @@ struct Envelope<T> {
 }
 
 pub(super) fn encode(game: &Game) -> anyhow::Result<Vec<u8>> {
-    Ok(serde_json::to_vec(&Envelope {
+    let mut span = performance::Span::new("persistence_encode", || json!({"game_id": game.id}));
+    let bytes = serde_json::to_vec(&Envelope {
         schema_version: SCHEMA,
         dependency: DEPENDENCY.trim().into(),
         game,
-    })?)
+    })?;
+    span.set("bytes", bytes.len());
+    span.finish();
+    Ok(bytes)
 }
 pub(super) fn decode(bytes: &[u8]) -> anyhow::Result<Game> {
     let saved: Envelope<Game> = serde_json::from_slice(bytes)?;
@@ -52,7 +57,10 @@ pub(super) fn decode(bytes: &[u8]) -> anyhow::Result<Game> {
     Ok(saved.game)
 }
 pub(super) fn digest(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    let span = performance::Span::new("persistence_hash", || json!({"bytes": bytes.len()}));
+    let hash = format!("{:x}", Sha256::digest(bytes));
+    span.finish();
+    hash
 }
 
 #[derive(Serialize, Deserialize)]
@@ -210,7 +218,9 @@ async fn transaction_boundary(
     if !game_request && !access_change {
         return next.run(request).await;
     }
+    let wait = performance::Span::new("durability_gate", || json!({"source": "http"}));
     let _gate = state.durability.gate.lock().await;
+    wait.finish();
     // Authentication ran before the gate. A concurrent logout may have revoked
     // its copied session while this request was waiting.
     if request
@@ -238,6 +248,12 @@ async fn transaction_boundary(
     if !mutation {
         return next.run(request).await;
     }
+    let boundary = performance::Span::new("mutation_boundary", || {
+        json!({
+            "operation": if access_change { "auth" } else { "game" },
+            "method": request.method().as_str()
+        })
+    });
     let actor = request
         .extensions()
         .get::<auth::Session>()
@@ -287,6 +303,7 @@ async fn transaction_boundary(
     if let Some(identity) = identity {
         identity.apply(&state.sessions);
     }
+    boundary.finish();
     response
 }
 

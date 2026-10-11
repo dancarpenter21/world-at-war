@@ -16,7 +16,11 @@ concurrency:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        storage: [volatile, postgres]
     defaults:
       run:
         working-directory: world-at-war
@@ -41,17 +45,19 @@ jobs:
       - run: npm ci --prefix web
       - run: cargo build --release --locked -p world-at-war-server
       - run: npm run test:performance --prefix web
+        env:
+          PERFORMANCE_POSTGRES_TESTS: ${{ matrix.storage == 'postgres' && '1' || '0' }}
       - name: Core repeat determinism
         run: |
           mkdir -p tmp/performance
           target/release/world-at-war-server --benchmark --ticks 120 --warmup 30 --repeats 2 --seed 12787750 > tmp/performance/core.json
       - name: Fifty authenticated clients, renewals and reconnects
-        run: node web/scripts/performance-server.mjs --warmup 5 --duration 120 --reconnect-every 30 --output tmp/performance/ci
+        run: node web/scripts/performance-server.mjs --storage ${{ matrix.storage }} --warmup 5 --duration 120 --reconnect-every 30 --output tmp/performance/ci
       - name: Upload performance evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: performance-evidence
+          name: performance-evidence-${{ matrix.storage }}
           path: world-at-war/tmp/performance/
           if-no-files-found: ignore
           retention-days: 14

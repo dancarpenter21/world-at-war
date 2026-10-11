@@ -13,7 +13,8 @@
     "test:e2e": "tsc --project tsconfig.e2e.json && cargo build --manifest-path ../Cargo.toml --package world-at-war-server --locked && playwright test",
     "preview": "vite preview",
     "perf:server": "node scripts/performance-server.mjs",
-    "test:performance": "node --test scripts/performance.node-test.mjs"
+    "test:performance": "node --test scripts/performance.node-test.mjs scripts/performance-soak.node-test.mjs",
+    "perf:soak": "node scripts/performance-soak.mjs"
   },
   "dependencies": {
     "@xyflow/react": "^12.11.2",

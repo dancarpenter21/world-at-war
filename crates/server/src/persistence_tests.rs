@@ -713,3 +713,88 @@ async fn durable_mutation_finishes_after_the_request_waiter_disconnects() {
     drop(fixture);
     database.close().await;
 }
+
+#[tokio::test]
+#[ignore = "requires TEST_DATABASE_URL and PostgreSQL CREATEDB permission"]
+async fn performance_cycles_include_database_delay_and_reject_failed_commits() {
+    let database = Database::new().await;
+    let fixture = durable_fixture(&database).await;
+    let state = &fixture.state;
+    let (cookie, csrf, _) = new_guest(state).await;
+    let (prefix, role) = create_game(state, &cookie, &csrf).await;
+    claim_seat(state, &prefix, &role, &cookie, &csrf).await;
+    let id: Uuid = prefix.rsplit('/').next().unwrap().parse().unwrap();
+    let client = database.client().await;
+    client.batch_execute("CREATE FUNCTION perf_delay() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(0.05); RETURN NEW; END $$; CREATE TRIGGER perf_delay BEFORE INSERT ON game_events FOR EACH ROW EXECUTE FUNCTION perf_delay();").await.unwrap();
+    let path = std::env::temp_dir().join(format!("waw-durable-timing-{}.jsonl", Uuid::new_v4()));
+    let writer = performance::start_test_trace(&path);
+    state.games.write().await.get_mut(&id).unwrap().status = GameStatus::Running;
+    let task = tokio::spawn(run_simulation_loop(state.clone()));
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            if state.games.read().await[&id].simulation.tick() > 0 { break; }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }).await.unwrap();
+    client.batch_execute("CREATE OR REPLACE FUNCTION perf_delay() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected failure'; END $$;").await.unwrap();
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while !state.durability.failed.load(std::sync::atomic::Ordering::Acquire) {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }).await.unwrap();
+    task.abort();
+    let _ = task.await;
+    writer.finish().unwrap();
+    let rows: Vec<Value> = std::fs::read_to_string(&path).unwrap().lines().map(|line| serde_json::from_str(line).unwrap()).collect();
+    std::fs::remove_file(path).unwrap();
+    let cycles: Vec<_> = rows.iter().filter(|row| row["kind"] == "server_cycle" && row["running_games"].as_array().is_some_and(|ids| ids.contains(&json!(id)))).collect();
+    assert!(cycles.iter().any(|row| row["success"] == true && row["duration_ms"].as_f64().unwrap() >= 50.0));
+    assert_eq!(cycles.last().unwrap()["success"], false);
+    let commits: Vec<_> = rows.iter().filter(|row| row["kind"] == "persistence_commit" && row["game_ids"].as_array().is_some_and(|ids| ids.contains(&json!(id)))).collect();
+    assert!(commits.iter().any(|row| row["success"] == true && row["duration_ms"].as_f64().unwrap() >= 50.0));
+    assert_eq!(commits.last().unwrap()["success"], false);
+    assert!(commits.iter().filter(|row| row["success"] == true)
+        .all(|row| row["snapshot_submitted_bytes"] == 0),
+        "ordinary tick commits must not submit unused snapshots");
+    assert_eq!(state.games.read().await[&id].status, GameStatus::Paused);
+    database.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires TEST_DATABASE_URL and PostgreSQL CREATEDB permission"]
+async fn durable_ticks_preserve_unchanged_seat_rows_and_the_previous_checkpoint() {
+    let database = Database::new().await;
+    let mut fixture = durable_fixture(&database).await;
+    let state = &mut fixture.state;
+    let (cookie, csrf, _) = new_guest(state).await;
+    let (prefix, role) = create_game(state, &cookie, &csrf).await;
+    claim_seat(state, &prefix, &role, &cookie, &csrf).await;
+    let id: Uuid = prefix.rsplit('/').next().unwrap().parse().unwrap();
+    let client = database.client().await;
+    async fn versions(client: &Client) -> Vec<String> {
+        client.query("SELECT 'seat:' || seat_id::text || ':' || xmin::text FROM game_seats UNION ALL SELECT 'member:' || player_id::text || ':' || xmin::text FROM game_memberships ORDER BY 1", &[])
+            .await.unwrap().iter().map(|row| row.get(0)).collect()
+    }
+    let before_versions = versions(&client).await;
+    let before_snapshot: Vec<u8> = client.query_one("SELECT snapshot FROM games WHERE id=$1", &[&id]).await.unwrap().get(0);
+    {
+        let mut games = state.games.write().await;
+        let game = games.get_mut(&id).unwrap();
+        game.status = GameStatus::Running;
+        let input = recovery::TickInput::capture(game);
+        ai_orders::process_ai_orders(game);
+        advance_game_tick(game);
+        intents::record_execution_results(game);
+        let change = recovery::Boundary::new(game, Some(input), None, "simulation_tick").unwrap();
+        assert!(!change.checkpoint);
+        state.durability.store.as_ref().unwrap().commit(&[change], &mut games, None).await.unwrap();
+    }
+    assert_eq!(versions(&client).await, before_versions, "unchanged rows must not generate new tuple versions");
+    let row = client.query_one("SELECT snapshot,sequence,snapshot_sequence FROM games WHERE id=$1", &[&id]).await.unwrap();
+    assert_eq!(row.get::<_, Vec<u8>>(0), before_snapshot);
+    assert!(row.get::<_, i64>(1) > row.get::<_, i64>(2));
+    restart(state, &database).await.unwrap();
+    assert_eq!(state.games.read().await[&id].simulation.tick(), 1);
+    assert_eq!(state.games.read().await[&id].status, GameStatus::Paused);
+    database.close().await;
+}
