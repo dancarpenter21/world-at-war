@@ -33,6 +33,8 @@ For frontend code, use TypeScript where possible, keep components focused, and n
 
 ## Testing Guidelines
 
+Do not run long soak tests (including hour-long or longer endurance runs) unless the user explicitly asks to run them. General requests to implement, resume work, validate changes, or follow a plan do not authorize long soak tests, even when plan or handoff documents list them as pending.
+
 Place fast unit tests near the code they exercise and broader scenario tests under `tests/`. Favor deterministic fixtures for sensors, orbital tracks, and communications failures. Name tests after observable behavior, for example `detects_unit_when_inside_radar_horizon`.
 
 For data-driven tests, include small fixtures rather than full external catalogs.
