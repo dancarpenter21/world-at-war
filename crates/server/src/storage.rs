@@ -2,6 +2,7 @@
 //! credential is included in operational errors.
 use super::*;
 use anyhow::Context;
+use serde_json::json;
 use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
 use tokio_postgres::{Client, NoTls};
@@ -80,7 +81,21 @@ impl Store {
         games: &mut BTreeMap<Uuid, Game>,
         identity: Option<&auth::SessionUpdate>,
     ) -> anyhow::Result<()> {
+        let commit = performance::Span::new("persistence_commit", || {
+            json!({
+                "boundaries": changes.len(),
+            "game_ids": changes.iter().map(|c| c.id).collect::<Vec<_>>(),
+                "checkpoints": changes.iter().filter(|c| c.checkpoint).count(),
+                "journal_bytes": changes.iter().map(|c| c.payload.len()).sum::<usize>(),
+                // Baseline SQL sends state even when CASE discards it.
+                "snapshot_submitted_bytes": changes.iter().map(|c| c.state.len()).sum::<usize>(),
+                "archived_events": changes.iter().map(|c| games[&c.id].network_message_events.len()).sum::<usize>()
+            })
+        });
+        let wait = performance::Span::new("persistence_lock", || json!({}));
         let mut client = self.client.lock().await;
+        wait.finish();
+        let sql = performance::Span::new("persistence_sql", || json!({}));
         let transaction = client.transaction().await?;
         if let Some(identity) = identity {
             if let Some(previous) = &identity.previous {
@@ -166,7 +181,10 @@ impl Store {
                 transaction.execute("INSERT INTO game_seats(game_id, seat_id, owner_id, grant_id, generation, lease) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT(game_id, seat_id) DO UPDATE SET owner_id = EXCLUDED.owner_id, grant_id = EXCLUDED.grant_id, generation = EXCLUDED.generation, lease = EXCLUDED.lease", &[&game.id, id, &occupancy.owner, &grant, &generation, &lease]).await?;
             }
         }
+        sql.finish();
+        let flush = performance::Span::new("persistence_flush", || json!({}));
         transaction.commit().await?;
+        flush.finish();
         for change in changes {
             // Historical lifecycle records now live in the archive. Current
             // message states and duplicate-suppression IDs remain in snapshots.
@@ -176,6 +194,7 @@ impl Store {
                 .network_message_events
                 .clear();
         }
+        commit.finish();
         Ok(())
     }
 

@@ -713,3 +713,46 @@ async fn durable_mutation_finishes_after_the_request_waiter_disconnects() {
     drop(fixture);
     database.close().await;
 }
+
+#[tokio::test]
+#[ignore = "requires TEST_DATABASE_URL and PostgreSQL CREATEDB permission"]
+async fn performance_cycles_include_database_delay_and_reject_failed_commits() {
+    let database = Database::new().await;
+    let fixture = durable_fixture(&database).await;
+    let state = &fixture.state;
+    let (cookie, csrf, _) = new_guest(state).await;
+    let (prefix, role) = create_game(state, &cookie, &csrf).await;
+    claim_seat(state, &prefix, &role, &cookie, &csrf).await;
+    let id: Uuid = prefix.rsplit('/').next().unwrap().parse().unwrap();
+    let client = database.client().await;
+    client.batch_execute("CREATE FUNCTION perf_delay() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(0.05); RETURN NEW; END $$; CREATE TRIGGER perf_delay BEFORE INSERT ON game_events FOR EACH ROW EXECUTE FUNCTION perf_delay();").await.unwrap();
+    let path = std::env::temp_dir().join(format!("waw-durable-timing-{}.jsonl", Uuid::new_v4()));
+    let writer = performance::start_test_trace(&path);
+    state.games.write().await.get_mut(&id).unwrap().status = GameStatus::Running;
+    let task = tokio::spawn(run_simulation_loop(state.clone()));
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            if state.games.read().await[&id].simulation.tick() > 0 { break; }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }).await.unwrap();
+    client.batch_execute("CREATE OR REPLACE FUNCTION perf_delay() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected failure'; END $$;").await.unwrap();
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while !state.durability.failed.load(std::sync::atomic::Ordering::Acquire) {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }).await.unwrap();
+    task.abort();
+    let _ = task.await;
+    writer.finish().unwrap();
+    let rows: Vec<Value> = std::fs::read_to_string(&path).unwrap().lines().map(|line| serde_json::from_str(line).unwrap()).collect();
+    std::fs::remove_file(path).unwrap();
+    let cycles: Vec<_> = rows.iter().filter(|row| row["kind"] == "server_cycle" && row["running_games"].as_array().is_some_and(|ids| ids.contains(&json!(id)))).collect();
+    assert!(cycles.iter().any(|row| row["success"] == true && row["duration_ms"].as_f64().unwrap() >= 50.0));
+    assert_eq!(cycles.last().unwrap()["success"], false);
+    let commits: Vec<_> = rows.iter().filter(|row| row["kind"] == "persistence_commit" && row["game_ids"].as_array().is_some_and(|ids| ids.contains(&json!(id)))).collect();
+    assert!(commits.iter().any(|row| row["success"] == true && row["duration_ms"].as_f64().unwrap() >= 50.0));
+    assert_eq!(commits.last().unwrap()["success"], false);
+    assert_eq!(state.games.read().await[&id].status, GameStatus::Paused);
+    database.close().await;
+}

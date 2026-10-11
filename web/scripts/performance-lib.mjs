@@ -47,7 +47,7 @@ export async function* records(file) {
 }
 export async function analyze(directory, start, end) {
   const groups = new Map(); const errors = []; let traceEnd, serverEpoch, written = 0;
-  const resources = []; const retention = {}; const outcomes = {}; const traffic = new Map();
+  const resources = []; const database = []; const committedGames = {}; const retention = {}; const outcomes = {}; const traffic = new Map();
   const add = (group, name, value) => {
     if (value === undefined || value === null) return;
     if (!groups.has(group)) groups.set(group, new Map());
@@ -60,6 +60,7 @@ export async function analyze(directory, start, end) {
     written++;
     if (row.kind === 'trace_start') serverEpoch = row.unix_ms - row.elapsed_ms;
     const time = serverEpoch + row.elapsed_ms;
+    if (row.success === false && ['server_cycle', 'persistence_commit', 'mutation_boundary'].includes(row.kind)) errors.push(`Failed server operation: ${row.kind}`);
     if (!(time >= start && time <= end)) continue;
     const group = row.game_id ? `game:${row.game_id}` : 'server';
     if (row.kind === 'retention') {
@@ -78,6 +79,22 @@ export async function analyze(directory, start, end) {
       entry.samples++; entry.first ??= sample; entry.last = sample; entry.series.push(sample);
       for (const [key, value] of Object.entries(counts)) entry.peak[key] = Math.max(entry.peak[key] ?? 0, value);
     }
+    if (row.kind === 'server_cycle' && row.success) {
+      // Idle cycles must not dilute the workload's percentiles.
+      if (row.running_games?.length) {
+        for (const id of row.running_games) committedGames[id] = (committedGames[id] ?? 0) + 1;
+        for (const key of ['duration_ms', 'schedule_delay_ms', 'scheduled_to_committed_ms']) add('server', `cycle_${key}`, row[key]);
+      }
+    }
+    if (row.kind.startsWith('persistence_') || ['mutation_boundary', 'durability_gate'].includes(row.kind)) {
+      if (row.success) {
+        const stage = `${row.kind}${row.source ? `:${row.source}` : ''}`;
+        for (const key of ['duration_ms', 'bytes', 'boundaries', 'checkpoints', 'journal_bytes', 'snapshot_submitted_bytes', 'archived_events']) {
+          add('server', `${stage}_${key}`, row[key]);
+          if (row.game_id) add(group, `${stage}_${key}`, row[key]);
+        }
+      }
+    }
     if (row.kind === 'tick') for (const name of ['duration_ms', 'schedule_delay_ms']) add(group, `tick_${name}`, row[name]);
     if (row.kind === 'game_lock') for (const name of ['wait_ms', 'hold_ms']) {
       add('server', `lock_${name}`, row[name]); add(`lock:${row.caller}:${row.mode}`, name, row[name]);
@@ -91,6 +108,7 @@ export async function analyze(directory, start, end) {
     if (row.kind === 'error') errors.push(row.message);
     if (row.time < start || row.time > end) continue;
     if (row.kind === 'resource') resources.push(row);
+    if (row.kind === 'database_resource') database.push(row);
     if (row.kind === 'generator_lag') add('generator', 'schedule_lag_ms', row.duration_ms);
     if (row.kind === 'intent') outcomes[row.state] = (outcomes[row.state] ?? 0) + 1;
     if (row.kind === 'http') {
@@ -107,6 +125,23 @@ export async function analyze(directory, start, end) {
     }
   }
   for (const [key, bytes] of traffic) add(`client:${key.split(':')[0]}`, 'received_bytes_per_active_second', bytes);
-  return { valid: errors.length === 0, errors, trace: traceEnd, measured_seconds: (end - start) / 1000, intent_observations: outcomes, resources, retention,
+  return { valid: errors.length === 0, errors, trace: traceEnd, measured_seconds: (end - start) / 1000, intent_observations: outcomes, resources, database, committed_games: committedGames, retention,
     metrics: Object.fromEntries([...groups].map(([group, metrics]) => [group, Object.fromEntries([...metrics].map(([name, metric]) => [name, metric.summary()]))])) };
+}
+
+// Called only for new harness runs. Historical trace analysis stays compatible.
+export function validateRun(result, metadata) {
+  const reject = message => { result.errors.push(message); result.valid = false; };
+  if (!metadata.measurement_completed) reject('Measurement window did not complete');
+  for (const game of metadata.games ?? []) {
+    if (!(result.committed_games[game.id] > 0)) reject(`Missing committed progress: ${game.id}`);
+  }
+  if (!metadata.games?.length) reject('No games were measured');
+  if (!result.metrics.server?.cycle_duration_ms?.samples) reject('Missing full server-cycle telemetry');
+  if (metadata.storage === 'postgres') {
+    if (!result.metrics.server?.persistence_commit_duration_ms?.samples) reject('Missing PostgreSQL commit telemetry');
+    if (!result.database.length) reject('Missing PostgreSQL resource telemetry');
+  }
+  result.measurement_version = metadata.measurement_version;
+  result.storage = metadata.storage;
 }

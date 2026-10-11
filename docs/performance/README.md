@@ -75,15 +75,16 @@ compressed snapshot/delta budgets remain open.
 ## Runtime diagnostics
 
 The map's **Diagnostics** button shows connection freshness, state request time,
-map reconciliation time, full server tick latest/p95 and overruns, projection
+map reconciliation time, tick processing latest/p95 (before persistence) and overruns, projection
 latest/p95, uncompressed state size and queues visible to the held role. It
 separates a paused simulation from failed state requests and delayed progress.
 Map processing measures JavaScript entity reconciliation, not GPU rendering.
 
 `GET /v1/games/{game_id}/diagnostics?role_id=...&lease_generation=...` requires
 the authenticated guest cookie and the same role authorization as `/state`. Samples are bounded to 120 per metric and are
-observational only. Full server ticks include AI, authority resolution,
-simulation, delivery handling and planning reports. Projection samples describe
+observational only. Per-game tick processing includes AI, authority resolution,
+simulation, delivery handling and planning reports, but excludes PostgreSQL
+persistence. Use the version 2 full-cycle trace for durable performance acceptance. Projection samples describe
 HTTP `/state` responses; other projection consumers are not included. Diagnostics
 also exposes the latest simulation-stage timings and scheduling delay. Queue
 totals include only links present in that role's projection, never global queues

@@ -11,16 +11,19 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID, createHash } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import WebSocket from 'ws';
-import { analyze, profiles } from './performance-lib.mjs';
+import { analyze, profiles, validateRun } from './performance-lib.mjs';
+import { PerformancePostgres } from './performance-postgres.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const { values } = parseArgs({ options: {
+  storage: { type: 'string', default: 'volatile' }, 'postgres-image': { type: 'string', default: 'postgres:17-alpine' },
   profile: { type: 'string', default: 'mixed' }, clients: { type: 'string' },
   warmup: { type: 'string', default: '60' }, duration: { type: 'string', default: '300' },
   seed: { type: 'string', default: '12787750' }, output: { type: 'string' },
   'reconnect-every': { type: 'string', default: '300' },
   'check-budgets': { type: 'boolean', default: false },
 } });
+assert.ok(['volatile', 'postgres'].includes(values.storage), 'storage must be volatile or postgres');
 const numeric = (key, min, max) => {
   const n = Number(values[key]); assert.ok(Number.isSafeInteger(n) && n >= min && n <= max, `${key} must be ${min}..${max}`); return n;
 };
@@ -31,7 +34,7 @@ const output = path.resolve(values.output ?? path.join(root, 'tmp/performance', 
 await mkdir(path.dirname(output), { recursive: true });
 await mkdir(output, { recursive: false });
 const errors = []; const players = [], games = [], tasks = []; let stopping = false, backend, provider, base, serverLog;
-let measurementStart, measurementEnd, workloadStart; let phase = 'setup'; let recording = true;
+let measurementStart, measurementEnd, workloadStart; let phase = 'setup'; let recording = true; let database, databaseSampling;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 function emit(row) {
   if (!recording) return;
@@ -41,7 +44,7 @@ function emit(row) {
 function fail(error) { const message = String(error?.message ?? error); errors.push(message); emit({ kind: 'error', message }); stopping = true; }
 process.on('SIGINT', () => { fail(new Error('Run interrupted')); });
 process.on('SIGTERM', () => { fail(new Error('Run terminated')); });
-const metadata = { schema_version: 1, retention_sample_seconds: 5, profile: values.profile, layout, seed, warmup_seconds: warmup, measured_seconds: duration,
+const metadata = { schema_version: 2, measurement_version: 2, storage: values.storage, retention_sample_seconds: 5, profile: values.profile, layout, seed, warmup_seconds: warmup, measured_seconds: duration,
   reconnect_every_seconds: reconnectEvery, started_at: new Date().toISOString(),
   revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
   dirty: execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim().length > 0,
@@ -157,7 +160,7 @@ class Player {
   }
 }
 async function stopBackend() {
-  if (!backend || backend.exitCode !== null || backend.signalCode !== null) return;
+  if (!backend?.pid || backend.exitCode !== null || backend.signalCode !== null) return;
   const exited = once(backend, 'exit'); backend.kill('SIGTERM');
   const timer = setTimeout(() => backend.kill('SIGKILL'), 10_000);
   try { await exited; } finally { clearTimeout(timer); }
@@ -171,6 +174,12 @@ async function resources() {
     audit_bytes: auditBytes, generator_rss_bytes: process.memoryUsage().rss, generator_cpu: process.cpuUsage() });
 }
 try {
+  if (values.storage === 'postgres') {
+    database = new PerformancePostgres(values['postgres-image']);
+    metadata.postgres = await database.start();
+    await writeFile(path.join(output, 'metadata.json'), JSON.stringify(metadata, null, 2));
+    assert.ok(!stopping, 'Run stopped during database startup');
+  }
   assert.equal(process.platform, 'linux', 'Reference harness requires Linux/WSL process telemetry');
   metadata.clock_ticks_per_second = Number(execFileSync('getconf', ['CLK_TCK'], { encoding: 'utf8' }).trim());
   provider = createServer((request, response) => {
@@ -188,7 +197,7 @@ try {
   await writeFile(path.join(runtime, 'airports/latest.json'), JSON.stringify({ schema_version: 1, synced_unix: Math.floor(Date.now() / 1000), checksum: 'performance-fixture', sources: [], degraded_sources: [], airports }));
   serverLog = createWriteStream(path.join(output, 'server.log'), { flags: 'wx' });
   backend = spawn(path.join(root, 'target/release/world-at-war-server'), [], { cwd: runtime,
-    env: { PATH: process.env.PATH, BIND_ADDR: `127.0.0.1:${port}`, APP_ALLOWED_ORIGINS: base,
+    env: { PATH: process.env.PATH, DATABASE_URL: database?.url ?? '', BIND_ADDR: `127.0.0.1:${port}`, APP_ALLOWED_ORIGINS: base,
       COOKIE_SECURE: 'false', ADMIN_SETUP_TOKEN: '', PERFORMANCE_TRACE_DIR: output,
       SPACETRACK_USERNAME: '', SPACETRACK_PASSWORD: '', SPACETRACK_LOGIN_URL: `${providerBase}/login`, SPACETRACK_GP_URL: `${providerBase}/gp`,
       AIRPORT_CACHE_DIR: path.join(runtime, 'airports'), AIRPORT_REFRESH_MAX_AGE_SECONDS: '86400',
@@ -198,7 +207,7 @@ try {
       COMMUNICATIONS_CATALOG_PATH: path.join(root, 'data/communications/catalog.yaml') }, stdio: ['ignore', 'pipe', 'pipe'] });
   backend.stdout.pipe(serverLog, { end: false }); backend.stderr.pipe(serverLog, { end: false });
   backend.on('error', fail); backend.on('exit', (code, signal) => { if (!stopping) fail(new Error(`Server exited: ${code ?? signal}`)); });
-  const deadline = Date.now() + 30_000;
+  const deadline = Date.now() + 120_000;
   while (!(await fetch(base + '/health').then(r => r.ok, () => false))) { assert.ok(!stopping && Date.now() < deadline, 'Server startup failed'); await sleep(100); }
   for (const [scenario, count] of layout) {
     const host = new Player(players.length); players.push(host);
@@ -233,6 +242,13 @@ try {
   metadata.measurement_start_unix_ms = measurementStart; metadata.measurement_end_unix_ms = measurementEnd;
   await writeFile(path.join(output, 'metadata.json'), JSON.stringify(metadata, null, 2));
   console.log(`Performance ${values.profile}: ${players.length} players / ${games.length} games; ${warmup}s warmup + ${duration}s measurement. Artifacts: ${output}`);
+  if (database) databaseSampling = (async () => {
+    while (!stopping) {
+      const next = Date.now() + 5000;
+      emit(await database.sample());
+      while (!stopping && Date.now() < next) await sleep(Math.min(100, next - Date.now()));
+    }
+  })().catch(fail);
   let nextResource = 0, nextReconnect = measurementStart + reconnectEvery * 1000, cycle = 0, nextProgress = 0;
   while (!stopping && Date.now() < measurementEnd) {
     phase = Date.now() < measurementStart ? 'warmup' : 'measurement';
@@ -247,27 +263,36 @@ try {
     }
     if (Date.now() >= nextProgress) { console.log(`${phase}: ${Math.max(0, Math.floor((Date.now() - measurementStart) / 1000))}/${duration}s, errors=${errors.length}`); nextProgress = Date.now() + 60_000; }
   }
+  metadata.measurement_completed = !stopping && Date.now() >= measurementEnd;
 } catch (error) { fail(error); }
 finally {
   stopping = true; phase = 'cleanup';
   for (const p of players) { p.disconnected = true; p.socket?.terminate(); for (const c of p.controllers) c.abort(); }
   await Promise.allSettled(tasks);
   for (const game of games) try { await game.host.request(game.host.prefix + '/pause', 'POST', {}); } catch (error) { fail(error); }
-  await stopBackend();
+  await databaseSampling;
+  try { await stopBackend(); } catch (error) { fail(error); }
+  if (database) try { await database.stop(); } catch (error) { fail(error); }
   if (provider?.listening) await new Promise(resolve => provider.close(resolve));
   if (serverLog) { serverLog.end(); await finished(serverLog); }
   recording = false; sink.end(); await finished(sink);
+  await writeFile(path.join(output, 'metadata.json'), JSON.stringify(metadata, null, 2));
   try {
     const result = await analyze(output, measurementStart, measurementEnd);
+    validateRun(result, metadata);
     result.valid &&= errors.length === 0 && Date.now() >= measurementEnd;
     result.errors = [...new Set([...result.errors, ...errors])];
-    result.budgets = { regional: games.filter(g => g.scenario_id === 'regional-campaign.v1').map(g => {
-      const metric = result.metrics[`game:${g.id}`]?.tick_duration_ms;
+    result.budgets = { regional: games.filter(g => values.profile === 'regional' && g.scenario_id === 'regional-campaign.v1').map(g => {
+      const metric = values.profile === 'regional' ? result.metrics.server?.cycle_duration_ms : undefined;
       return { game_id: g.id, p95_ms: metric?.p95, max_ms: metric?.max, met: !!metric && metric.p95 <= 250 && metric.max <= 1000 };
     }), reconnect: Object.entries(result.metrics).filter(([key, m]) => key.startsWith('client:') && m.reconnect_ms).map(([client, m]) => ({ client, max_ms: m.reconnect_ms.max, met: m.reconnect_ms.max <= 3000 })) };
     await writeFile(path.join(output, 'summary.json'), JSON.stringify(result, null, 2));
     console.log(JSON.stringify({ valid: result.valid, errors: result.errors, budgets: result.budgets, output }, null, 2));
     if (!result.valid || (values['check-budgets'] && [...result.budgets.regional, ...result.budgets.reconnect].some(b => !b.met))) process.exitCode = 1;
-  } catch (error) { console.error(error); process.exitCode = 1; }
+  } catch (error) {
+    const result = { valid: false, storage: values.storage, measurement_version: 2, errors: [...errors, `Analysis failed: ${error.message}`] };
+    await writeFile(path.join(output, 'summary.json'), JSON.stringify(result, null, 2));
+    console.error(JSON.stringify(result)); process.exitCode = 1;
+  }
   await rm(runtime, { recursive: true, force: true });
 }

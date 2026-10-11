@@ -83,7 +83,8 @@ WebSocket errors, forbidden reads succeeding, stalled tick/stream progress for
 - `summary.json`: measured-window histograms by game, client and operation, budget
   comparisons, resource series and run validity. `server.log` records process output.
 
-Server tick timing includes AI, authority, simulation and existing audit writes.
+Per-game tick timing includes AI, authority, simulation and existing file audit writes,
+but excludes PostgreSQL persistence. See measurement version 2 below.
 Scheduling delay and lock contention are separate metrics; a short tick does not
 prove timely service. HTTP projection build timing excludes lock acquisition;
 operational WebSocket build timing explicitly includes it. Observer projection
@@ -136,3 +137,68 @@ RSS series with the baseline; RSS alone cannot distinguish retained allocations
 from allocator high-water marks. Player-visible message history, completed IDs,
 intent receipts and audit files still grow with activity and are not expired by
 this increment. Their archival policy belongs to persistence work.
+
+## PostgreSQL comparison (measurement version 2)
+
+Pass `--storage postgres` to measure durable operation. The default remains
+`--storage volatile`. PostgreSQL mode requires Docker access and starts its own
+PostgreSQL 17 container with a fresh named disk volume and loopback-only random
+port. It never uses the development database or reads `.env`. Credentials are
+generated per run and excluded from artifacts. Normal cleanup and handled
+interruptions remove that container and volume; cleanup failures invalidate the
+run. A forcibly killed harness may leave its named resources behind: metadata
+records their names for targeted cleanup, never use a system-wide prune.
+
+`--postgres-image postgres@sha256:...` selects an exact image for comparisons.
+The default is `postgres:17-alpine`; metadata records the resolved image ID,
+repository digest, PostgreSQL version and durability settings. Use the same image,
+hardware, toolchain and sampling settings for before/after runs. Fsync,
+synchronous commit and full-page writes must remain enabled.
+
+```sh
+node web/scripts/performance-server.mjs --storage postgres --profile regional \
+  --warmup 60 --duration 300 --reconnect-every 60 \
+  --output tmp/performance/durable-regional
+```
+
+Run regional, global and mixed profiles sequentially in each storage mode. A
+reference comparison uses 60 seconds warmup, 300 measured seconds and reconnects
+every 60 seconds; record actual reconnect coverage rather than claiming every
+player reconnected. Repeat the final matrix in reverse storage-mode order.
+These are separate short runs, not authorization to run a long soak.
+
+Version 2 adds `server_cycle` timing from acquisition of the shared games lock
+through backups, lease expiry, all game advances, boundary encoding and hashing,
+SQL commit and post-commit bookkeeping. It excludes gate/lock waits; the separate
+scheduled-to-committed metric includes them. Shared transaction costs belong to
+the whole cycle, not individual games. Idle cycles do not dilute percentiles.
+The older `tick` timing and diagnostics API still measure game processing before
+persistence; they cannot certify durable tick performance.
+
+Additional local spans measure encoding, hashing, mutation boundaries, durability
+gate waits (HTTP, simulation and streams), storage-lock waits, SQL execution and
+transaction commit. These spans nest: their durations must not be summed as if
+independent. Cancelled/failed durable boundaries are not successful cycles.
+Aggregate counts include journal bytes, submitted snapshot bytes, checkpoints and
+archived events. No message or snapshot bodies are recorded.
+
+Five-second database samples contain database/table/index sizes, WAL growth since
+container readiness, and Docker container CPU/memory/block-I/O measurements.
+Docker memory includes the container's processes; it is not server-process RSS.
+Sampling duration is reported. All growth claims use measured-window samples;
+WAL includes the workload and PostgreSQL background activity in this isolated
+instance. These metrics have no invented memory or storage pass threshold.
+
+A new run must complete its measurement window and contain committed progress for
+every game, a complete trace footer, and (for PostgreSQL) commit and resource
+samples. Failed durable operations invalidate the run. Legacy traces remain
+readable but cannot satisfy the new validation contract. The standalone regional
+budget now uses the complete server cycle (p95 <=250 ms, maximum <=1,000 ms).
+Mixed/global full cycles are reported without assigning shared commit costs to
+regional games. Reconnect remains <=3 seconds. CI gates validity rather than
+machine-dependent timing.
+
+`PERFORMANCE_POSTGRES_TESTS=1 npm run test:performance --prefix web` additionally
+checks real-container interruption cleanup. The ignored Rust persistence tests
+include an injected database delay and failure to verify that full-cycle timing
+includes commits and never reports a rolled-back tick as committed.

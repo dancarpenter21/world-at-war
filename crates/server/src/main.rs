@@ -2857,7 +2857,12 @@ async fn stream_network_socket(
     let mut last_sequence = query.after_sequence;
     loop {
         interval.tick().await;
+        let wait = performance::Span::new(
+            "durability_gate",
+            || serde_json::json!({"source": "websocket"}),
+        );
         let gate = state.durability.gate.lock().await;
+        wait.finish();
         if !state.sessions.valid(&session) {
             drop(gate);
             let _ = socket
@@ -2937,7 +2942,12 @@ async fn stream_socket(
     let mut interval = tokio::time::interval(Duration::from_secs(1));
     loop {
         interval.tick().await;
+        let wait = performance::Span::new(
+            "durability_gate",
+            || serde_json::json!({"source": "websocket"}),
+        );
         let gate = state.durability.gate.lock().await;
+        wait.finish();
         if !state.sessions.valid(&session) {
             drop(gate);
             let _ = socket
@@ -3054,7 +3064,12 @@ async fn run_simulation_loop(state: AppState) {
     let mut last_retention_sample = std::time::Instant::now();
     loop {
         let scheduled = interval.tick().await;
+        let wait = performance::Span::new(
+            "durability_gate",
+            || serde_json::json!({"source": "simulation"}),
+        );
         let _gate = state.durability.gate.lock().await;
+        wait.finish();
         if state
             .durability
             .failed
@@ -3068,6 +3083,13 @@ async fn run_simulation_loop(state: AppState) {
         }
         let expired = state.sessions.expired_players();
         let mut games = state.games.write().await;
+        let mut cycle = performance::Span::new("server_cycle", || {
+            serde_json::json!({
+                "storage": if state.durability.store.is_some() { "postgres" } else { "volatile" },
+                "schedule_delay_ms": scheduled.elapsed().as_secs_f64() * 1000.0,
+                "running_games": games.values().filter(|g| g.status == GameStatus::Running).map(|g| g.id).collect::<Vec<_>>()
+            })
+        });
         let before = if state.durability.store.is_some() {
             match recovery::backup(&games) {
                 Ok(before) => Some(before),
@@ -3154,8 +3176,14 @@ async fn run_simulation_loop(state: AppState) {
                         .is_err())
             {
                 recovery::rollback(&state, &mut games, before);
+                continue;
             }
         }
+        cycle.set(
+            "scheduled_to_committed_ms",
+            scheduled.elapsed().as_secs_f64() * 1000.0,
+        );
+        cycle.finish();
         if performance::enabled() && last_retention_sample.elapsed() >= Duration::from_secs(5) {
             for game in games.values() {
                 performance::record_retention(game);

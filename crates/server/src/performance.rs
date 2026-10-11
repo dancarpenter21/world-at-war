@@ -117,6 +117,14 @@ pub(super) fn start() -> anyhow::Result<Option<Writer>> {
     );
     Ok(Some(writer))
 }
+#[cfg(test)]
+pub(super) fn start_test_trace(path: &Path) -> Writer {
+    let writer = Writer::start(path, CAPACITY).unwrap();
+    TRACE
+        .set(writer.trace.clone())
+        .unwrap_or_else(|_| panic!("test trace already started"));
+    writer
+}
 pub(super) fn record(make: impl FnOnce() -> Value) {
     if let Some(trace) = TRACE.get() {
         trace.record(make);
@@ -124,6 +132,49 @@ pub(super) fn record(make: impl FnOnce() -> Value) {
 }
 pub(super) fn enabled() -> bool {
     TRACE.get().is_some()
+}
+
+/// A cancelled or early-returning durable operation must never look committed.
+/// Fields are constructed lazily and contain only local aggregate telemetry.
+pub(super) struct Span {
+    started: Option<Instant>,
+    fields: Value,
+    success: bool,
+}
+impl Span {
+    pub fn new(kind: &'static str, fields: impl FnOnce() -> Value) -> Self {
+        let started = enabled().then(Instant::now);
+        let mut fields = if started.is_some() {
+            fields()
+        } else {
+            Value::Null
+        };
+        if started.is_some() {
+            fields["kind"] = json!(kind);
+        }
+        Self {
+            started,
+            fields,
+            success: false,
+        }
+    }
+    pub fn set(&mut self, key: &'static str, value: impl Into<Value>) {
+        if self.started.is_some() {
+            self.fields[key] = value.into();
+        }
+    }
+    pub fn finish(mut self) {
+        self.success = true;
+    }
+}
+impl Drop for Span {
+    fn drop(&mut self) {
+        if let Some(started) = self.started {
+            self.fields["duration_ms"] = json!(started.elapsed().as_secs_f64() * 1000.0);
+            self.fields["success"] = json!(self.success);
+            record(|| self.fields.take());
+        }
+    }
 }
 
 /// Only emitted into the opt-in local trace, never exposed to role projections.
