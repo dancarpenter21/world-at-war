@@ -2,6 +2,7 @@
 use super::*;
 use sim_scenario::{ObserverKind, ObserverSeatDefinition};
 
+#[derive(Serialize, Deserialize)]
 pub(super) struct ObserverSeat {
     pub definition: ObserverSeatDefinition,
     pub granted_player: Option<Uuid>,
@@ -259,6 +260,7 @@ pub(super) async fn stream(
             loop {
                 interval.tick().await;
                 let bytes = {
+                    let _gate = state.durability.gate.lock().await;
                     let mut games = state.games.write().await;
                     games
                         .get_mut(&id)

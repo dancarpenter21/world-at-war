@@ -1,4 +1,21 @@
 services:
+  database:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: world_at_war
+      POSTGRES_USER: world_at_war
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-development-only-change-me}
+    volumes:
+      - world-at-war-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U world_at_war -d world_at_war"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - world-at-war
+    restart: unless-stopped
+
   proxy:
     image: nginx:1.27-alpine
     depends_on:
@@ -22,6 +39,7 @@ services:
       additional_contexts:
         c3mesh: ../c3mesh
     environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://world_at_war:${POSTGRES_PASSWORD:-development-only-change-me}@database:5432/world_at_war}
       BIND_ADDR: 0.0.0.0:8000
       ADMIN_SETUP_TOKEN: ${ADMIN_SETUP_TOKEN:-}
       APP_ALLOWED_ORIGINS: ${APP_ALLOWED_ORIGINS:-http://localhost:${APP_PORT:-8080},http://127.0.0.1:${APP_PORT:-8080},http://localhost:5173,http://127.0.0.1:5173}
@@ -41,6 +59,9 @@ services:
       - ./data/generated/space-cards:/app/data/generated/space-cards:ro
       - ./data/communications:/app/data/communications:ro
       - ./var/network-events:/app/var/network-events
+    depends_on:
+      database:
+        condition: service_healthy
     expose:
       - "8000"
     healthcheck:
@@ -84,3 +105,6 @@ services:
 networks:
   world-at-war:
     driver: bridge
+
+volumes:
+  world-at-war-postgres:

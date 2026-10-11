@@ -126,6 +126,7 @@ pub struct Projection {
     pub weapons: Vec<WeaponView>,
     pub messages: Vec<MessageTrace>,
 }
+#[derive(Clone, Serialize, Deserialize)]
 struct Flight {
     id: Uuid,
     launcher: Uuid,
@@ -152,13 +153,14 @@ struct Flight {
     device_ids: Vec<DeviceId>,
     status: BTreeMap<Uuid, (GeoPose, String, u64, u64, Uuid)>,
 }
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub(super) struct Launch {
     pub launcher: Uuid,
     pub position: GeoPose,
     pub side: Side,
     pub track: Track,
 }
+#[derive(Clone, Serialize, Deserialize)]
 struct Datagram {
     id: u64,
     from: Uuid,
@@ -169,7 +171,7 @@ struct Datagram {
     expires: u64,
     priority: u8,
 }
-#[derive(Resource)]
+#[derive(Resource, Clone, Serialize, Deserialize)]
 pub(super) struct WeaponSystem {
     catalog: Catalog,
     config: Configuration,
@@ -177,10 +179,12 @@ pub(super) struct WeaponSystem {
     packets: BTreeMap<u64, Datagram>,
     trace: VecDeque<MessageTrace>,
     pub(super) designations: BTreeMap<Uuid, Track>,
+    #[serde(with = "crate::snapshot::entries")]
     pub(super) provenance: BTreeMap<(Uuid, Uuid), (Uuid, Uuid)>,
     sequence: u64,
     pub launches: Vec<Launch>,
     pub commands: Vec<(Uuid, Uuid, Command)>,
+    #[serde(with = "crate::snapshot::entries")]
     last_report_tick: BTreeMap<(Uuid, Uuid), u64>,
     clock_ns: u64,
     pub(super) previous_positions: BTreeMap<Uuid, GeoPose>,

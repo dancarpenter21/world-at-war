@@ -1,6 +1,7 @@
 use super::*;
 use sim_core::{NetworkEvent, NetworkTime, PacketMetadata};
 
+#[derive(Serialize, Deserialize)]
 pub(super) enum DeliveryAction {
     ExecuteIntent(AuthorizedIntent),
     ReceiveExecutionAck {
@@ -87,7 +88,7 @@ pub(super) fn transmit_c2_message_from_entity(
     let profile = game.message_profiles.get(profile_id)?.clone();
     let tick = game.simulation.radio_tick();
     let message = C2Message {
-        id: Uuid::new_v4(),
+        id: game.next_id("network-message"),
         profile_id: profile_id.into(),
         header: MessageHeader {
             origin_role_id,

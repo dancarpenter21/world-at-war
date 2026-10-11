@@ -16,6 +16,7 @@ import { GameSessionControls, GameSessionNotice, type Game } from "./GameSession
 
 import type { ObserverRole } from "./observerTypes";
 import { ObserverGrants } from "./ObserverGrants";
+import { AccountAccess } from "./AccountAccess";
 type Role = OperationalRole | ObserverRole;
 function isObserver(role: Role | null): role is ObserverRole { return role?.observer_kind !== undefined; }
 
@@ -187,7 +188,7 @@ function App() {
     const lost = () => {
       leave(); setPlayerId(""); sessionRestoreAttempted.current = false;
       localStorage.removeItem("world-at-war-session");
-      setMessage("Guest session ended. Previous roles and host ownership cannot be recovered.");
+      setMessage("Session ended. Sign in to recover a saved account, or continue as a new guest.");
     };
     const changed = (event: StorageEvent) => { if (event.key === GUEST_REVOKED_KEY) { clearGuest(); lost(); } };
     window.addEventListener("guest-session-lost", lost);
@@ -229,7 +230,7 @@ function App() {
     try {
       await request("/v1/auth/logout", { method: "POST", body: "{}" });
       clearGuest(true); localStorage.removeItem("world-at-war-session"); setPlayerId("");
-      setMessage("Guest session ended. Previous host ownership cannot be recovered.");
+      setMessage("Session ended. Sign in to recover a saved account, or continue as a new guest.");
     } catch (error) { setMessage((error as Error).message); }
   }
 
@@ -512,7 +513,12 @@ function App() {
       {playable && !isObserver(role) && <button className="secondary mobile-command-toggle" aria-expanded={showCommands} aria-controls="command-panel" onClick={() => setShowCommands((value) => !value)}>Commands</button>}
       {game && game.host_player_id === playerId && roles.some(isObserver) && <button className="secondary" onClick={() => setShowObserverGrants(true)}>Observer access</button>}
       {role && <button className="secondary" onClick={() => void releaseRole()}>Release role</button>}
-      {!game && playerId && <button className="secondary" onClick={() => void endGuest()}>End guest session</button>}
+      {!game && <AccountAccess apiBase={API_BASE} playerId={playerId} onSignOut={endGuest} onAuthenticated={session => {
+        leave(); setPlayerId(session.player_id); setDisplayName(session.display_name);
+        localStorage.removeItem("world-at-war-session");
+        setMessage(session.username ? `Signed in as ${session.username}.` : "Guest session ready.");
+        void refreshLobby();
+      }} />}
       {game && <button className="secondary session-leave" onClick={leave}>Leave scenario</button>}
     </header>
     {!playable && <div className="lobby-stage"><section className="scenario-modal" aria-modal="true" role="dialog">

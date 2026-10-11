@@ -2,7 +2,7 @@ use super::*;
 use sim_core::operations::*;
 use sim_core::DeliveryState;
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub(super) struct PlanningState {
     template: Option<CampaignPlan>,
     pub(super) drafts: BTreeMap<Uuid, CampaignPlan>,
@@ -13,7 +13,7 @@ pub(super) struct PlanningState {
     handoffs: BTreeMap<Uuid, Vec<Handoff>>,
     proposals: BTreeMap<Uuid, Vec<Proposal>>,
 }
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct Proposal {
     origin_role: Uuid,
     plan: CampaignPlan,

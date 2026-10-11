@@ -50,10 +50,56 @@ jobs:
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
 
+  persistence:
+    name: PostgreSQL recovery and durability
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: waw_test
+          POSTGRES_PASSWORD: isolated-ci-only
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U waw_test -d postgres"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgres://waw_test:isolated-ci-only@127.0.0.1:5432/postgres
+    defaults:
+      run:
+        working-directory: world-at-war
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: world-at-war
+          persist-credentials: false
+      - run: sh scripts/setup-c3mesh.sh
+      - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: '1.89.0'
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
+        with:
+          workspaces: world-at-war
+          shared-key: world-rust-1.89.0
+      - run: cargo test --locked -p world-at-war-server -- --ignored
+
   browser:
     name: Web build and real gameplay
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: waw_test
+          POSTGRES_PASSWORD: isolated-ci-only
+          POSTGRES_DB: waw_browser
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U waw_test -d waw_browser"
+          --health-interval 5s --health-timeout 3s --health-retries 12
     defaults:
       run:
         working-directory: world-at-war/web
@@ -63,6 +109,7 @@ jobs:
       SPACETRACK_USERNAME: ''
       SPACETRACK_PASSWORD: ''
       PLAYWRIGHT_HTML_OPEN: never
+      PERSISTENCE_E2E_DATABASE_URL: postgres://waw_test:isolated-ci-only@127.0.0.1:5432/waw_browser
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:

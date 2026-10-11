@@ -12,11 +12,13 @@ mod leases;
 mod observers;
 mod performance;
 mod planning;
+mod recovery;
 #[cfg(test)]
 mod role_tests;
 mod sensor_reports;
 mod space_assets;
 mod space_catalog;
+mod storage;
 mod transport;
 
 use std::{
@@ -79,6 +81,7 @@ const EXTERNAL_OPERATOR_APPROVAL_BPS: u16 = 5_000;
 
 #[derive(Clone)]
 struct AppState {
+    durability: Arc<recovery::Durability>,
     sessions: Arc<auth::Sessions>,
     games: Arc<RwLock<BTreeMap<Uuid, Game>>>,
     scenarios: Arc<BTreeMap<String, Scenario>>,
@@ -91,7 +94,10 @@ struct AppState {
     network_event_dir: Arc<PathBuf>,
 }
 
+#[derive(Serialize, Deserialize)]
 struct Game {
+    persistence_sequence: u64,
+    next_identifier: u64,
     members: BTreeSet<Uuid>,
     participant_names: BTreeMap<Uuid, String>,
     observers: BTreeMap<Uuid, observers::ObserverSeat>,
@@ -99,16 +105,20 @@ struct Game {
     title: String,
     host: Uuid,
     status: GameStatus,
+    #[serde(with = "recovery::simulation")]
     simulation: Simulation,
+    #[serde(skip)]
     diagnostics: diagnostics::Diagnostics,
     planning: planning::PlanningState,
     roles: BTreeMap<Uuid, Role>,
     authority: AuthorityDefinition,
+    #[serde(with = "recovery::authority_requests")]
     authority_requests: BTreeMap<Uuid, AuthorityRequest>,
     authority_events: Vec<AuthorityEvent>,
     unit_ids: BTreeSet<Uuid>,
     space_catalog_checksum: Option<String>,
     network_messages: Vec<NetworkMessageRecord>,
+    #[serde(skip)]
     network_message_events: Vec<NetworkMessageRecord>,
     message_profiles: BTreeMap<String, MessageProfile>,
     packet_messages: BTreeMap<u64, Uuid>,
@@ -119,10 +129,12 @@ struct Game {
     execution_acks: execution_acks::ExecutionAckState,
     intent_submissions: BTreeMap<Uuid, intents::IntentSubmission>,
     network_projection_sequence: u64,
+    #[serde(skip)]
     network_event_path: Option<PathBuf>,
     network_event_sequence: u64,
     scenario_id: String,
     scenario_version: u32,
+    scenario_checksum: String,
     communications_catalog_checksum: String,
     message_pack_checksum: String,
     network_policy_id: String,
@@ -130,7 +142,7 @@ struct Game {
     operational_error: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct NetworkMessageRecord {
     sequence: u64,
     message: C2Message,
@@ -177,7 +189,7 @@ struct NetworkStreamFrame {
     projection: NetworkProjection,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 enum GameStatus {
     Lobby,
@@ -185,7 +197,7 @@ enum GameStatus {
     Paused,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct Role {
     id: Uuid,
     name: String,
@@ -343,20 +355,20 @@ struct SubmitIntentRequest {
     lease_generation: u64,
     intent: PlayerIntent,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 enum SubmissionOutcome {
     Queued { intent_id: Uuid, message_id: Uuid },
     PendingAuthority { request_id: Uuid, message_id: Uuid },
 }
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct AuthorityDecisionRecord {
     role_id: Uuid,
     approved: bool,
     automatic: bool,
     tick: u64,
 }
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
 enum AuthorityRequestStatus {
     InTransit {
@@ -383,7 +395,7 @@ enum AuthorityRequestStatus {
     },
     BlockedComms,
 }
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct AuthorityRequest {
     id: Uuid,
     action: String,
@@ -401,13 +413,13 @@ struct AuthorityRequest {
     #[serde(skip)]
     intent: Option<PlayerIntent>,
 }
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 enum AuthorityTarget {
     Unit { unit_id: Uuid },
     Satellite { norad_catalog_id: u64 },
 }
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct FrozenSatelliteContext {
     authority_assignment: SatelliteAuthorityAssignment,
     catalog_checksum: String,
@@ -415,7 +427,7 @@ struct FrozenSatelliteContext {
     requester_role_id: Uuid,
     public_sources: Vec<SourceReference>,
 }
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct AuthorityEvent {
     tick: u64,
     kind: String,
@@ -500,9 +512,9 @@ struct SpaceTrackConnectRequest {
     #[serde(default)]
     remember: bool,
 }
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct ErrorResponse {
-    code: &'static str,
+    code: String,
     error: String,
 }
 type ApiResult<T> = Result<Json<T>, (StatusCode, Json<ErrorResponse>)>;
@@ -538,8 +550,10 @@ async fn main() -> anyhow::Result<()> {
         std::env::var("NETWORK_EVENT_DIR").unwrap_or_else(|_| "var/network-events".into()),
     );
     std::fs::create_dir_all(&network_event_dir)?;
+    let store = storage::Store::from_environment().await?;
     let state = AppState {
-        sessions: Arc::new(auth::Sessions::new()?),
+        durability: Arc::new(recovery::Durability::new(store.clone())),
+        sessions: Arc::new(auth::Sessions::load(store).await?),
         games: Arc::new(RwLock::new(BTreeMap::new())),
         scenarios: Arc::new(
             scenarios
@@ -555,6 +569,7 @@ async fn main() -> anyhow::Result<()> {
         communications_catalog: Arc::new(communications_catalog),
         network_event_dir: Arc::new(network_event_dir),
     };
+    recovery::load(&state).await?;
     let simulation_task = tokio::spawn(run_simulation_loop(state.clone()));
     let airport_catalog = state.airport_catalog.clone();
     tokio::spawn(async move {
@@ -570,12 +585,14 @@ async fn main() -> anyhow::Result<()> {
         result = axum::serve(listener, app) => result,
         () = shutdown_signal() => Ok(()),
     };
+    let checkpoint = recovery::shutdown(&state).await;
     simulation_task.abort();
     let _ = simulation_task.await;
     if let Some(writer) = performance_writer {
         writer.finish()?;
     }
     result?;
+    checkpoint?;
     Ok(())
 }
 
@@ -596,6 +613,8 @@ async fn shutdown_signal() {
 fn router(state: AppState) -> Router {
     Router::new()
         .route("/v1/auth/guest", post(auth::guest))
+        .route("/v1/auth/register", post(auth::register))
+        .route("/v1/auth/login", post(auth::login))
         .route("/v1/auth/session", get(auth::current))
         .route("/v1/auth/logout", post(auth::logout))
         .route("/health", get(health))
@@ -723,6 +742,10 @@ fn router(state: AppState) -> Router {
             "/v1/settings/space-track/credentials",
             post(restore_space_track).delete(forget_space_track),
         )
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            recovery::boundary,
+        ))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             auth::guard,
@@ -875,18 +898,22 @@ async fn create_game(
     let network_event_path = state
         .network_event_dir
         .join(format!("{game_id}.network-events.jsonl"));
-    OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(&network_event_path)
-        .map_err(|error| {
-            api_error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "network_event_store",
-                error.to_string(),
-            )
-        })?;
+    if state.durability.store.is_none() {
+        OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&network_event_path)
+            .map_err(|error| {
+                api_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "network_event_store",
+                    error.to_string(),
+                )
+            })?;
+    }
     let game = Game {
+        persistence_sequence: 0,
+        next_identifier: 0,
         participant_names: BTreeMap::from([(request.host_player_id, "Host".into())]),
         observers: observers::from_scenario(scenario),
         members: BTreeSet::from([request.host_player_id]),
@@ -928,10 +955,17 @@ async fn create_game(
         intent_submissions: BTreeMap::new(),
         execution_acks: execution_acks::ExecutionAckState::default(),
         network_projection_sequence: 0,
-        network_event_path: Some(network_event_path),
+        network_event_path: state
+            .durability
+            .store
+            .is_none()
+            .then_some(network_event_path),
         network_event_sequence: 0,
         scenario_id: scenario.id.clone(),
         scenario_version: scenario.version,
+        scenario_checksum: recovery::digest(
+            &serde_json::to_vec(&scenario).expect("valid scenario"),
+        ),
         communications_catalog_checksum: state.communications_catalog.checksum(),
         message_pack_checksum: state.communications_catalog.message_pack_checksum(),
         network_policy_id: network_policy_id.to_owned(),
@@ -1379,7 +1413,7 @@ async fn create_satellite_request(
         ));
     }
     let tick = game.simulation.tick();
-    let request_id = Uuid::new_v4();
+    let request_id = game.next_id("authority-request");
     let status = if detail.authority.kind == SatelliteAuthorityKind::MilitaryRole {
         let first_step = policy.decision_steps.first().ok_or_else(|| {
             api_error(
@@ -1660,7 +1694,7 @@ fn submit_authority_action(
             "no communications route to the deciding role",
         )
     })?;
-    let request_id = Uuid::new_v4();
+    let request_id = game.next_id("authority-request");
     let tick = game.simulation.tick();
     let mut request = AuthorityRequest {
         id: request_id,
@@ -2037,6 +2071,36 @@ async fn list_network_events(
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
     let role = authorized_role(game, &query.authorization())?;
     let limit = query.limit.unwrap_or(100).clamp(1, 500);
+    if let Some(store) = &state.durability.store {
+        let mut events = Vec::new();
+        let mut cursor = query.cursor.unwrap_or(0);
+        loop {
+            let batch = store
+                .network_events(game_id, cursor, role, &query)
+                .await
+                .map_err(|_| storage::unavailable())?;
+            let exhausted = batch.len() < 500;
+            for record in batch {
+                cursor = record.sequence;
+                if network_message_visible(&record, role) {
+                    events.push(network_record_for_role(&record, role));
+                    if events.len() > limit {
+                        events.pop();
+                        return Ok(Json(NetworkEventsPage {
+                            next_cursor: events.last().map(|record| record.sequence),
+                            events,
+                        }));
+                    }
+                }
+            }
+            if exhausted {
+                return Ok(Json(NetworkEventsPage {
+                    events,
+                    next_cursor: None,
+                }));
+            }
+        }
+    }
     let mut matching = game.network_message_events.iter().filter(|record| {
         record.sequence > query.cursor.unwrap_or(0)
             && network_message_visible(record, role)
@@ -2793,7 +2857,9 @@ async fn stream_network_socket(
     let mut last_sequence = query.after_sequence;
     loop {
         interval.tick().await;
+        let gate = state.durability.gate.lock().await;
         if !state.sessions.valid(&session) {
+            drop(gate);
             let _ = socket
                 .send(Message::Close(Some(axum::extract::ws::CloseFrame {
                     code: 1008,
@@ -2810,6 +2876,7 @@ async fn stream_network_socket(
             };
             let Ok(role) = authorized_role(game, &query).cloned() else {
                 drop(games);
+                drop(gate);
                 let _ = socket
                     .send(Message::Close(Some(axum::extract::ws::CloseFrame {
                         code: 1008,
@@ -2843,6 +2910,7 @@ async fn stream_network_socket(
                 },
             }
         };
+        drop(gate);
         let build_ms = projection_started.elapsed().as_secs_f64() * 1000.0;
         last_sequence = Some(frame.sequence);
         let serialization_started = std::time::Instant::now();
@@ -2869,7 +2937,9 @@ async fn stream_socket(
     let mut interval = tokio::time::interval(Duration::from_secs(1));
     loop {
         interval.tick().await;
+        let gate = state.durability.gate.lock().await;
         if !state.sessions.valid(&session) {
+            drop(gate);
             let _ = socket
                 .send(Message::Close(Some(axum::extract::ws::CloseFrame {
                     code: 1008,
@@ -2886,6 +2956,7 @@ async fn stream_socket(
             };
             let Ok(role) = authorized_role(game, &query) else {
                 drop(games);
+                drop(gate);
                 let _ = socket
                     .send(Message::Close(Some(axum::extract::ws::CloseFrame {
                         code: 1008,
@@ -2897,6 +2968,7 @@ async fn stream_socket(
             game.simulation
                 .projection_for(role.location_unit_id, role.side)
         };
+        drop(gate);
         let build_ms = projection_started.elapsed().as_secs_f64() * 1000.0;
         let serialization_started = std::time::Instant::now();
         let Ok(payload) = serde_json::to_string(&projection) else {
@@ -2982,14 +3054,53 @@ async fn run_simulation_loop(state: AppState) {
     let mut last_retention_sample = std::time::Instant::now();
     loop {
         let scheduled = interval.tick().await;
+        let _gate = state.durability.gate.lock().await;
+        if state
+            .durability
+            .failed
+            .load(std::sync::atomic::Ordering::Acquire)
+            || state
+                .durability
+                .stopping
+                .load(std::sync::atomic::Ordering::Acquire)
+        {
+            continue;
+        }
         let expired = state.sessions.expired_players();
         let mut games = state.games.write().await;
+        let before = if state.durability.store.is_some() {
+            match recovery::backup(&games) {
+                Ok(before) => Some(before),
+                Err(_) => {
+                    state
+                        .durability
+                        .failed
+                        .store(true, std::sync::atomic::Ordering::Release);
+                    for game in games.values_mut() {
+                        game.status = GameStatus::Paused;
+                        game.operational_error =
+                            Some("Snapshot encoding failed; game paused".into());
+                    }
+                    continue;
+                }
+            }
+        } else {
+            None
+        };
         for game in games.values_mut() {
             for player in &expired {
                 leases::release_player(game, *player);
             }
             leases::expire(game, std::time::Instant::now());
         }
+        let mut inputs: BTreeMap<_, _> = if before.is_some() {
+            games
+                .iter()
+                .map(|(id, game)| (*id, recovery::TickInput::capture(game)))
+                .collect()
+        } else {
+            BTreeMap::new()
+        };
         for game in games
             .values_mut()
             .filter(|game| game.status == GameStatus::Running)
@@ -3006,6 +3117,44 @@ async fn run_simulation_loop(state: AppState) {
                 "scenario": game.scenario_id, "tick": game.simulation.tick(), "duration_ms": elapsed_ms,
                 "schedule_delay_ms": delay})
             });
+        }
+        if let Some(before) = before {
+            let mut changes = Vec::new();
+            let mut failed = false;
+            for game in games.values_mut() {
+                match recovery::encode(game) {
+                    Ok(bytes) if before.get(&game.id) == Some(&bytes) => continue,
+                    Ok(_) => match recovery::Boundary::new(
+                        game,
+                        inputs.remove(&game.id),
+                        None,
+                        "simulation_tick",
+                    ) {
+                        Ok(change) => changes.push(change),
+                        Err(_) => {
+                            failed = true;
+                            break;
+                        }
+                    },
+                    Err(_) => {
+                        failed = true;
+                        break;
+                    }
+                }
+            }
+            if failed
+                || (!changes.is_empty()
+                    && state
+                        .durability
+                        .store
+                        .as_ref()
+                        .unwrap()
+                        .commit(&changes, &mut games, None)
+                        .await
+                        .is_err())
+            {
+                recovery::rollback(&state, &mut games, before);
+            }
         }
         if performance::enabled() && last_retention_sample.elapsed() >= Duration::from_secs(5) {
             for game in games.values() {
@@ -3083,7 +3232,7 @@ fn api_error(
     (
         status,
         Json(ErrorResponse {
-            code,
+            code: code.into(),
             error: error.into(),
         }),
     )
@@ -3132,6 +3281,8 @@ mod authority_tests {
             })
             .collect();
         Game {
+            persistence_sequence: 0,
+            next_identifier: 0,
             participant_names: BTreeMap::new(),
             observers: observers::from_scenario(&scenario),
             members: BTreeSet::new(),
@@ -3180,8 +3331,11 @@ mod authority_tests {
             network_projection_sequence: 0,
             network_event_path: None,
             network_event_sequence: 0,
-            scenario_id: scenario.id,
+            scenario_id: scenario.id.clone(),
             scenario_version: scenario.version,
+            scenario_checksum: recovery::digest(
+                &serde_json::to_vec(&scenario).expect("valid scenario"),
+            ),
             communications_catalog_checksum: String::new(),
             message_pack_checksum: String::new(),
             network_policy_id: "fifo.v1".into(),

@@ -2,7 +2,7 @@
 use super::*;
 use std::time::Instant;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub(super) struct Occupancy {
     pub owner: Option<Uuid>,
     pub lease_generation: u64,
@@ -15,6 +15,49 @@ const RESERVED_SECONDS: u64 = 300;
 pub(super) struct Lease {
     active_until: Instant,
     reserved_until: Instant,
+    active_until_unix_ms: u64,
+    reserved_until_unix_ms: u64,
+}
+
+#[derive(Serialize, Deserialize)]
+struct StoredLease {
+    active_until_unix_ms: u64,
+    reserved_until_unix_ms: u64,
+}
+fn unix_millis() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
+impl Serialize for Lease {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        StoredLease {
+            active_until_unix_ms: self.active_until_unix_ms,
+            reserved_until_unix_ms: self.reserved_until_unix_ms,
+        }
+        .serialize(serializer)
+    }
+}
+impl<'de> Deserialize<'de> for Lease {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let saved = StoredLease::deserialize(deserializer)?;
+        if saved.active_until_unix_ms > saved.reserved_until_unix_ms {
+            return Err(serde::de::Error::custom("invalid lease deadlines"));
+        }
+        let now = Instant::now();
+        let unix = unix_millis();
+        let deadline = |at: u64| {
+            now.checked_add(Duration::from_millis(at.saturating_sub(unix)))
+                .ok_or_else(|| serde::de::Error::custom("lease deadline overflow"))
+        };
+        Ok(Self {
+            active_until: deadline(saved.active_until_unix_ms)?,
+            reserved_until: deadline(saved.reserved_until_unix_ms)?,
+            active_until_unix_ms: saved.active_until_unix_ms,
+            reserved_until_unix_ms: saved.reserved_until_unix_ms,
+        })
+    }
 }
 impl Lease {
     #[cfg(test)]
@@ -23,6 +66,8 @@ impl Lease {
         Self {
             active_until,
             reserved_until: active_until + Duration::from_secs(RESERVED_SECONDS),
+            active_until_unix_ms: unix_millis(),
+            reserved_until_unix_ms: unix_millis() + RESERVED_SECONDS * 1000,
         }
     }
     pub fn new(now: Instant) -> Self {
@@ -30,6 +75,8 @@ impl Lease {
         Self {
             active_until,
             reserved_until: active_until + Duration::from_secs(RESERVED_SECONDS),
+            active_until_unix_ms: unix_millis() + ACTIVE_SECONDS * 1000,
+            reserved_until_unix_ms: unix_millis() + (ACTIVE_SECONDS + RESERVED_SECONDS) * 1000,
         }
     }
     pub fn active(&self, now: Instant) -> bool {
@@ -335,5 +382,33 @@ mod tests {
         acquire(game.roles.get_mut(&id).unwrap(), player, false, now).unwrap();
         release_player(&mut game, player);
         assert!(game.roles[&id].owner.is_none());
+    }
+}
+
+#[cfg(test)]
+mod persistence_tests {
+    use super::*;
+    #[test]
+    fn restore_preserves_absolute_deadlines_and_never_renews_expired_reservations() {
+        let now = unix_millis();
+        for (active, reserved, expected) in [
+            (now - 2000, now - 1000, LeaseState::Available),
+            (now - 1000, now + 60_000, LeaseState::Reserved),
+            (now + 60_000, now + 120_000, LeaseState::Active),
+        ] {
+            let value = serde_json::json!({"active_until_unix_ms":active,"reserved_until_unix_ms":reserved});
+            let lease: Lease = serde_json::from_value(value.clone()).unwrap();
+            assert_eq!(serde_json::to_value(&lease).unwrap(), value);
+            let role = Occupancy {
+                owner: Some(Uuid::new_v4()),
+                lease_generation: 3,
+                lease: Some(lease),
+            };
+            assert_eq!(summary(&role, Instant::now()).0, expected);
+        }
+        assert!(serde_json::from_value::<Lease>(
+            serde_json::json!({"active_until_unix_ms":2,"reserved_until_unix_ms":1})
+        )
+        .is_err());
     }
 }

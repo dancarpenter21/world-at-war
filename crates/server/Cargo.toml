@@ -10,6 +10,7 @@ getrandom = "0.3"
 serde_urlencoded = "0.7"
 sim-geo = { path = "../sim-geo" }
 anyhow.workspace = true
+argon2.workspace = true
 axum.workspace = true
 base64.workspace = true
 chacha20poly1305.workspace = true
@@ -25,6 +26,7 @@ sim-comms = { path = "../sim-comms" }
 sim-core = { path = "../sim-core" }
 sim-scenario = { path = "../sim-scenario" }
 tokio.workspace = true
+tokio-postgres.workspace = true
 tower-http.workspace = true
 uuid.workspace = true
 

@@ -16,7 +16,7 @@ pub enum DeliveryState {
     Unacknowledged,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeliveryEvent {
     pub id: Uuid,
     pub state: DeliveryState,
@@ -24,6 +24,7 @@ pub struct DeliveryEvent {
     pub payload: Vec<u8>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 struct Message {
     from: Uuid,
     to: Uuid,
@@ -35,6 +36,7 @@ struct Message {
     delivered: bool,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 struct Fragment {
     message: Uuid,
     index: usize,
@@ -43,7 +45,7 @@ struct Fragment {
     ack: bool,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Serialize, Deserialize)]
 pub(super) struct Transport {
     messages: BTreeMap<Uuid, Message>,
     packets: BTreeMap<u64, Fragment>,

@@ -6,8 +6,10 @@ use sim_scenario::ImpactReportRoute;
 pub(super) const IMPACT_REPORT_PROFILE: &str = "public-safe.jseries.impact-report.v1";
 const MAX_ATTEMPTS: u8 = 4;
 
+#[derive(Serialize, Deserialize)]
 pub(super) struct ImpactReportState {
     routes: Vec<ImpactReportRoute>,
+    #[serde(with = "sim_core::snapshot::entries")]
     attempts: BTreeMap<(Uuid, Uuid, Uuid), (u64, u8)>,
     pub(super) window_ticks: u64,
     pub(super) remaining_ticks: u64,

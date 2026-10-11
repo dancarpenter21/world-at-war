@@ -6,11 +6,12 @@ pub(super) const ACK_PROFILE: &str = "public-safe.network.ack.v1";
 pub(super) const RETRY_TICKS: u64 = 10;
 const MAX_ATTEMPTS: u8 = 4;
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 pub(super) struct ExecutionAckState {
     results: BTreeMap<Uuid, ExecutionAcknowledgement>,
 }
 
+#[derive(Serialize, Deserialize)]
 struct ExecutionAcknowledgement {
     issuer_role_id: Uuid,
     executor_entity_id: Uuid,

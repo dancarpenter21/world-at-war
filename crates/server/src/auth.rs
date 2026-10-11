@@ -19,10 +19,37 @@ type Rejection = (StatusCode, Json<ErrorResponse>);
 pub(super) struct Session {
     pub player_id: Uuid,
     display_name: String,
+    username: Option<String>,
     csrf: String,
     expires: Instant,
     expires_unix: u64,
     key: String,
+}
+/// Applied to the session cache only after the database commits the same
+/// transaction as any released seats. Carried internally, never sent on the wire.
+#[derive(Clone)]
+pub(super) struct SessionUpdate {
+    pub previous: Option<String>,
+    pub session: Option<Session>,
+}
+impl SessionUpdate {
+    pub fn apply(&self, sessions: &Sessions) {
+        let mut entries = sessions.entries.lock().unwrap();
+        if let Some(previous) = &self.previous {
+            entries.remove(previous);
+        }
+        if let Some(session) = &self.session {
+            entries.insert(session.key.clone(), session.clone());
+        }
+    }
+    fn finish(self, state: &AppState, mut response: Response) -> Response {
+        if state.durability.store.is_some() {
+            response.extensions_mut().insert(self);
+        } else {
+            self.apply(&state.sessions);
+        }
+        response
+    }
 }
 #[derive(Serialize)]
 struct SessionView {
@@ -30,14 +57,18 @@ struct SessionView {
     display_name: String,
     csrf_token: String,
     expires_unix: u64,
+    username: Option<String>,
+    accounts_available: bool,
 }
 impl Session {
-    fn view(&self) -> SessionView {
+    fn view(&self, accounts_available: bool) -> SessionView {
         SessionView {
             player_id: self.player_id,
             display_name: self.display_name.clone(),
             csrf_token: self.csrf.clone(),
             expires_unix: self.expires_unix,
+            username: self.username.clone(),
+            accounts_available,
         }
     }
 }
@@ -45,6 +76,9 @@ pub(super) struct Sessions {
     entries: Mutex<BTreeMap<String, Session>>,
     pub origins: Vec<HeaderValue>,
     secure: bool,
+    pub store: Option<Arc<storage::Store>>,
+    password_jobs: Arc<tokio::sync::Semaphore>,
+    attempts: Mutex<BTreeMap<String, (Instant, u8)>>,
 }
 fn secret() -> String {
     let mut bytes = [0u8; 32];
@@ -64,7 +98,35 @@ impl Sessions {
             origins,
             secure: std::env::var("COOKIE_SECURE")
                 .is_ok_and(|s| matches!(s.as_str(), "1" | "true" | "yes")),
+            store: None,
+            password_jobs: Arc::new(tokio::sync::Semaphore::new(2)),
+            attempts: Mutex::new(BTreeMap::new()),
         })
+    }
+    pub async fn load(store: Option<Arc<storage::Store>>) -> anyhow::Result<Self> {
+        let mut sessions = Self::new()?;
+        if let Some(store) = &store {
+            let now = unix_now();
+            for saved in store.sessions(now).await? {
+                let session = Session {
+                    player_id: saved.player_id,
+                    display_name: saved.display_name,
+                    username: saved.username,
+                    csrf: saved.csrf_token,
+                    expires: Instant::now()
+                        + Duration::from_secs(saved.expires_unix.saturating_sub(now)),
+                    expires_unix: saved.expires_unix,
+                    key: saved.token_hash,
+                };
+                sessions
+                    .entries
+                    .get_mut()
+                    .unwrap()
+                    .insert(session.key.clone(), session);
+            }
+        }
+        sessions.store = store;
+        Ok(sessions)
     }
     fn find(&self, headers: &HeaderMap) -> Option<Session> {
         let token = headers
@@ -95,16 +157,28 @@ impl Sessions {
         ))
         .unwrap()
     }
+    pub fn active_players(&self) -> BTreeSet<Uuid> {
+        self.entries
+            .lock()
+            .unwrap()
+            .values()
+            .filter(|session| session.expires > Instant::now())
+            .map(|session| session.player_id)
+            .collect()
+    }
     pub fn expired_players(&self) -> Vec<Uuid> {
         let mut entries = self.entries.lock().unwrap();
         let now = Instant::now();
-        let players = entries
+        let candidates: Vec<_> = entries
             .values()
             .filter(|s| s.expires <= now)
             .map(|s| s.player_id)
             .collect();
         entries.retain(|_, s| s.expires > now);
-        players
+        candidates
+            .into_iter()
+            .filter(|player| !entries.values().any(|s| s.player_id == *player))
+            .collect()
     }
 }
 fn denied(code: &'static str, message: &'static str) -> Rejection {
@@ -156,10 +230,8 @@ pub(super) async fn guard(
         return denied("origin_not_allowed", "Request origin is not allowed").into_response();
     }
     // Guest bootstrap has no CSRF token yet, so requires an explicitly trusted origin.
-    if path == "/v1/auth/guest"
-        && mutation
-        && !origin.is_some_and(|o| state.sessions.origins.contains(o))
-    {
+    let bootstrap = matches!(path, "/v1/auth/guest" | "/v1/auth/login");
+    if bootstrap && mutation && !origin.is_some_and(|o| state.sessions.origins.contains(o)) {
         return denied(
             "origin_required",
             "Guest creation requires an allowed Origin header",
@@ -174,12 +246,12 @@ pub(super) async fn guard(
         .into_response();
     }
     let session = state.sessions.find(request.headers());
-    if (is_game || (is_auth && path != "/v1/auth/guest")) && session.is_none() {
+    if (is_game || (is_auth && !bootstrap)) && session.is_none() {
         return required().into_response();
     }
     if let Some(session) = session {
         if mutation
-            && path != "/v1/auth/guest"
+            && !bootstrap
             && request
                 .headers()
                 .get("x-csrf-token")
@@ -291,7 +363,7 @@ pub(super) async fn guest(
     Json(request): Json<GuestRequest>,
 ) -> Result<Response, Rejection> {
     if let Some(session) = state.sessions.find(&headers) {
-        return Ok(Json(session.view()).into_response());
+        return Ok(Json(session.view(state.sessions.store.is_some())).into_response());
     }
     let name = request.display_name.unwrap_or_else(|| "Commander".into());
     let name = name.trim();
@@ -306,6 +378,7 @@ pub(super) async fn guest(
     let session = Session {
         player_id: Uuid::new_v4(),
         display_name: name.into(),
+        username: None,
         csrf: secret(),
         expires: Instant::now() + Duration::from_secs(SESSION_SECONDS),
         expires_unix: std::time::SystemTime::now()
@@ -315,7 +388,13 @@ pub(super) async fn guest(
             + SESSION_SECONDS,
         key: hash(&token),
     };
-    let mut response = Json(session.view()).into_response();
+    if let Some(store) = &state.sessions.store {
+        store
+            .insert_session(&stored(&session), true)
+            .await
+            .map_err(|_| storage::unavailable())?;
+    }
+    let mut response = Json(session.view(state.sessions.store.is_some())).into_response();
     response
         .headers_mut()
         .insert(SET_COOKIE, state.sessions.cookie(&token, SESSION_SECONDS));
@@ -328,26 +407,254 @@ pub(super) async fn guest(
         .insert(session.key.clone(), session);
     Ok(response)
 }
-pub(super) async fn current(session: Session) -> Response {
-    Json(session.view()).into_response()
+pub(super) async fn current(State(state): State<AppState>, session: Session) -> Response {
+    Json(session.view(state.sessions.store.is_some())).into_response()
 }
-pub(super) async fn logout(State(state): State<AppState>, session: Session) -> Response {
-    state.sessions.entries.lock().unwrap().remove(&session.key);
+pub(super) async fn logout(
+    State(state): State<AppState>,
+    session: Session,
+) -> Result<Response, Rejection> {
     let mut games = state.games.write().await;
     for game in games.values_mut() {
         leases::release_player(game, session.player_id);
     }
-    eprintln!("guest_logged_out player={}", session.player_id);
     let mut response = Json(serde_json::json!({"logged_out": true})).into_response();
     response
         .headers_mut()
         .insert(SET_COOKIE, state.sessions.cookie("", 0));
+    Ok(SessionUpdate {
+        previous: Some(session.key),
+        session: None,
+    }
+    .finish(&state, response))
+}
+
+fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+pub(super) fn stored(session: &Session) -> storage::StoredSession {
+    storage::StoredSession {
+        token_hash: session.key.clone(),
+        player_id: session.player_id,
+        display_name: session.display_name.clone(),
+        username: session.username.clone(),
+        csrf_token: session.csrf.clone(),
+        expires_unix: session.expires_unix,
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct AccountRequest {
+    username: String,
+    password: String,
+}
+fn account_name(value: &str) -> Result<String, Rejection> {
+    let name = value.trim().to_ascii_lowercase();
+    if !(3..=40).contains(&name.len())
+        || !name
+            .bytes()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'_')
+    {
+        return Err(api_error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "invalid_username",
+            "Username must contain 3–40 letters, numbers, or underscores",
+        ));
+    }
+    Ok(name)
+}
+fn password_limit(password: &str) -> Result<(), Rejection> {
+    if !(12..=128).contains(&password.chars().count()) || password.len() > 512 {
+        return Err(api_error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "invalid_password",
+            "Password must contain 12–128 characters",
+        ));
+    }
+    Ok(())
+}
+fn throttle(sessions: &Sessions, username: &str) -> Result<(), Rejection> {
+    let now = Instant::now();
+    let mut attempts = sessions.attempts.lock().unwrap();
+    attempts.retain(|_, (start, _)| now.duration_since(*start) < Duration::from_secs(60));
+    if attempts.len() >= 4096 {
+        return Err(api_error(
+            StatusCode::TOO_MANY_REQUESTS,
+            "login_throttled",
+            "Try signing in again in a minute",
+        ));
+    }
+    let entry = attempts.entry(hash(username)).or_insert((now, 0));
+    if entry.1 >= 10 {
+        return Err(api_error(
+            StatusCode::TOO_MANY_REQUESTS,
+            "login_throttled",
+            "Try signing in again in a minute",
+        ));
+    }
+    entry.1 += 1;
+    Ok(())
+}
+
+pub(super) async fn register(
+    State(state): State<AppState>,
+    session: Session,
+    Json(request): Json<AccountRequest>,
+) -> Result<Response, Rejection> {
+    let store = state.sessions.store.as_ref().ok_or_else(|| {
+        api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "accounts_unavailable",
+            "Accounts require configured durable storage",
+        )
+    })?;
+    let username = account_name(&request.username)?;
+    password_limit(&request.password)?;
+    throttle(&state.sessions, &username)?;
+    let permit = state
+        .sessions
+        .password_jobs
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| {
+            api_error(
+                StatusCode::TOO_MANY_REQUESTS,
+                "login_busy",
+                "Sign-in is busy; try again shortly",
+            )
+        })?;
+    let password_hash = tokio::task::spawn_blocking(move || {
+        use argon2::{password_hash::SaltString, Argon2, PasswordHasher};
+        let _permit = permit;
+        let mut salt = [0u8; 16];
+        getrandom::fill(&mut salt).map_err(|_| ())?;
+        let salt = SaltString::encode_b64(&salt).map_err(|_| ())?;
+        Argon2::default()
+            .hash_password(request.password.as_bytes(), &salt)
+            .map(|hash| hash.to_string())
+            .map_err(|_| ())
+    })
+    .await
+    .map_err(|_| storage::unavailable())?
+    .map_err(|_| storage::unavailable())?;
+    if !store
+        .register(session.player_id, &username, &password_hash)
+        .await
+        .map_err(|_| storage::unavailable())?
+    {
+        return Err(api_error(
+            StatusCode::CONFLICT,
+            "account_unavailable",
+            "Username is unavailable or this player already has an account",
+        ));
+    }
+    let mut session = session;
+    session.username = Some(username);
+    for current in state.sessions.entries.lock().unwrap().values_mut() {
+        if current.player_id == session.player_id {
+            current.username = session.username.clone();
+        }
+    }
+    Ok(Json(session.view(true)).into_response())
+}
+
+pub(super) async fn login(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<AccountRequest>,
+) -> Result<Response, Rejection> {
+    let store = state.sessions.store.as_ref().ok_or_else(|| {
+        api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "accounts_unavailable",
+            "Accounts require configured durable storage",
+        )
+    })?;
+    let username = account_name(&request.username)?;
+    password_limit(&request.password)?;
+    throttle(&state.sessions, &username)?;
+    let account = store
+        .account(&username)
+        .await
+        .map_err(|_| storage::unavailable())?;
+    let encoded = account.as_ref().map(|a| a.password_hash.clone());
+    let permit = state
+        .sessions
+        .password_jobs
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| {
+            api_error(
+                StatusCode::TOO_MANY_REQUESTS,
+                "login_busy",
+                "Sign-in is busy; try again shortly",
+            )
+        })?;
+    let verified = tokio::task::spawn_blocking(move || {
+        use argon2::{
+            password_hash::SaltString, Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
+        };
+        let _permit = permit;
+        if let Some(encoded) = encoded {
+            PasswordHash::new(&encoded).is_ok_and(|hash| {
+                Argon2::default()
+                    .verify_password(request.password.as_bytes(), &hash)
+                    .is_ok()
+            })
+        } else {
+            // Perform the same expensive work for an unknown username.
+            let salt = SaltString::encode_b64(&[0; 16]).expect("valid fixed salt");
+            let _ = Argon2::default().hash_password(request.password.as_bytes(), &salt);
+            false
+        }
+    })
+    .await
+    .map_err(|_| storage::unavailable())?;
+    let Some(account) = account.filter(|_| verified) else {
+        return Err(api_error(
+            StatusCode::UNAUTHORIZED,
+            "invalid_login",
+            "Username or password is incorrect",
+        ));
+    };
+    let token = secret();
+    let session = Session {
+        player_id: account.player_id,
+        display_name: account.display_name,
+        username: Some(account.username),
+        csrf: secret(),
+        key: hash(&token),
+        expires: Instant::now() + Duration::from_secs(SESSION_SECONDS),
+        expires_unix: unix_now() + SESSION_SECONDS,
+    };
+    let previous = state.sessions.find(&headers);
+    if let Some(previous) = &previous {
+        if previous.player_id != session.player_id {
+            let mut games = state.games.write().await;
+            for game in games.values_mut() {
+                leases::release_player(game, previous.player_id);
+            }
+        }
+    }
+    let mut response = Json(session.view(true)).into_response();
     response
+        .headers_mut()
+        .insert(SET_COOKIE, state.sessions.cookie(&token, SESSION_SECONDS));
+    Ok(SessionUpdate {
+        previous: previous.map(|s| s.key),
+        session: Some(session),
+    }
+    .finish(&state, response))
 }
 
 #[cfg(test)]
 mod tests {
     include!("observer_auth_tests.rs");
+    include!("persistence_tests.rs");
     use super::*;
     use axum::body::{to_bytes, Body};
     use serde_json::{json, Value};
@@ -370,10 +677,14 @@ mod tests {
         ];
         Fixture {
             state: AppState {
+                durability: Arc::new(recovery::Durability::default()),
                 sessions: Arc::new(Sessions {
                     entries: Mutex::new(BTreeMap::new()),
                     origins: vec![HeaderValue::from_static("http://localhost:5173")],
                     secure: true,
+                    store: None,
+                    password_jobs: Arc::new(tokio::sync::Semaphore::new(2)),
+                    attempts: Mutex::new(BTreeMap::new()),
                 }),
                 games: Arc::new(RwLock::new(BTreeMap::new())),
                 scenarios: Arc::new(scenarios.into_iter().map(|s| (s.id.clone(), s)).collect()),

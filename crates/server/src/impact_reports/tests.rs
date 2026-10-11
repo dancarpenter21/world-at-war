@@ -408,3 +408,36 @@ fn a_delivered_report_adds_a_debrief_row_without_revealing_unreported_submission
     .is_err());
     assert_eq!(game.network_messages.len(), count);
 }
+
+#[test]
+fn recovery_preserves_pending_combat_acknowledgements_and_post_mission_reports() {
+    let mut live = fixture(report_scenario());
+    for _ in 0..5 {
+        tick(&mut live);
+    }
+    fire(&mut live, COMMANDER, 991001);
+    let mut saw_reporting = false;
+    for _ in 0..40 {
+        let bytes = crate::recovery::encode(&live).unwrap();
+        let mut recovered = crate::recovery::decode(&bytes).unwrap();
+        assert_eq!(bytes, crate::recovery::encode(&recovered).unwrap());
+        tick(&mut live);
+        tick(&mut recovered);
+        assert_eq!(
+            crate::recovery::digest(&crate::recovery::encode(&live).unwrap()),
+            crate::recovery::digest(&crate::recovery::encode(&recovered).unwrap())
+        );
+        assert_eq!(
+            debrief(&mut live, COMMANDER),
+            debrief(&mut recovered, COMMANDER)
+        );
+        saw_reporting |= live.simulation.mission_complete() && live.status == GameStatus::Running;
+        live = recovered;
+        if live.status == GameStatus::Paused {
+            break;
+        }
+    }
+    assert!(saw_reporting);
+    assert_eq!(live.status, GameStatus::Paused);
+    assert_eq!(received(&mut live).len(), 1);
+}
