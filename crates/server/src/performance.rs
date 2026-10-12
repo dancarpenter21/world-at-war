@@ -12,6 +12,14 @@ use std::{
 };
 
 const CAPACITY: usize = 8192;
+static COMMIT_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+pub(super) fn next_commit_id() -> u64 {
+    if enabled() {
+        COMMIT_SEQUENCE.fetch_add(1, Ordering::Relaxed) + 1
+    } else {
+        0
+    }
+}
 static TRACE: OnceLock<Arc<Trace>> = OnceLock::new();
 struct Trace {
     sender: mpsc::SyncSender<Option<Value>>,

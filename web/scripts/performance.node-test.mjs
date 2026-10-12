@@ -193,3 +193,37 @@ test('performance clock preserves stream gaps and deadlines across wall-clock co
   wall += 60_000; mono += 299_750;
   assert.equal(clock.now(), deadline);
 });
+
+test('audit stages retain aggregate metrics and database diagnostic reset timestamps', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'waw-audit-stages-'));
+  try {
+    const server = [{ kind: 'trace_start', unix_ms: 1000, elapsed_ms: 0 },
+      { kind: 'persistence_audit_prepare', success: true, commit_id: 4, rows: 7, role_rows: 3, bytes: 800, duration_ms: 2, elapsed_ms: 100 },
+      { kind: 'persistence_audit_records', success: true, commit_id: 4, rows: 7, bytes: 800, duration_ms: 12, elapsed_ms: 120 },
+      { kind: 'trace_end', written: 3, dropped: 0 }];
+    const db = { kind: 'database_resource', time: 1150, checkpointer: { num_timed: 2, stats_reset: '2026-10-11' }, wal_stats: { wal_bytes: 900, stats_reset: '2026-10-11' }, io_stats: [{ writes: 8, stats_reset: '2026-10-11' }] };
+    await writeFile(path.join(directory, 'server.jsonl'), server.map(JSON.stringify).join('\n'));
+    await writeFile(path.join(directory, 'clients.jsonl'), JSON.stringify(db));
+    const result = await analyze(directory, 1050, 1300);
+    assert.equal(result.valid, true);
+    assert.equal(result.metrics.server.persistence_audit_prepare_role_rows.max, 3);
+    assert.equal(result.metrics.server.persistence_audit_records_duration_ms.max, 12);
+    assert.equal(result.metrics.server.persistence_audit_records_bytes.max, 800);
+    assert.deepEqual(result.database[0], db);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('PostgreSQL samples include checkpoint, WAL and I/O counters without enabling timing or weakening durability', async () => {
+  const { PerformancePostgres } = await import('./performance-postgres.mjs');
+  let query;
+  const db = new PerformancePostgres('test-image', async (args, options) => {
+    if (args[0] === 'exec') { query = options.input; return JSON.stringify({ checkpointer: { stats_reset: 'epoch' }, wal_stats: { stats_reset: 'epoch' }, io_stats: [] }); }
+    if (args[0] === 'stats') return '{}';
+    assert.fail('unexpected Docker operation');
+  });
+  db.initialLsn = '0/123';
+  const result = await db.sample();
+  assert.equal(result.checkpointer.stats_reset, 'epoch');
+  assert.ok(query.includes('pg_stat_checkpointer') && query.includes('pg_stat_wal') && query.includes('pg_stat_io') && query.includes('pg_stat_activity'));
+  assert.ok(!/ALTER|SET /i.test(query));
+});

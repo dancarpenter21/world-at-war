@@ -18,7 +18,7 @@ const clock = createClock();
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const { values } = parseArgs({ options: {
-  storage: { type: 'string', default: 'volatile' }, 'postgres-image': { type: 'string', default: 'postgres:17-alpine' },
+  binary: { type: 'string' }, storage: { type: 'string', default: 'volatile' }, 'postgres-image': { type: 'string', default: 'postgres:17-alpine' },
   profile: { type: 'string', default: 'mixed' }, clients: { type: 'string' },
   warmup: { type: 'string', default: '60' }, duration: { type: 'string', default: '300' },
   'archive-retention-days': { type: 'string', default: '0' },
@@ -34,6 +34,7 @@ const warmup = numeric('warmup', 0, 3600), duration = numeric('duration', 1, 864
 const seed = numeric('seed', 0, Number.MAX_SAFE_INTEGER), reconnectEvery = numeric('reconnect-every', 15, 86400);
 const archiveRetentionDays = numeric('archive-retention-days', 0, 4294967295);
 const layout = profiles(values.profile, values.clients === undefined ? undefined : Number(values.clients));
+const binary = path.resolve(values.binary ?? path.join(root, 'target/release/world-at-war-server'));
 const output = path.resolve(values.output ?? path.join(root, 'tmp/performance', `${new Date().toISOString().replaceAll(':', '-')}-${values.profile}`));
 await mkdir(path.dirname(output), { recursive: true });
 await mkdir(output, { recursive: false });
@@ -55,7 +56,7 @@ const metadata = { schema_version: 2, measurement_version: 3, clock: 'epoch anch
   c3mesh_revision: (await readFile(path.join(root, 'c3mesh-revision.txt'), 'utf8')).trim(),
   rustc: execFileSync('rustc', ['--version'], { encoding: 'utf8' }).trim(), node: process.version,
   os: process.platform, os_release: release(), cpu: cpus()[0]?.model, logical_cpus: cpus().length, memory_bytes: totalmem(),
-  binary_sha256: createHash('sha256').update(await readFile(path.join(root, 'target/release/world-at-war-server'))).digest('hex'),
+  binary_sha256: createHash('sha256').update(await readFile(binary)).digest('hex'),
   protocol: '1 Hz full snapshots; state/planning HTTP plus network WebSocket, no browser rendering; encoded HTTP body bytes when Content-Length is present, otherwise decoded bytes',
 };
 const runtime = await mkdtemp(path.join(tmpdir(), 'waw-performance-'));
@@ -202,7 +203,7 @@ try {
   const airports = [JSON.parse(await readFile(path.join(root, 'web/e2e/fixtures/airport.json'), 'utf8'))];
   await writeFile(path.join(runtime, 'airports/latest.json'), JSON.stringify({ schema_version: 1, synced_unix: Math.floor(clock.now() / 1000), checksum: 'performance-fixture', sources: [], degraded_sources: [], airports }));
   serverLog = createWriteStream(path.join(output, 'server.log'), { flags: 'wx' });
-  backend = spawn(path.join(root, 'target/release/world-at-war-server'), [], { cwd: runtime,
+  backend = spawn(binary, [], { cwd: runtime,
     env: { PATH: process.env.PATH, COMMUNICATIONS_ARCHIVE_RETENTION_DAYS: String(archiveRetentionDays), DATABASE_URL: database?.url ?? '', BIND_ADDR: `127.0.0.1:${port}`, APP_ALLOWED_ORIGINS: base,
       COOKIE_SECURE: 'false', ADMIN_SETUP_TOKEN: '', PERFORMANCE_TRACE_DIR: output,
       SPACETRACK_USERNAME: '', SPACETRACK_PASSWORD: '', SPACETRACK_LOGIN_URL: `${providerBase}/login`, SPACETRACK_GP_URL: `${providerBase}/gp`,

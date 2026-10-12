@@ -5,7 +5,7 @@ use anyhow::Context;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
-use tokio_postgres::{Client, NoTls};
+use tokio_postgres::{types::Json as PgJson, Client, NoTls};
 
 const MIGRATIONS: &[&str] = &[
     include_str!("../migrations/001_identity.sql"),
@@ -18,9 +18,9 @@ const MIGRATIONS: &[&str] = &[
 const RUNTIME_LOCK: i64 = 0x57415752554e;
 
 const COMMIT_SQL: &[(&str, &str)] = &[
-    ("audit_records", "INSERT INTO communications_audit(game_id,boundary,ordinal,message_key,detail) SELECT $1,$2,* FROM UNNEST($3::BIGINT[],$4::TEXT[],$5::JSONB[])"),
-    ("audit_roles", "INSERT INTO communications_audit_roles(game_id,role_id,sequence,boundary,ordinal,detail) SELECT $1,role_id,sequence,$2,ordinal,detail FROM UNNEST($3::UUID[],$4::BIGINT[],$5::BIGINT[],$6::JSONB[]) AS r(role_id,sequence,ordinal,detail)"),
-    ("audit_runtime", "INSERT INTO communications_audit_runtime(game_id,correlations,heads,coverage_tick,partial_history) VALUES($1,$2,$3,$4,$5) ON CONFLICT(game_id) DO UPDATE SET correlations=EXCLUDED.correlations,heads=EXCLUDED.heads WHERE (communications_audit_runtime.correlations,communications_audit_runtime.heads) IS DISTINCT FROM (EXCLUDED.correlations,EXCLUDED.heads)"),
+    ("audit_records", "INSERT INTO communications_audit(game_id,boundary,ordinal,message_key,detail) SELECT * FROM UNNEST($1::UUID[],$2::BIGINT[],$3::BIGINT[],$4::TEXT[],$5::JSONB[])"),
+    ("audit_roles", "INSERT INTO communications_audit_roles(game_id,role_id,sequence,boundary,ordinal,detail) SELECT * FROM UNNEST($1::UUID[],$2::UUID[],$3::BIGINT[],$4::BIGINT[],$5::BIGINT[],$6::JSONB[])"),
+    ("audit_runtime", "INSERT INTO communications_audit_runtime(game_id,correlations,heads,coverage_tick,partial_history) SELECT * FROM UNNEST($1::UUID[],$2::JSONB[],$3::JSONB[],$4::BIGINT[],$5::BOOLEAN[]) ON CONFLICT(game_id) DO UPDATE SET correlations=EXCLUDED.correlations,heads=EXCLUDED.heads WHERE (communications_audit_runtime.correlations,communications_audit_runtime.heads) IS DISTINCT FROM (EXCLUDED.correlations,EXCLUDED.heads)"),
 
     ("delete_session", "DELETE FROM browser_sessions WHERE token_hash = $1"),
     ("insert_session", "INSERT INTO browser_sessions(token_hash, player_id, csrf_token, expires_unix) VALUES ($1, $2, $3, $4)"),
@@ -34,6 +34,199 @@ const COMMIT_SQL: &[(&str, &str)] = &[
     ("memberships", "INSERT INTO game_memberships(game_id,player_id,display_name) SELECT $1, * FROM UNNEST($2::uuid[],$3::text[]) ON CONFLICT(game_id,player_id) DO UPDATE SET display_name=EXCLUDED.display_name WHERE game_memberships.display_name IS DISTINCT FROM EXCLUDED.display_name"),
     ("seats", "INSERT INTO game_seats(game_id,seat_id,owner_id,grant_id,generation,lease) SELECT $1, * FROM UNNEST($2::uuid[],$3::uuid[],$4::uuid[],$5::bigint[],$6::jsonb[]) ON CONFLICT(game_id,seat_id) DO UPDATE SET owner_id=EXCLUDED.owner_id,grant_id=EXCLUDED.grant_id,generation=EXCLUDED.generation,lease=EXCLUDED.lease WHERE (game_seats.owner_id,game_seats.grant_id,game_seats.generation,game_seats.lease) IS DISTINCT FROM (EXCLUDED.owner_id,EXCLUDED.grant_id,EXCLUDED.generation,EXCLUDED.lease)"),
 ];
+
+// Missing optional JSON members and explicit nulls decode identically. Keep the
+// public serializers unchanged; only the private database representation is sparse.
+struct StoredEventJson<'a>(&'a sim_core::audit::Event);
+struct StoredPhysicalJson<'a>(&'a sim_core::audit::Physical);
+struct StoredContextJson<'a>(&'a sim_core::audit::Context);
+struct StoredMetadataJson<'a>(&'a audit::Metadata);
+
+macro_rules! optional_entry {
+    ($map:ident, $field:ident) => {
+        if $field.is_some() {
+            $map.serialize_entry(stringify!($field), $field)?;
+        }
+    };
+}
+impl Serialize for StoredEventJson<'_> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        let sim_core::audit::Event {
+            physical,
+            kind,
+            at_ns,
+            packet_id,
+            bytes,
+            context,
+            terminal,
+            reason,
+        } = self.0;
+        let mut map = serializer.serialize_map(None)?;
+        if let Some(physical) = physical {
+            map.serialize_entry("physical", &StoredPhysicalJson(physical))?;
+        }
+        map.serialize_entry("kind", kind)?;
+        map.serialize_entry("at_ns", at_ns)?;
+        optional_entry!(map, packet_id);
+        map.serialize_entry("bytes", bytes)?;
+        map.serialize_entry("context", &StoredContextJson(context))?;
+        optional_entry!(map, terminal);
+        optional_entry!(map, reason);
+        map.end()
+    }
+}
+impl Serialize for StoredPhysicalJson<'_> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        let sim_core::audit::Physical {
+            source_device,
+            destination_device,
+            observer_device,
+            channel,
+            next_device,
+            effective_bit_rate_bps,
+            receive_at_ns,
+            hops_remaining,
+        } = self.0;
+        let mut map = serializer.serialize_map(None)?;
+        map.serialize_entry("source_device", source_device)?;
+        map.serialize_entry("destination_device", destination_device)?;
+        map.serialize_entry("observer_device", observer_device)?;
+        optional_entry!(map, channel);
+        optional_entry!(map, next_device);
+        optional_entry!(map, effective_bit_rate_bps);
+        optional_entry!(map, receive_at_ns);
+        map.serialize_entry("hops_remaining", hops_remaining)?;
+        map.end()
+    }
+}
+impl Serialize for StoredContextJson<'_> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        let sim_core::audit::Context {
+            message_id,
+            fragment,
+            attempt,
+            hop,
+            acknowledgement,
+            from,
+            to,
+        } = self.0;
+        let mut map = serializer.serialize_map(None)?;
+        optional_entry!(map, message_id);
+        optional_entry!(map, fragment);
+        optional_entry!(map, attempt);
+        optional_entry!(map, hop);
+        map.serialize_entry("acknowledgement", acknowledgement)?;
+        optional_entry!(map, from);
+        optional_entry!(map, to);
+        map.end()
+    }
+}
+impl Serialize for StoredMetadataJson<'_> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        let audit::Metadata {
+            sequence,
+            kind,
+            at_ns,
+            message_id,
+            packet_id,
+            fragment,
+            attempt,
+            hop,
+            acknowledgement,
+            bytes,
+            reason,
+        } = self.0;
+        let mut map = serializer.serialize_map(None)?;
+        map.serialize_entry("sequence", sequence)?;
+        map.serialize_entry("kind", kind)?;
+        map.serialize_entry("at_ns", at_ns)?;
+        optional_entry!(map, message_id);
+        optional_entry!(map, packet_id);
+        optional_entry!(map, fragment);
+        optional_entry!(map, attempt);
+        optional_entry!(map, hop);
+        map.serialize_entry("acknowledgement", acknowledgement)?;
+        map.serialize_entry("bytes", bytes)?;
+        optional_entry!(map, reason);
+        map.end()
+    }
+}
+
+type EncodedJson = PgJson<Box<serde_json::value::RawValue>>;
+
+#[derive(Default)]
+struct AuditBatch {
+    games: Vec<Uuid>,
+    boundaries: Vec<i64>,
+    ordinals: Vec<i64>,
+    keys: Vec<String>,
+    details: Vec<EncodedJson>,
+    role_games: Vec<Uuid>,
+    roles: Vec<Uuid>,
+    sequences: Vec<i64>,
+    role_boundaries: Vec<i64>,
+    role_ordinals: Vec<i64>,
+    role_details: Vec<EncodedJson>,
+    runtime_games: Vec<Uuid>,
+    correlations: Vec<EncodedJson>,
+    heads: Vec<EncodedJson>,
+    coverage: Vec<i64>,
+    partial: Vec<bool>,
+    proposed_heads: BTreeMap<Uuid, BTreeMap<Uuid, u64>>,
+    bytes: usize,
+    role_bytes: usize,
+    runtime_bytes: usize,
+}
+impl AuditBatch {
+    fn prepare(
+        changes: &[recovery::Boundary],
+        games: &BTreeMap<Uuid, Game>,
+    ) -> anyhow::Result<Self> {
+        let mut batch = Self::default();
+        for change in changes {
+            let game = &games[&change.id];
+            let projection = audit::prepare(game, &game.audit.pending);
+            // Count the encoded private rows plus compact JSON array punctuation.
+            batch.bytes += 2 + game.audit.pending.len().saturating_sub(1);
+            for (ordinal, event) in game.audit.pending.iter().enumerate() {
+                let detail = serde_json::value::to_raw_value(&StoredEventJson(event))?;
+                batch.bytes += detail.get().len();
+                batch.games.push(game.id);
+                batch.boundaries.push(change.sequence);
+                batch.ordinals.push(i64::try_from(ordinal)?);
+                batch.keys.push(audit::message_key(event));
+                batch.details.push(PgJson(detail));
+            }
+            for (role, ordinal, event) in projection.events {
+                let detail = serde_json::value::to_raw_value(&StoredMetadataJson(&event))?;
+                batch.role_bytes += detail.get().len();
+                batch.role_games.push(game.id);
+                batch.roles.push(role);
+                batch.sequences.push(i64::try_from(event.sequence)?);
+                batch.role_boundaries.push(change.sequence);
+                batch.role_ordinals.push(i64::try_from(ordinal)?);
+                batch.role_details.push(PgJson(detail));
+            }
+            batch.runtime_games.push(game.id);
+            let correlations =
+                serde_json::value::to_raw_value(game.simulation.audit_correlations())?;
+            let heads = serde_json::value::to_raw_value(&projection.heads)?;
+            batch.runtime_bytes += correlations.get().len() + heads.get().len();
+            batch.correlations.push(PgJson(correlations));
+            batch.heads.push(PgJson(heads));
+            batch
+                .coverage
+                .push(i64::try_from(game.audit.coverage_tick)?);
+            batch.partial.push(game.audit.partial_history);
+            batch.proposed_heads.insert(game.id, projection.heads);
+        }
+        Ok(batch)
+    }
+}
 
 pub(super) struct Store {
     client: Mutex<Client>,
@@ -327,23 +520,36 @@ impl Store {
         for change in changes {
             audit::collect(games.get_mut(&change.id).unwrap());
         }
-        let commit = performance::Span::new("persistence_commit", || {
+        let commit_id = performance::next_commit_id();
+        let mut commit = performance::Span::new("persistence_commit", || {
             json!({
+                "commit_id": commit_id,
                 "boundaries": changes.len(),
-            "game_ids": changes.iter().map(|c| c.id).collect::<Vec<_>>(),
+                "game_ids": changes.iter().map(|c| c.id).collect::<Vec<_>>(),
                 "checkpoints": changes.iter().filter(|c| c.checkpoint).count(),
                 "journal_bytes": changes.iter().map(|c| c.payload.len()).sum::<usize>(),
                 // Only checkpoints submit snapshot bytes to PostgreSQL.
                 "snapshot_submitted_bytes": changes.iter().filter(|c| c.checkpoint || c.sequence == 1).map(|c| c.state.len()).sum::<usize>(),
                 "audit_events": changes.iter().map(|c| games[&c.id].audit.pending.len()).sum::<usize>(),
-                "audit_bytes": changes.iter().map(|c| serde_json::to_vec(&games[&c.id].audit.pending).map_or(0, |b| b.len())).sum::<usize>(),
                 "archived_events": changes.iter().map(|c| games[&c.id].network_message_events.len()).sum::<usize>()
             })
         });
-        let wait = performance::Span::new("persistence_lock", || json!({}));
+        let mut preparation = performance::Span::new(
+            "persistence_audit_prepare",
+            || json!({"commit_id":commit_id}),
+        );
+        let batch = AuditBatch::prepare(changes, games)?;
+        preparation.set("rows", batch.details.len());
+        preparation.set("role_rows", batch.role_details.len());
+        preparation.set("bytes", batch.bytes);
+        preparation.set("role_bytes", batch.role_bytes);
+        preparation.set("runtime_bytes", batch.runtime_bytes);
+        preparation.finish();
+        commit.set("audit_bytes", batch.bytes);
+        let wait = performance::Span::new("persistence_lock", || json!({"commit_id":commit_id}));
         let mut client = self.client.lock().await;
         wait.finish();
-        let sql = performance::Span::new("persistence_sql", || json!({}));
+        let sql = performance::Span::new("persistence_sql", || json!({"commit_id":commit_id}));
         let transaction = client.transaction().await?;
         if let Some(identity) = identity {
             if let Some(previous) = &identity.previous {
@@ -404,66 +610,7 @@ impl Store {
                     ],
                 )
                 .await?;
-            let game = games.get_mut(&change.id).unwrap();
-            let captured = game.audit.pending.clone();
-            let projected = audit::project(game, &captured);
-            if !captured.is_empty() {
-                let ordinals: Vec<i64> = (0..captured.len())
-                    .map(|n| i64::try_from(n).unwrap())
-                    .collect();
-                let keys: Vec<_> = captured.iter().map(audit::message_key).collect();
-                let details = captured
-                    .iter()
-                    .map(serde_json::to_value)
-                    .collect::<Result<Vec<_>, _>>()?;
-                transaction
-                    .execute(
-                        &self.statements["audit_records"],
-                        &[&game.id, &change.sequence, &ordinals, &keys, &details],
-                    )
-                    .await?;
-            }
-            if !projected.is_empty() {
-                let roles: Vec<_> = projected.iter().map(|(r, _, _)| *r).collect();
-                let sequences: Vec<i64> = projected
-                    .iter()
-                    .map(|(_, _, e)| i64::try_from(e.sequence).unwrap())
-                    .collect();
-                let ordinals: Vec<i64> = projected
-                    .iter()
-                    .map(|(_, n, _)| i64::try_from(*n).unwrap())
-                    .collect();
-                let details = projected
-                    .iter()
-                    .map(|(_, _, e)| serde_json::to_value(e))
-                    .collect::<Result<Vec<_>, _>>()?;
-                transaction
-                    .execute(
-                        &self.statements["audit_roles"],
-                        &[
-                            &game.id,
-                            &change.sequence,
-                            &roles,
-                            &sequences,
-                            &ordinals,
-                            &details,
-                        ],
-                    )
-                    .await?;
-            }
-            transaction
-                .execute(
-                    &self.statements["audit_runtime"],
-                    &[
-                        &game.id,
-                        &serde_json::to_value(game.simulation.audit_correlations())?,
-                        &serde_json::to_value(&game.audit.heads)?,
-                        &i64::try_from(game.audit.coverage_tick)?,
-                        &game.audit.partial_history,
-                    ],
-                )
-                .await?;
-            let game = &*game;
+            let game = &games[&change.id];
             let status = match game.status {
                 GameStatus::Lobby => "lobby",
                 GameStatus::Running => "running",
@@ -611,10 +758,71 @@ impl Store {
                     .await?;
             }
         }
+        if !batch.details.is_empty() {
+            let stage = performance::Span::new(
+                "persistence_audit_records",
+                || json!({"commit_id":commit_id,"rows":batch.details.len(),"bytes":batch.bytes}),
+            );
+            transaction
+                .execute(
+                    &self.statements["audit_records"],
+                    &[
+                        &batch.games,
+                        &batch.boundaries,
+                        &batch.ordinals,
+                        &batch.keys,
+                        &batch.details,
+                    ],
+                )
+                .await?;
+            stage.finish();
+        }
+        if !batch.role_details.is_empty() {
+            let stage = performance::Span::new(
+                "persistence_audit_roles",
+                || json!({"commit_id":commit_id,"rows":batch.role_details.len(),"bytes":batch.role_bytes}),
+            );
+            transaction
+                .execute(
+                    &self.statements["audit_roles"],
+                    &[
+                        &batch.role_games,
+                        &batch.roles,
+                        &batch.sequences,
+                        &batch.role_boundaries,
+                        &batch.role_ordinals,
+                        &batch.role_details,
+                    ],
+                )
+                .await?;
+            stage.finish();
+        }
+        if !batch.runtime_games.is_empty() {
+            let stage = performance::Span::new(
+                "persistence_audit_runtime",
+                || json!({"commit_id":commit_id,"rows":batch.runtime_games.len(),"bytes":batch.runtime_bytes}),
+            );
+            transaction
+                .execute(
+                    &self.statements["audit_runtime"],
+                    &[
+                        &batch.runtime_games,
+                        &batch.correlations,
+                        &batch.heads,
+                        &batch.coverage,
+                        &batch.partial,
+                    ],
+                )
+                .await?;
+            stage.finish();
+        }
         sql.finish();
-        let flush = performance::Span::new("persistence_flush", || json!({}));
+        let flush = performance::Span::new("persistence_flush", || json!({"commit_id":commit_id}));
         transaction.commit().await?;
         flush.finish();
+        for (game_id, heads) in batch.proposed_heads {
+            games.get_mut(&game_id).unwrap().audit.heads = heads;
+        }
         for change in changes {
             games.get_mut(&change.id).unwrap().audit.pending.clear();
             // Historical lifecycle records now live in the archive. Current
@@ -826,4 +1034,72 @@ pub(super) fn unavailable() -> (StatusCode, Json<ErrorResponse>) {
         "storage_unavailable",
         "Durable storage is unavailable; retry when the server recovers",
     )
+}
+
+#[cfg(test)]
+mod audit_encoding_tests {
+    use super::*;
+
+    #[test]
+    fn sparse_database_json_round_trips_optional_and_populated_fields() {
+        use sim_core::audit::{Context, Event, Kind, Physical};
+        for variant in 0..3 {
+            let populated = variant == 2;
+            let event = Event {
+                physical: (variant > 0).then(|| Physical {
+                    source_device: "source".into(),
+                    destination_device: "dest".into(),
+                    observer_device: "observer".into(),
+                    channel: populated.then(|| "radio".into()),
+                    next_device: populated.then(|| "next".into()),
+                    effective_bit_rate_bps: populated.then_some(800),
+                    receive_at_ns: populated.then_some(9),
+                    hops_remaining: 2,
+                }),
+                kind: Kind::Attempt,
+                at_ns: 3,
+                packet_id: populated.then_some(7),
+                bytes: 12,
+                context: Context {
+                    message_id: populated.then(|| "quoted \"α\"\n".into()),
+                    fragment: populated.then_some(0),
+                    attempt: populated.then_some(0),
+                    hop: populated.then_some(0),
+                    acknowledgement: populated,
+                    from: populated.then_some(Uuid::from_u128(1)),
+                    to: populated.then_some(Uuid::from_u128(2)),
+                },
+                terminal: populated.then_some(Uuid::from_u128(3)),
+                reason: populated.then(|| "local\n".into()),
+            };
+            let encoded = serde_json::value::to_raw_value(&StoredEventJson(&event)).unwrap();
+            assert!(!encoded.get().contains("null"));
+            let restored: Event = serde_json::from_str(encoded.get()).unwrap();
+            assert_eq!(
+                serde_json::to_value(&event).unwrap(),
+                serde_json::to_value(restored).unwrap()
+            );
+            let metadata = audit::Metadata {
+                sequence: 5,
+                kind: event.kind,
+                at_ns: event.at_ns,
+                message_id: event.context.message_id.clone(),
+                packet_id: event.packet_id,
+                fragment: event.context.fragment,
+                attempt: event.context.attempt,
+                hop: None,
+                acknowledgement: populated,
+                bytes: 12,
+                reason: event.reason.clone(),
+            };
+            let encoded = serde_json::value::to_raw_value(&StoredMetadataJson(&metadata)).unwrap();
+            let restored: audit::Metadata = serde_json::from_str(encoded.get()).unwrap();
+            assert_eq!(
+                serde_json::to_value(&metadata).unwrap(),
+                serde_json::to_value(restored).unwrap()
+            );
+            assert!(!encoded.get().contains("null"));
+            assert!(!encoded.get().contains("hop"));
+        }
+    }
 }

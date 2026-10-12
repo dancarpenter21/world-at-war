@@ -1,0 +1,230 @@
+[
+  {
+    "directory": "tmp/performance/audit-write-20261011/baseline/regional-volatile",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 26187
+    },
+    "audit_events": 0,
+    "audit_bytes": 0
+  },
+  {
+    "directory": "tmp/performance/audit-write-20261011/baseline/global-volatile",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 11463
+    },
+    "audit_events": 0,
+    "audit_bytes": 0
+  },
+  {
+    "directory": "tmp/performance/audit-write-20261011/baseline/mixed-volatile",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 120982
+    },
+    "audit_events": 0,
+    "audit_bytes": 0
+  },
+  {
+    "directory": "tmp/performance/audit-write-20261011/baseline/regional-postgres",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 42253
+    },
+    "audit_events": 237199,
+    "audit_bytes": 174354758
+  },
+  {
+    "directory": "tmp/performance/audit-write-20261011/baseline/global-postgres",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 20347
+    },
+    "audit_events": 17,
+    "audit_bytes": 5827
+  },
+  {
+    "directory": "tmp/performance/audit-write-20261011/baseline/mixed-postgres",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 187712
+    },
+    "audit_events": 712061,
+    "audit_bytes": 523465072
+  },
+  {
+    "directory": "tmp/performance/audit-write-20261011/optimized/regional-volatile",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 26201
+    },
+    "audit_events": 0,
+    "audit_bytes": 0
+  },
+  {
+    "directory": "tmp/performance/audit-write-20261011/optimized/global-volatile",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 11463
+    },
+    "audit_events": 0,
+    "audit_bytes": 0
+  },
+  {
+    "directory": "tmp/performance/audit-write-20261011/optimized/mixed-volatile",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 121001
+    },
+    "audit_events": 0,
+    "audit_bytes": 0
+  },
+  {
+    "directory": "tmp/performance/audit-write-20261011/optimized/regional-postgres",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 42348
+    },
+    "audit_events": 237199,
+    "audit_bytes": 161107587
+  },
+  {
+    "directory": "tmp/performance/audit-write-20261011/optimized/global-postgres",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 20346
+    },
+    "audit_events": 17,
+    "audit_bytes": 3940
+  },
+  {
+    "directory": "tmp/performance/audit-write-20261011/optimized/mixed-postgres",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 191851
+    },
+    "audit_events": 711640,
+    "audit_bytes": 483390186
+  },
+  {
+    "directory": "tmp/performance/audit-write-20261011/optimized-reverse/regional-volatile",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 26200
+    },
+    "audit_events": 0,
+    "audit_bytes": 0
+  },
+  {
+    "directory": "tmp/performance/audit-write-20261011/optimized-reverse/global-volatile",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 11464
+    },
+    "audit_events": 0,
+    "audit_bytes": 0
+  },
+  {
+    "directory": "tmp/performance/audit-write-20261011/optimized-reverse/mixed-volatile",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 120994
+    },
+    "audit_events": 0,
+    "audit_bytes": 0
+  },
+  {
+    "directory": "tmp/performance/audit-write-20261011/optimized-reverse/regional-postgres",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 42464
+    },
+    "audit_events": 237199,
+    "audit_bytes": 161107587
+  },
+  {
+    "directory": "tmp/performance/audit-write-20261011/optimized-reverse/global-postgres",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 20366
+    },
+    "audit_events": 19,
+    "audit_bytes": 4324
+  },
+  {
+    "directory": "tmp/performance/audit-write-20261011/optimized-reverse/mixed-postgres",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 192162
+    },
+    "audit_events": 714972,
+    "audit_bytes": 485999412
+  },
+  {
+    "directory": "tmp/performance/audit-write-20261011/retention-smoke",
+    "valid": true,
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 2131
+    },
+    "audit_events": 56510,
+    "audit_bytes": 38161927
+  }
+]

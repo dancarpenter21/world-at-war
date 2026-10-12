@@ -1,0 +1,4233 @@
+[
+  {
+    "run": "tmp/performance/audit-write-20261011/baseline/regional-postgres",
+    "settings": {
+      "version": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "fsync": "on",
+      "synchronous_commit": "on",
+      "full_page_writes": "on",
+      "shared_buffers": "128MB",
+      "checkpoint_timeout": "5min",
+      "max_wal_size": "1GB",
+      "wal_buffers": "4MB",
+      "track_io_timing": "off",
+      "track_wal_io_timing": "off"
+    },
+    "cycle": {
+      "samples": 300,
+      "mean": 82.31660989333334,
+      "p50": 31.900000000000002,
+      "p95": 165.70000000000002,
+      "max": 2614.593962,
+      "histogram_resolution": 0.1,
+      "histogram_ceiling": 10000
+    },
+    "largest_measured_commits": [
+      {
+        "commit_id": 310,
+        "time": 1791762281099.681,
+        "duration_ms": 2595.639094,
+        "audit_events": 2546,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.414573,
+            "game_id": "08dfb504-437b-4306-b271-fc94e7790bb3",
+            "rows": 2546
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 53.675584
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 39.990092999999995
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 1.800691
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 105.78754599999999
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 2487.709448
+          }
+        ],
+        "sample_before_time": 1791762279021.4404,
+        "sample_after_time": 1791762283289.6152,
+        "sample_before_waits": null,
+        "sample_after_waits": null,
+        "wait_samples_during_commit": [
+          {
+            "time": 1791762279021.4404,
+            "sampling_ms": 1878.4442960000015,
+            "waits": null
+          }
+        ],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 23018,
+            "wal_fpi": 0,
+            "wal_bytes": 6851523,
+            "wal_buffers_full": 83,
+            "wal_write": 90,
+            "wal_sync": 6,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 314,
+        "time": 1791762284781.8994,
+        "duration_ms": 2277.931042,
+        "audit_events": 909,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.084381,
+            "game_id": "08dfb504-437b-4306-b271-fc94e7790bb3",
+            "rows": 909
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 11.919718
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 13.922640999999999
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 3.1911140000000002
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 33.280069000000005
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 2244.267167
+          }
+        ],
+        "sample_before_time": 1791762283289.6152,
+        "sample_after_time": 1791762288774.0513,
+        "sample_before_waits": null,
+        "sample_after_waits": null,
+        "wait_samples_during_commit": [
+          {
+            "time": 1791762283289.6152,
+            "sampling_ms": 1146.2211020000104,
+            "waits": null
+          }
+        ],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 23569,
+            "wal_fpi": 0,
+            "wal_bytes": 6967796,
+            "wal_buffers_full": 83,
+            "wal_write": 89,
+            "wal_sync": 5,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 315,
+        "time": 1791762286086.1384,
+        "duration_ms": 1277.9627979999998,
+        "audit_events": 2546,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.451681,
+            "game_id": "08dfb504-437b-4306-b271-fc94e7790bb3",
+            "rows": 2546
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 54.758261000000005
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 48.170227000000004
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 2.1733450000000003
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 116.790707
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 1159.2962049999999
+          }
+        ],
+        "sample_before_time": 1791762283289.6152,
+        "sample_after_time": 1791762288774.0513,
+        "sample_before_waits": null,
+        "sample_after_waits": null,
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 23569,
+            "wal_fpi": 0,
+            "wal_bytes": 6967796,
+            "wal_buffers_full": 83,
+            "wal_write": 89,
+            "wal_sync": 5,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 305,
+        "time": 1791762274637.503,
+        "duration_ms": 1131.3039119999999,
+        "audit_events": 2546,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.382559,
+            "game_id": "08dfb504-437b-4306-b271-fc94e7790bb3",
+            "rows": 2546
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 49.932142
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 44.375671
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 1.5343939999999998
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 106.026625
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 1022.857112
+          }
+        ],
+        "sample_before_time": 1791762273253.9802,
+        "sample_after_time": 1791762279021.4404,
+        "sample_before_waits": null,
+        "sample_after_waits": null,
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 24559,
+            "wal_fpi": 0,
+            "wal_bytes": 7746085,
+            "wal_buffers_full": 83,
+            "wal_write": 92,
+            "wal_sync": 7,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 311,
+        "time": 1791762282007.1147,
+        "duration_ms": 893.326187,
+        "audit_events": 393,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.103962,
+            "game_id": "08dfb504-437b-4306-b271-fc94e7790bb3",
+            "rows": 393
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 6.06862
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 7.915903999999999
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.5716589999999999
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 18.280162999999998
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 874.6604679999999
+          }
+        ],
+        "sample_before_time": 1791762279021.4404,
+        "sample_after_time": 1791762283289.6152,
+        "sample_before_waits": null,
+        "sample_after_waits": null,
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 23018,
+            "wal_fpi": 0,
+            "wal_bytes": 6851523,
+            "wal_buffers_full": 83,
+            "wal_write": 90,
+            "wal_sync": 6,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      }
+    ],
+    "diagnostic_limits": "Nested spans overlap. Five-second sample counter changes establish temporal correlation only. I/O timing counters are meaningful only when the corresponding timing setting is enabled."
+  },
+  {
+    "run": "tmp/performance/audit-write-20261011/baseline/global-postgres",
+    "settings": {
+      "version": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "fsync": "on",
+      "synchronous_commit": "on",
+      "full_page_writes": "on",
+      "shared_buffers": "128MB",
+      "checkpoint_timeout": "5min",
+      "max_wal_size": "1GB",
+      "wal_buffers": "4MB",
+      "track_io_timing": "off",
+      "track_wal_io_timing": "off"
+    },
+    "cycle": {
+      "samples": 300,
+      "mean": 59.39047104666668,
+      "p50": 58.900000000000006,
+      "p95": 70.3,
+      "max": 121.420761,
+      "histogram_resolution": 0.1,
+      "histogram_ceiling": 10000
+    },
+    "largest_measured_commits": [
+      {
+        "commit_id": 221,
+        "time": 1791762602159.3113,
+        "duration_ms": 111.88123399999999,
+        "audit_events": 0,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.0046879999999999995,
+            "game_id": "ff1376cd-238b-4697-a4a2-ddb48b9e1949",
+            "rows": 0
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.666088
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 109.449591
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 2.36323
+          }
+        ],
+        "sample_before_time": 1791762597886.4255,
+        "sample_after_time": 1791762602878.994,
+        "sample_before_waits": null,
+        "sample_after_waits": null,
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 140,
+            "wal_fpi": 0,
+            "wal_bytes": 18230,
+            "wal_buffers_full": 0,
+            "wal_write": 5,
+            "wal_sync": 5,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 397,
+        "time": 1791762752890.4329,
+        "duration_ms": 103.73701200000001,
+        "audit_events": 0,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.022072,
+            "game_id": "ff1376cd-238b-4697-a4a2-ddb48b9e1949",
+            "rows": 0
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.689357
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 100.924159
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 2.7449380000000003
+          }
+        ],
+        "sample_before_time": 1791762747898.867,
+        "sample_after_time": 1791762752907.2947,
+        "sample_before_waits": null,
+        "sample_after_waits": null,
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 82
+          },
+          "wal_stats": {
+            "wal_records": 142,
+            "wal_fpi": 0,
+            "wal_bytes": 18422,
+            "wal_buffers_full": 0,
+            "wal_write": 6,
+            "wal_sync": 6,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 330,
+        "time": 1791762693081.876,
+        "duration_ms": 103.356446,
+        "audit_events": 1,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.0059050000000000005,
+            "game_id": "ff1376cd-238b-4697-a4a2-ddb48b9e1949",
+            "rows": 1
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 0.644096
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 0.34391700000000003
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.31637800000000005
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 92.057821
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 11.226544
+          }
+        ],
+        "sample_before_time": 1791762692883.9421,
+        "sample_after_time": 1791762697898.1387,
+        "sample_before_waits": null,
+        "sample_after_waits": null,
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 5700,
+            "wal_fpi": 0,
+            "wal_bytes": 4664489,
+            "wal_buffers_full": 0,
+            "wal_write": 13,
+            "wal_sync": 13,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 331,
+        "time": 1791762693238.5796,
+        "duration_ms": 100.967025,
+        "audit_events": 0,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.010773,
+            "game_id": "ff1376cd-238b-4697-a4a2-ddb48b9e1949",
+            "rows": 0
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.604022
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 98.97218600000001
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 1.929076
+          }
+        ],
+        "sample_before_time": 1791762692883.9421,
+        "sample_after_time": 1791762697898.1387,
+        "sample_before_waits": null,
+        "sample_after_waits": null,
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 5700,
+            "wal_fpi": 0,
+            "wal_bytes": 4664489,
+            "wal_buffers_full": 0,
+            "wal_write": 13,
+            "wal_sync": 13,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 116,
+        "time": 1791762511703.2595,
+        "duration_ms": 98.502438,
+        "audit_events": 0,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.003163,
+            "game_id": "ff1376cd-238b-4697-a4a2-ddb48b9e1949",
+            "rows": 0
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.566083
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 87.214479
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 11.221271999999999
+          }
+        ],
+        "sample_before_time": 1791762508839.3345,
+        "sample_after_time": 1791762512856.1633,
+        "sample_before_waits": null,
+        "sample_after_waits": null,
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 168,
+            "wal_fpi": 0,
+            "wal_bytes": 21876,
+            "wal_buffers_full": 0,
+            "wal_write": 6,
+            "wal_sync": 6,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      }
+    ],
+    "diagnostic_limits": "Nested spans overlap. Five-second sample counter changes establish temporal correlation only. I/O timing counters are meaningful only when the corresponding timing setting is enabled."
+  },
+  {
+    "run": "tmp/performance/audit-write-20261011/baseline/mixed-postgres",
+    "settings": {
+      "version": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "fsync": "on",
+      "synchronous_commit": "on",
+      "full_page_writes": "on",
+      "shared_buffers": "128MB",
+      "checkpoint_timeout": "5min",
+      "max_wal_size": "1GB",
+      "wal_buffers": "4MB",
+      "track_io_timing": "off",
+      "track_wal_io_timing": "off"
+    },
+    "cycle": {
+      "samples": 301,
+      "mean": 277.22528945182717,
+      "p50": 232.9,
+      "p95": 493.90000000000003,
+      "max": 1627.811101,
+      "histogram_resolution": 0.1,
+      "histogram_ceiling": 10000
+    },
+    "largest_measured_commits": [
+      {
+        "commit_id": 959,
+        "time": 1791763054539.668,
+        "duration_ms": 1481.425446,
+        "audit_events": 1916,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.032504,
+            "game_id": "150fa8e4-dcce-46d2-aefb-e02d0699dfc0",
+            "rows": 98
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 1.7320820000000001
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 2.4397849999999996
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.353679
+          },
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.0014470000000000002,
+            "game_id": "4d960bb4-7f2b-45ec-bb2f-feebfce1cbea",
+            "rows": 0
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.297921
+          },
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.001589,
+            "game_id": "e5225481-25fc-44e8-81f5-58e70042c64d",
+            "rows": 0
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.279607
+          },
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.090133,
+            "game_id": "edc40a4a-c656-413d-898b-c28767e7c78f",
+            "rows": 909
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 10.932716000000001
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 15.491295000000001
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 3.355368
+          },
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.098447,
+            "game_id": "ffa5170c-a24c-4e67-b8d0-243b90a58cfc",
+            "rows": 909
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 8.988117
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 15.029942
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 3.253657
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 75.946456
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 1404.670602
+          }
+        ],
+        "sample_before_time": 1791763053045.589,
+        "sample_after_time": 1791763057788.2356,
+        "sample_before_waits": null,
+        "sample_after_waits": null,
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 25251,
+            "wal_fpi": 1,
+            "wal_bytes": 13309263,
+            "wal_buffers_full": 0,
+            "wal_write": 26,
+            "wal_sync": 23,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 931,
+        "time": 1791763045792.9011,
+        "duration_ms": 1075.5615149999999,
+        "audit_events": 5990,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.230604,
+            "game_id": "150fa8e4-dcce-46d2-aefb-e02d0699dfc0",
+            "rows": 898
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 9.916345
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 14.669256
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 3.435438
+          },
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.001642,
+            "game_id": "4d960bb4-7f2b-45ec-bb2f-feebfce1cbea",
+            "rows": 0
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.303756
+          },
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.001339,
+            "game_id": "e5225481-25fc-44e8-81f5-58e70042c64d",
+            "rows": 0
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.276954
+          },
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 1.034596,
+            "game_id": "edc40a4a-c656-413d-898b-c28767e7c78f",
+            "rows": 2546
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 132.90394999999998
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 40.495166999999995
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 1.91064
+          },
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.7558750000000001,
+            "game_id": "ffa5170c-a24c-4e67-b8d0-243b90a58cfc",
+            "rows": 2546
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 37.7708
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 41.782607
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 1.740435
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 314.831889
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 754.781514
+          }
+        ],
+        "sample_before_time": 1791763042783.5151,
+        "sample_after_time": 1791763047785.7097,
+        "sample_before_waits": null,
+        "sample_after_waits": null,
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 32
+          },
+          "wal_stats": {
+            "wal_records": 55836,
+            "wal_fpi": 0,
+            "wal_bytes": 18952266,
+            "wal_buffers_full": 689,
+            "wal_write": 706,
+            "wal_sync": 15,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 946,
+        "time": 1791763050268.8748,
+        "duration_ms": 893.1394750000001,
+        "audit_events": 425,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.128367,
+            "game_id": "150fa8e4-dcce-46d2-aefb-e02d0699dfc0",
+            "rows": 393
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 5.488356
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 6.802062
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.482361
+          },
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.001793,
+            "game_id": "4d960bb4-7f2b-45ec-bb2f-feebfce1cbea",
+            "rows": 0
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.32650799999999996
+          },
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.001328,
+            "game_id": "e5225481-25fc-44e8-81f5-58e70042c64d",
+            "rows": 0
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.313617
+          },
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.027274,
+            "game_id": "edc40a4a-c656-413d-898b-c28767e7c78f",
+            "rows": 16
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 0.53787
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 0.567284
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.361748
+          },
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.008307,
+            "game_id": "ffa5170c-a24c-4e67-b8d0-243b90a58cfc",
+            "rows": 16
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 0.567348
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 0.757663
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.339179
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 27.123715999999998
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 865.5086789999999
+          }
+        ],
+        "sample_before_time": 1791763047785.7097,
+        "sample_after_time": 1791763053045.589,
+        "sample_before_waits": null,
+        "sample_after_waits": null,
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 85252,
+            "sync_time": 1866,
+            "buffers_written": 8
+          },
+          "wal_stats": {
+            "wal_records": 35955,
+            "wal_fpi": 2,
+            "wal_bytes": 18078039,
+            "wal_buffers_full": 5,
+            "wal_write": 42,
+            "wal_sync": 33,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 988,
+        "time": 1791763068916.7314,
+        "duration_ms": 751.364139,
+        "audit_events": 1,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.0050479999999999995,
+            "game_id": "edc40a4a-c656-413d-898b-c28767e7c78f",
+            "rows": 1
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 0.744406
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 0.372016
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.36098
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 31.644841
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 719.6272369999999
+          }
+        ],
+        "sample_before_time": 1791763067806.6206,
+        "sample_after_time": 1791763073723.7683,
+        "sample_before_waits": null,
+        "sample_after_waits": null,
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 500
+          },
+          "wal_stats": {
+            "wal_records": 99973,
+            "wal_fpi": 130,
+            "wal_bytes": 35714699,
+            "wal_buffers_full": 868,
+            "wal_write": 896,
+            "wal_sync": 25,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 935,
+        "time": 1791763047590.0166,
+        "duration_ms": 695.867405,
+        "audit_events": 3333,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.567596,
+            "game_id": "150fa8e4-dcce-46d2-aefb-e02d0699dfc0",
+            "rows": 2547
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 47.315411000000005
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 225.792278
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 2.2360409999999997
+          },
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.002203,
+            "game_id": "4d960bb4-7f2b-45ec-bb2f-feebfce1cbea",
+            "rows": 0
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.313269
+          },
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.0016849999999999999,
+            "game_id": "e5225481-25fc-44e8-81f5-58e70042c64d",
+            "rows": 0
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.322395
+          },
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.171615,
+            "game_id": "edc40a4a-c656-413d-898b-c28767e7c78f",
+            "rows": 393
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 5.246805999999999
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 6.489605
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.472861
+          },
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.185559,
+            "game_id": "ffa5170c-a24c-4e67-b8d0-243b90a58cfc",
+            "rows": 393
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 4.985144
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 6.477423000000001
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.500063
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 320.61350300000004
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 372.55611700000003
+          }
+        ],
+        "sample_before_time": 1791763042783.5151,
+        "sample_after_time": 1791763047785.7097,
+        "sample_before_waits": null,
+        "sample_after_waits": null,
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 32
+          },
+          "wal_stats": {
+            "wal_records": 55836,
+            "wal_fpi": 0,
+            "wal_bytes": 18952266,
+            "wal_buffers_full": 689,
+            "wal_write": 706,
+            "wal_sync": 15,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      }
+    ],
+    "diagnostic_limits": "Nested spans overlap. Five-second sample counter changes establish temporal correlation only. I/O timing counters are meaningful only when the corresponding timing setting is enabled."
+  },
+  {
+    "run": "tmp/performance/audit-write-20261011/optimized/regional-postgres",
+    "settings": {
+      "version": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "fsync": "on",
+      "synchronous_commit": "on",
+      "full_page_writes": "on",
+      "shared_buffers": "128MB",
+      "checkpoint_timeout": "5min",
+      "max_wal_size": "1GB",
+      "wal_buffers": "4MB",
+      "track_io_timing": "off",
+      "track_wal_io_timing": "off"
+    },
+    "cycle": {
+      "samples": 300,
+      "mean": 67.4708451266666,
+      "p50": 29.900000000000002,
+      "p95": 150,
+      "max": 2400.305962,
+      "histogram_resolution": 0.1,
+      "histogram_ceiling": 10000
+    },
+    "largest_measured_commits": [
+      {
+        "commit_id": 461,
+        "time": 1791764429529.887,
+        "duration_ms": 2382.3927249999997,
+        "audit_events": 2546,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 2.075166,
+            "rows": 2546,
+            "role_rows": 2406,
+            "bytes": 2058111,
+            "role_bytes": 459932,
+            "runtime_bytes": 24203
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.0007689999999999999
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 37.44292,
+            "rows": 2546,
+            "bytes": 2058111
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 39.84542,
+            "rows": 2406,
+            "bytes": 459932
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 1.397001,
+            "rows": 1,
+            "bytes": 24203
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 80.915026
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 2298.6218790000003
+          }
+        ],
+        "sample_before_time": 1791764425785.852,
+        "sample_after_time": 1791764430793.1792,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "IO",
+            "wait_event": "WalSync",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 12634,
+            "wal_fpi": 0,
+            "wal_bytes": 7119743,
+            "wal_buffers_full": 0,
+            "wal_write": 14,
+            "wal_sync": 11,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 466,
+        "time": 1791764432839.803,
+        "duration_ms": 1832.072215,
+        "audit_events": 2546,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 2.576067,
+            "rows": 2546,
+            "role_rows": 2406,
+            "bytes": 2058111,
+            "role_bytes": 459932,
+            "runtime_bytes": 24203
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.001022
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 50.979992,
+            "rows": 2546,
+            "bytes": 2058111
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 327.77126200000004,
+            "rows": 2406,
+            "bytes": 459932
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 1.7848,
+            "rows": 1,
+            "bytes": 24203
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 383.583661
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 1444.3043129999999
+          }
+        ],
+        "sample_before_time": 1791764430793.1792,
+        "sample_after_time": 1791764435932.1733,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "IO",
+            "wait_event": "WalSync",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 41881,
+            "wal_fpi": 0,
+            "wal_bytes": 12125686,
+            "wal_buffers_full": 102,
+            "wal_write": 114,
+            "wal_sync": 12,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 455,
+        "time": 1791764425969.056,
+        "duration_ms": 481.23704,
+        "audit_events": 910,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.710365,
+            "rows": 910,
+            "role_rows": 858,
+            "bytes": 317764,
+            "role_bytes": 159435,
+            "runtime_bytes": 164731
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.000714
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 11.696257,
+            "rows": 910,
+            "bytes": 317764
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 28.356982,
+            "rows": 858,
+            "bytes": 159435
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 2.973996,
+            "rows": 1,
+            "bytes": 164731
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 46.235645999999996
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 434.139734
+          }
+        ],
+        "sample_before_time": 1791764425785.852,
+        "sample_after_time": 1791764430793.1792,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "IO",
+            "wait_event": "WalSync",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [
+          {
+            "time": 1791764425785.852,
+            "sampling_ms": 1133.9556340000127,
+            "waits": [
+              {
+                "wait_event_type": "Client",
+                "wait_event": "ClientRead",
+                "sessions": 1
+              }
+            ]
+          }
+        ],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 12634,
+            "wal_fpi": 0,
+            "wal_bytes": 7119743,
+            "wal_buffers_full": 0,
+            "wal_write": 14,
+            "wal_sync": 11,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 459,
+        "time": 1791764426903.9714,
+        "duration_ms": 329.204311,
+        "audit_events": 0,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.24550100000000002,
+            "rows": 0,
+            "role_rows": 0,
+            "bytes": 2,
+            "role_bytes": 0,
+            "runtime_bytes": 164731
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.002144
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 3.492359,
+            "rows": 1,
+            "bytes": 164731
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 62.263269
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 266.640073
+          }
+        ],
+        "sample_before_time": 1791764425785.852,
+        "sample_after_time": 1791764430793.1792,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "IO",
+            "wait_event": "WalSync",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 12634,
+            "wal_fpi": 0,
+            "wal_bytes": 7119743,
+            "wal_buffers_full": 0,
+            "wal_write": 14,
+            "wal_sync": 11,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 456,
+        "time": 1791764426261.9456,
+        "duration_ms": 277.509959,
+        "audit_events": 0,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.14948199999999998,
+            "rows": 0,
+            "role_rows": 0,
+            "bytes": 2,
+            "role_bytes": 0,
+            "runtime_bytes": 164731
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.001044
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 1.907553,
+            "rows": 1,
+            "bytes": 164731
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 53.618238999999996
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 223.688437
+          }
+        ],
+        "sample_before_time": 1791764425785.852,
+        "sample_after_time": 1791764430793.1792,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "IO",
+            "wait_event": "WalSync",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 12634,
+            "wal_fpi": 0,
+            "wal_bytes": 7119743,
+            "wal_buffers_full": 0,
+            "wal_write": 14,
+            "wal_sync": 11,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      }
+    ],
+    "diagnostic_limits": "Nested spans overlap. Five-second sample counter changes establish temporal correlation only. I/O timing counters are meaningful only when the corresponding timing setting is enabled."
+  },
+  {
+    "run": "tmp/performance/audit-write-20261011/optimized/global-postgres",
+    "settings": {
+      "version": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "fsync": "on",
+      "synchronous_commit": "on",
+      "full_page_writes": "on",
+      "shared_buffers": "128MB",
+      "checkpoint_timeout": "5min",
+      "max_wal_size": "1GB",
+      "wal_buffers": "4MB",
+      "track_io_timing": "off",
+      "track_wal_io_timing": "off"
+    },
+    "cycle": {
+      "samples": 300,
+      "mean": 62.77223582666666,
+      "p50": 61.400000000000006,
+      "p95": 78.30000000000001,
+      "max": 136.800103,
+      "histogram_resolution": 0.1,
+      "histogram_ceiling": 10000
+    },
+    "largest_measured_commits": [
+      {
+        "commit_id": 375,
+        "time": 1791764769638.0828,
+        "duration_ms": 104.387246,
+        "audit_events": 0,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.007661,
+            "rows": 0,
+            "role_rows": 0,
+            "bytes": 2,
+            "role_bytes": 0,
+            "runtime_bytes": 87
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.001586
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.301841,
+            "rows": 1,
+            "bytes": 87
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 101.823443
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 2.501587
+          }
+        ],
+        "sample_before_time": 1791764765314.959,
+        "sample_after_time": 1791764770340.1619,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 140,
+            "wal_fpi": 0,
+            "wal_bytes": 18230,
+            "wal_buffers_full": 0,
+            "wal_write": 5,
+            "wal_sync": 5,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 330,
+        "time": 1791764730487.7383,
+        "duration_ms": 102.622853,
+        "audit_events": 0,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.007666999999999999,
+            "rows": 0,
+            "role_rows": 0,
+            "bytes": 2,
+            "role_bytes": 0,
+            "runtime_bytes": 87
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.001871
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.29459100000000005,
+            "rows": 1,
+            "bytes": 87
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 91.377747
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 11.183883
+          }
+        ],
+        "sample_before_time": 1791764730336.9456,
+        "sample_after_time": 1791764735341.1892,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 5701,
+            "wal_fpi": 0,
+            "wal_bytes": 4666741,
+            "wal_buffers_full": 0,
+            "wal_write": 11,
+            "wal_sync": 11,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 116,
+        "time": 1791764549110.4795,
+        "duration_ms": 99.638837,
+        "audit_events": 0,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.007741,
+            "rows": 0,
+            "role_rows": 0,
+            "bytes": 2,
+            "role_bytes": 0,
+            "runtime_bytes": 86
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.001516
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.31455099999999997,
+            "rows": 1,
+            "bytes": 86
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 86.871781
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 12.70692
+          }
+        ],
+        "sample_before_time": 1791764546075.4429,
+        "sample_after_time": 1791764550308.0466,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": null,
+            "wait_event": null,
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 168,
+            "wal_fpi": 0,
+            "wal_bytes": 21876,
+            "wal_buffers_full": 0,
+            "wal_write": 6,
+            "wal_sync": 6,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 224,
+        "time": 1791764640082.3354,
+        "duration_ms": 99.380565,
+        "audit_events": 0,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.007397,
+            "rows": 0,
+            "role_rows": 0,
+            "bytes": 2,
+            "role_bytes": 0,
+            "runtime_bytes": 87
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.0010780000000000002
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.332531,
+            "rows": 1,
+            "bytes": 87
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 88.469915
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 10.851628999999999
+          }
+        ],
+        "sample_before_time": 1791764635345.8794,
+        "sample_after_time": 1791764640325.5347,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 140,
+            "wal_fpi": 0,
+            "wal_bytes": 18230,
+            "wal_buffers_full": 0,
+            "wal_write": 5,
+            "wal_sync": 5,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 117,
+        "time": 1791764549309.7886,
+        "duration_ms": 99.311783,
+        "audit_events": 1,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.017938,
+            "rows": 1,
+            "role_rows": 1,
+            "bytes": 192,
+            "role_bytes": 141,
+            "runtime_bytes": 86
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.00237
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 0.387843,
+            "rows": 1,
+            "bytes": 192
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 0.35768900000000003,
+            "rows": 1,
+            "bytes": 141
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.363712,
+            "rows": 1,
+            "bytes": 86
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 97.806999
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 1.428972
+          }
+        ],
+        "sample_before_time": 1791764546075.4429,
+        "sample_after_time": 1791764550308.0466,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": null,
+            "wait_event": null,
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 168,
+            "wal_fpi": 0,
+            "wal_bytes": 21876,
+            "wal_buffers_full": 0,
+            "wal_write": 6,
+            "wal_sync": 6,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      }
+    ],
+    "diagnostic_limits": "Nested spans overlap. Five-second sample counter changes establish temporal correlation only. I/O timing counters are meaningful only when the corresponding timing setting is enabled."
+  },
+  {
+    "run": "tmp/performance/audit-write-20261011/optimized/mixed-postgres",
+    "settings": {
+      "version": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "fsync": "on",
+      "synchronous_commit": "on",
+      "full_page_writes": "on",
+      "shared_buffers": "128MB",
+      "checkpoint_timeout": "5min",
+      "max_wal_size": "1GB",
+      "wal_buffers": "4MB",
+      "track_io_timing": "off",
+      "track_wal_io_timing": "off"
+    },
+    "cycle": {
+      "samples": 300,
+      "mean": 247.81034663333335,
+      "p50": 219.5,
+      "p95": 430.1,
+      "max": 517.676578,
+      "histogram_resolution": 0.1,
+      "histogram_ceiling": 10000
+    },
+    "largest_measured_commits": [
+      {
+        "commit_id": 1204,
+        "time": 1791765174052.0173,
+        "duration_ms": 350.832823,
+        "audit_events": 5990,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 5.219729999999999,
+            "rows": 5990,
+            "role_rows": 5658,
+            "bytes": 4426783,
+            "role_bytes": 1077697,
+            "runtime_bytes": 213311
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.0014
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 112.48177199999999,
+            "rows": 5990,
+            "bytes": 4426783
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 97.011454,
+            "rows": 5658,
+            "bytes": 1077697
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 4.6545179999999995,
+            "rows": 5,
+            "bytes": 213311
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 223.427659
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 120.5647
+          }
+        ],
+        "sample_before_time": 1791765171369.2908,
+        "sample_after_time": null,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "IO",
+            "wait_event": "WalSync",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": null,
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {}
+      },
+      {
+        "commit_id": 808,
+        "time": 1791765043783.0222,
+        "duration_ms": 333.00131,
+        "audit_events": 5990,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 6.408509,
+            "rows": 5990,
+            "role_rows": 5658,
+            "bytes": 4426783,
+            "role_bytes": 1077697,
+            "runtime_bytes": 213311
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.002046
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 141.82324,
+            "rows": 5990,
+            "bytes": 4426783
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 160.957573,
+            "rows": 5658,
+            "bytes": 1077697
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 9.790457,
+            "rows": 5,
+            "bytes": 213311
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 322.735951
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 1.309161
+          }
+        ],
+        "sample_before_time": 1791765041354.064,
+        "sample_after_time": 1791765046772.123,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 71036,
+            "wal_fpi": 5,
+            "wal_bytes": 20299824,
+            "wal_buffers_full": 1006,
+            "wal_write": 1017,
+            "wal_sync": 10,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 1140,
+        "time": 1791765148997.5012,
+        "duration_ms": 295.438789,
+        "audit_events": 6002,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 5.1875089999999995,
+            "rows": 6002,
+            "role_rows": 5670,
+            "bytes": 4434000,
+            "role_bytes": 1079307,
+            "runtime_bytes": 213311
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.00189
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 129.223322,
+            "rows": 6002,
+            "bytes": 4434000
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 129.04368399999998,
+            "rows": 5670,
+            "bytes": 1079307
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 5.762637,
+            "rows": 5,
+            "bytes": 213311
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 274.037879
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 14.605609000000001
+          }
+        ],
+        "sample_before_time": 1791765146603.5437,
+        "sample_after_time": 1791765151385.685,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 64851,
+            "wal_fpi": 9,
+            "wal_bytes": 25564660,
+            "wal_buffers_full": 770,
+            "wal_write": 798,
+            "wal_sync": 26,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 448,
+        "time": 1791764913720.484,
+        "duration_ms": 293.615679,
+        "audit_events": 5990,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 5.291333,
+            "rows": 5990,
+            "role_rows": 5658,
+            "bytes": 4426783,
+            "role_bytes": 1073049,
+            "runtime_bytes": 213285
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.001888
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 136.166233,
+            "rows": 5990,
+            "bytes": 4426783
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 121.702323,
+            "rows": 5658,
+            "bytes": 1073049
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 13.141532,
+            "rows": 5,
+            "bytes": 213285
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 280.276349
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 5.73636
+          }
+        ],
+        "sample_before_time": 1791764911339.0215,
+        "sample_after_time": 1791764916618.595,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 228
+          },
+          "wal_stats": {
+            "wal_records": 120438,
+            "wal_fpi": 208,
+            "wal_bytes": 36762889,
+            "wal_buffers_full": 1405,
+            "wal_write": 1418,
+            "wal_sync": 11,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 1148,
+        "time": 1791765153718.5608,
+        "duration_ms": 285.634323,
+        "audit_events": 5990,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 5.52114,
+            "rows": 5990,
+            "role_rows": 5658,
+            "bytes": 4426783,
+            "role_bytes": 1077697,
+            "runtime_bytes": 213311
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.0019010000000000001
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 126.638958,
+            "rows": 5990,
+            "bytes": 4426783
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 129.374379,
+            "rows": 5658,
+            "bytes": 1077697
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 6.071418,
+            "rows": 5,
+            "bytes": 213311
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 271.14668800000004
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 7.681419
+          }
+        ],
+        "sample_before_time": 1791765151385.685,
+        "sample_after_time": 1791765156584.3035,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 73293,
+            "wal_fpi": 2,
+            "wal_bytes": 22152211,
+            "wal_buffers_full": 794,
+            "wal_write": 812,
+            "wal_sync": 17,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      }
+    ],
+    "diagnostic_limits": "Nested spans overlap. Five-second sample counter changes establish temporal correlation only. I/O timing counters are meaningful only when the corresponding timing setting is enabled."
+  },
+  {
+    "run": "tmp/performance/audit-write-20261011/optimized-reverse/regional-postgres",
+    "settings": {
+      "version": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "fsync": "on",
+      "synchronous_commit": "on",
+      "full_page_writes": "on",
+      "shared_buffers": "128MB",
+      "checkpoint_timeout": "5min",
+      "max_wal_size": "1GB",
+      "wal_buffers": "4MB",
+      "track_io_timing": "off",
+      "track_wal_io_timing": "off"
+    },
+    "cycle": {
+      "samples": 300,
+      "mean": 47.85475616333332,
+      "p50": 29.6,
+      "p95": 134.4,
+      "max": 163.432515,
+      "histogram_resolution": 0.1,
+      "histogram_ceiling": 10000
+    },
+    "largest_measured_commits": [
+      {
+        "commit_id": 531,
+        "time": 1791765508126.6938,
+        "duration_ms": 136.016969,
+        "audit_events": 2546,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 3.608117,
+            "rows": 2546,
+            "role_rows": 2406,
+            "bytes": 2058111,
+            "role_bytes": 459932,
+            "runtime_bytes": 24203
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.001489
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 59.363005,
+            "rows": 2546,
+            "bytes": 2058111
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 60.42944,
+            "rows": 2406,
+            "bytes": 459932
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 1.851854,
+            "rows": 1,
+            "bytes": 24203
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 124.705124
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 6.858587
+          }
+        ],
+        "sample_before_time": 1791765507966.6191,
+        "sample_after_time": null,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": null,
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {}
+      },
+      {
+        "commit_id": 180,
+        "time": 1791765258118.7578,
+        "duration_ms": 134.41003600000002,
+        "audit_events": 2546,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 2.621753,
+            "rows": 2546,
+            "role_rows": 2406,
+            "bytes": 2058111,
+            "role_bytes": 457972,
+            "runtime_bytes": 24195
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.0015290000000000002
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 54.267998,
+            "rows": 2546,
+            "bytes": 2058111
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 42.265144,
+            "rows": 2406,
+            "bytes": 457972
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 1.642196,
+            "rows": 1,
+            "bytes": 24195
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 116.42993899999999
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 14.655493
+          }
+        ],
+        "sample_before_time": 1791765257890.6611,
+        "sample_after_time": 1791765262868.958,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 23852,
+            "wal_fpi": 0,
+            "wal_bytes": 6832946,
+            "wal_buffers_full": 69,
+            "wal_write": 77,
+            "wal_sync": 8,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 383,
+        "time": 1791765398116.872,
+        "duration_ms": 130.603552,
+        "audit_events": 2546,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 2.85975,
+            "rows": 2546,
+            "role_rows": 2406,
+            "bytes": 2058111,
+            "role_bytes": 459932,
+            "runtime_bytes": 24203
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.001163
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 49.089897,
+            "rows": 2546,
+            "bytes": 2058111
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 67.883409,
+            "rows": 2406,
+            "bytes": 459932
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 1.520262,
+            "rows": 1,
+            "bytes": 24203
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 121.645425
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 5.4600610000000005
+          }
+        ],
+        "sample_before_time": 1791765397924.546,
+        "sample_after_time": 1791765403611.1104,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 23585,
+            "wal_fpi": 0,
+            "wal_bytes": 6656064,
+            "wal_buffers_full": 58,
+            "wal_write": 65,
+            "wal_sync": 7,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 467,
+        "time": 1791765458117.4639,
+        "duration_ms": 128.781298,
+        "audit_events": 2546,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 2.642862,
+            "rows": 2546,
+            "role_rows": 2406,
+            "bytes": 2058111,
+            "role_bytes": 459932,
+            "runtime_bytes": 24203
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.001221
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 47.379902,
+            "rows": 2546,
+            "bytes": 2058111
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 56.730061,
+            "rows": 2406,
+            "bytes": 459932
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 1.8364589999999998,
+            "rows": 1,
+            "bytes": 24203
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 108.845624
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 16.442792
+          }
+        ],
+        "sample_before_time": 1791765457941.1636,
+        "sample_after_time": 1791765462970.6807,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 23585,
+            "wal_fpi": 0,
+            "wal_bytes": 6657779,
+            "wal_buffers_full": 59,
+            "wal_write": 65,
+            "wal_sync": 6,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 224,
+        "time": 1791765288111.265,
+        "duration_ms": 124.086225,
+        "audit_events": 2546,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 2.634767,
+            "rows": 2546,
+            "role_rows": 2406,
+            "bytes": 2058111,
+            "role_bytes": 459932,
+            "runtime_bytes": 24203
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.000913
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 55.701057,
+            "rows": 2546,
+            "bytes": 2058111
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 53.33694,
+            "rows": 2406,
+            "bytes": 459932
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 1.798265,
+            "rows": 1,
+            "bytes": 24203
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 113.850032
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 6.798298
+          }
+        ],
+        "sample_before_time": 1791765287894.6904,
+        "sample_after_time": 1791765293821.8135,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 23593,
+            "wal_fpi": 0,
+            "wal_bytes": 6653190,
+            "wal_buffers_full": 58,
+            "wal_write": 64,
+            "wal_sync": 5,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      }
+    ],
+    "diagnostic_limits": "Nested spans overlap. Five-second sample counter changes establish temporal correlation only. I/O timing counters are meaningful only when the corresponding timing setting is enabled."
+  },
+  {
+    "run": "tmp/performance/audit-write-20261011/optimized-reverse/global-postgres",
+    "settings": {
+      "version": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "fsync": "on",
+      "synchronous_commit": "on",
+      "full_page_writes": "on",
+      "shared_buffers": "128MB",
+      "checkpoint_timeout": "5min",
+      "max_wal_size": "1GB",
+      "wal_buffers": "4MB",
+      "track_io_timing": "off",
+      "track_wal_io_timing": "off"
+    },
+    "cycle": {
+      "samples": 300,
+      "mean": 57.83480133333335,
+      "p50": 57,
+      "p95": 68,
+      "max": 118.292681,
+      "histogram_resolution": 0.1,
+      "histogram_ceiling": 10000
+    },
+    "largest_measured_commits": [
+      {
+        "commit_id": 365,
+        "time": 1791765791158.9983,
+        "duration_ms": 106.285119,
+        "audit_events": 1,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.013695,
+            "rows": 1,
+            "role_rows": 1,
+            "bytes": 193,
+            "role_bytes": 143,
+            "runtime_bytes": 87
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.002204
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 0.361294,
+            "rows": 1,
+            "bytes": 193
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 0.39188,
+            "rows": 1,
+            "bytes": 143
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.386574,
+            "rows": 1,
+            "bytes": 87
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 103.28466
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 2.924373
+          }
+        ],
+        "sample_before_time": 1791765791002.5618,
+        "sample_after_time": 1791765796029.3464,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 4641,
+            "wal_fpi": 0,
+            "wal_bytes": 3759335,
+            "wal_buffers_full": 0,
+            "wal_write": 11,
+            "wal_sync": 11,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 116,
+        "time": 1791765579791.4194,
+        "duration_ms": 105.365352,
+        "audit_events": 0,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.008557,
+            "rows": 0,
+            "role_rows": 0,
+            "bytes": 2,
+            "role_bytes": 0,
+            "runtime_bytes": 86
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.001951
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.288639,
+            "rows": 1,
+            "bytes": 86
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 90.41334400000001
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 14.888121
+          }
+        ],
+        "sample_before_time": 1791765576328.546,
+        "sample_after_time": 1791765581002.9163,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": null,
+            "wait_event": null,
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 1234,
+            "wal_fpi": 0,
+            "wal_bytes": 935147,
+            "wal_buffers_full": 0,
+            "wal_write": 7,
+            "wal_sync": 7,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 330,
+        "time": 1791765760995.935,
+        "duration_ms": 102.18507,
+        "audit_events": 1,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.012469999999999998,
+            "rows": 1,
+            "role_rows": 1,
+            "bytes": 193,
+            "role_bytes": 143,
+            "runtime_bytes": 87
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.001485
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 0.327709,
+            "rows": 1,
+            "bytes": 193
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 0.416277,
+            "rows": 1,
+            "bytes": 143
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.32897699999999996,
+            "rows": 1,
+            "bytes": 87
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 91.322185
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 10.796102
+          }
+        ],
+        "sample_before_time": 1791765756017.1753,
+        "sample_after_time": 1791765761735.3286,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 112,
+            "wal_fpi": 0,
+            "wal_bytes": 14584,
+            "wal_buffers_full": 0,
+            "wal_write": 4,
+            "wal_sync": 4,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 222,
+        "time": 1791765670241.1443,
+        "duration_ms": 101.646774,
+        "audit_events": 0,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.007494,
+            "rows": 0,
+            "role_rows": 0,
+            "bytes": 2,
+            "role_bytes": 0,
+            "runtime_bytes": 87
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.001588
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.304744,
+            "rows": 1,
+            "bytes": 87
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 89.515451
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 12.070720999999999
+          }
+        ],
+        "sample_before_time": 1791765665990.6982,
+        "sample_after_time": 1791765670983.382,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 112,
+            "wal_fpi": 0,
+            "wal_bytes": 14584,
+            "wal_buffers_full": 0,
+            "wal_write": 4,
+            "wal_sync": 4,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 117,
+        "time": 1791765579964.0737,
+        "duration_ms": 101.417886,
+        "audit_events": 1,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.013135,
+            "rows": 1,
+            "role_rows": 1,
+            "bytes": 192,
+            "role_bytes": 141,
+            "runtime_bytes": 86
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.0018750000000000001
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 0.373672,
+            "rows": 1,
+            "bytes": 192
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 0.37752199999999997,
+            "rows": 1,
+            "bytes": 141
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.337578,
+            "rows": 1,
+            "bytes": 86
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 99.618419
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 1.7478420000000001
+          }
+        ],
+        "sample_before_time": 1791765576328.546,
+        "sample_after_time": 1791765581002.9163,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": null,
+            "wait_event": null,
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 1234,
+            "wal_fpi": 0,
+            "wal_bytes": 935147,
+            "wal_buffers_full": 0,
+            "wal_write": 7,
+            "wal_sync": 7,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      }
+    ],
+    "diagnostic_limits": "Nested spans overlap. Five-second sample counter changes establish temporal correlation only. I/O timing counters are meaningful only when the corresponding timing setting is enabled."
+  },
+  {
+    "run": "tmp/performance/audit-write-20261011/optimized-reverse/mixed-postgres",
+    "settings": {
+      "version": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "fsync": "on",
+      "synchronous_commit": "on",
+      "full_page_writes": "on",
+      "shared_buffers": "128MB",
+      "checkpoint_timeout": "5min",
+      "max_wal_size": "1GB",
+      "wal_buffers": "4MB",
+      "track_io_timing": "off",
+      "track_wal_io_timing": "off"
+    },
+    "cycle": {
+      "samples": 301,
+      "mean": 240.93202543853826,
+      "p50": 213.9,
+      "p95": 419.40000000000003,
+      "max": 494.431735,
+      "histogram_resolution": 0.1,
+      "histogram_ceiling": 10000
+    },
+    "largest_measured_commits": [
+      {
+        "commit_id": 427,
+        "time": 1791765933638.5,
+        "duration_ms": 320.952041,
+        "audit_events": 5990,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 7.713105,
+            "rows": 5990,
+            "role_rows": 5658,
+            "bytes": 4426783,
+            "role_bytes": 1073049,
+            "runtime_bytes": 213285
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.001665
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 121.398202,
+            "rows": 5990,
+            "bytes": 4426783
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 140.790605,
+            "rows": 5658,
+            "bytes": 1073049
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 5.7045200000000005,
+            "rows": 5,
+            "bytes": 213285
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 308.814578
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 2.9291270000000003
+          }
+        ],
+        "sample_before_time": 1791765930770.097,
+        "sample_after_time": 1791765936349.649,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 1142
+          },
+          "wal_stats": {
+            "wal_records": 105426,
+            "wal_fpi": 3559,
+            "wal_bytes": 30239976,
+            "wal_buffers_full": 836,
+            "wal_write": 896,
+            "wal_sync": 54,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 798,
+        "time": 1791766063391.2869,
+        "duration_ms": 299.306219,
+        "audit_events": 5990,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 5.400333,
+            "rows": 5990,
+            "role_rows": 5658,
+            "bytes": 4426783,
+            "role_bytes": 1077697,
+            "runtime_bytes": 213311
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.00122
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 109.933938,
+            "rows": 5990,
+            "bytes": 4426783
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 161.12331,
+            "rows": 5658,
+            "bytes": 1077697
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 10.54742,
+            "rows": 5,
+            "bytes": 213311
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 290.603297
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 1.759813
+          }
+        ],
+        "sample_before_time": 1791766060776.1523,
+        "sample_after_time": 1791766066366.3225,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 94583,
+            "wal_fpi": 2827,
+            "wal_bytes": 18144724,
+            "wal_buffers_full": 417,
+            "wal_write": 471,
+            "wal_sync": 52,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 618,
+        "time": 1791765998360.2378,
+        "duration_ms": 292.07851,
+        "audit_events": 6001,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 5.070881,
+            "rows": 6001,
+            "role_rows": 5669,
+            "bytes": 4433798,
+            "role_bytes": 1079153,
+            "runtime_bytes": 213311
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.0015379999999999999
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 133.958661,
+            "rows": 6001,
+            "bytes": 4433798
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 133.136292,
+            "rows": 5669,
+            "bytes": 1079153
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 4.9612620000000005,
+            "rows": 5,
+            "bytes": 213311
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 281.003396
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 4.685158
+          }
+        ],
+        "sample_before_time": 1791765995789.8188,
+        "sample_after_time": 1791766001400.5288,
+        "sample_before_waits": [
+          {
+            "wait_event_type": null,
+            "wait_event": null,
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 5
+          },
+          "wal_stats": {
+            "wal_records": 105322,
+            "wal_fpi": 189,
+            "wal_bytes": 27124527,
+            "wal_buffers_full": 775,
+            "wal_write": 829,
+            "wal_sync": 50,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 893,
+        "time": 1791766098379.5999,
+        "duration_ms": 287.98130100000003,
+        "audit_events": 6001,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 5.592832,
+            "rows": 6001,
+            "role_rows": 5669,
+            "bytes": 4433798,
+            "role_bytes": 1079153,
+            "runtime_bytes": 213311
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.001793
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 106.56826199999999,
+            "rows": 6001,
+            "bytes": 4433798
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 99.795549,
+            "rows": 5669,
+            "bytes": 1079153
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 5.405888,
+            "rows": 5,
+            "bytes": 213311
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 277.953997
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 3.001845
+          }
+        ],
+        "sample_before_time": 1791766095788.337,
+        "sample_after_time": 1791766100785.714,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 73295,
+            "wal_fpi": 161,
+            "wal_bytes": 22911402,
+            "wal_buffers_full": 1054,
+            "wal_write": 1071,
+            "wal_sync": 16,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 1173,
+        "time": 1791766198373.0317,
+        "duration_ms": 267.960917,
+        "audit_events": 6001,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 5.101851,
+            "rows": 6001,
+            "role_rows": 5669,
+            "bytes": 4433809,
+            "role_bytes": 1079164,
+            "runtime_bytes": 213311
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.001309
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 117.609847,
+            "rows": 6001,
+            "bytes": 4433809
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 102.27475799999999,
+            "rows": 5669,
+            "bytes": 1079164
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 5.275608999999999,
+            "rows": 5,
+            "bytes": 213311
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 259.951711
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 1.581445
+          }
+        ],
+        "sample_before_time": 1791766196744.328,
+        "sample_after_time": 1791766200807.848,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 101427,
+            "wal_fpi": 4,
+            "wal_bytes": 34680984,
+            "wal_buffers_full": 1191,
+            "wal_write": 1222,
+            "wal_sync": 28,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      }
+    ],
+    "diagnostic_limits": "Nested spans overlap. Five-second sample counter changes establish temporal correlation only. I/O timing counters are meaningful only when the corresponding timing setting is enabled."
+  },
+  {
+    "run": "tmp/performance/audit-write-20261011/retention-smoke",
+    "settings": {
+      "version": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+      "fsync": "on",
+      "synchronous_commit": "on",
+      "full_page_writes": "on",
+      "shared_buffers": "128MB",
+      "checkpoint_timeout": "5min",
+      "max_wal_size": "1GB",
+      "wal_buffers": "4MB",
+      "track_io_timing": "off",
+      "track_wal_io_timing": "off"
+    },
+    "cycle": {
+      "samples": 72,
+      "mean": 104.43010880555555,
+      "p50": 37.5,
+      "p95": 207.8,
+      "max": 2080.699903,
+      "histogram_resolution": 0.1,
+      "histogram_ceiling": 10000
+    },
+    "largest_measured_commits": [
+      {
+        "commit_id": 81,
+        "time": 1791767254966.1704,
+        "duration_ms": 2063.493761,
+        "audit_events": 2546,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 2.021374,
+            "rows": 2546,
+            "role_rows": 2406,
+            "bytes": 2054779,
+            "role_bytes": 455190,
+            "runtime_bytes": 24194
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.001235
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 61.573046,
+            "rows": 2546,
+            "bytes": 2054779
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 56.525290999999996,
+            "rows": 2406,
+            "bytes": 455190
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 2.054783,
+            "rows": 1,
+            "bytes": 24194
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 122.333613
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 1938.4394069999998
+          }
+        ],
+        "sample_before_time": 1791767252126.5247,
+        "sample_after_time": null,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "IO",
+            "wait_event": "WalSync",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": null,
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {}
+      },
+      {
+        "commit_id": 80,
+        "time": 1791767252496.0957,
+        "duration_ms": 593.790108,
+        "audit_events": 909,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.644794,
+            "rows": 909,
+            "role_rows": 857,
+            "bytes": 316627,
+            "role_bytes": 157600,
+            "runtime_bytes": 164722
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.001268
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 14.388219000000001,
+            "rows": 909,
+            "bytes": 316627
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 19.240614,
+            "rows": 857,
+            "bytes": 157600
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 2.777039,
+            "rows": 1,
+            "bytes": 164722
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 38.918286
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 554.065126
+          }
+        ],
+        "sample_before_time": 1791767252126.5247,
+        "sample_after_time": null,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "IO",
+            "wait_event": "WalSync",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": null,
+        "wait_samples_during_commit": [
+          {
+            "time": 1791767252126.5247,
+            "sampling_ms": 1120.0495220000012,
+            "waits": [
+              {
+                "wait_event_type": "IO",
+                "wait_event": "WalSync",
+                "sessions": 1
+              }
+            ]
+          }
+        ],
+        "sample_counter_deltas": {}
+      },
+      {
+        "commit_id": 79,
+        "time": 1791767251354.1707,
+        "duration_ms": 454.534855,
+        "audit_events": 98,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 0.063825,
+            "rows": 98,
+            "role_rows": 94,
+            "bytes": 25482,
+            "role_bytes": 13841,
+            "runtime_bytes": 1000
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.0013779999999999999
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 1.786617,
+            "rows": 98,
+            "bytes": 25482
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 2.258698,
+            "rows": 94,
+            "bytes": 13841
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 0.369872,
+            "rows": 1,
+            "bytes": 1000
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 6.909860999999999
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 447.426983
+          }
+        ],
+        "sample_before_time": 1791767248006.993,
+        "sample_after_time": 1791767252126.5247,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "IO",
+            "wait_event": "WalSync",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 22930,
+            "wal_fpi": 0,
+            "wal_bytes": 6530746,
+            "wal_buffers_full": 15,
+            "wal_write": 22,
+            "wal_sync": 7,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 76,
+        "time": 1791767248113.0325,
+        "duration_ms": 186.665994,
+        "audit_events": 2546,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 2.623464,
+            "rows": 2546,
+            "role_rows": 2406,
+            "bytes": 2054779,
+            "role_bytes": 455190,
+            "runtime_bytes": 24194
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.001269
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 78.64563199999999,
+            "rows": 2546,
+            "bytes": 2054779
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 69.050192,
+            "rows": 2406,
+            "bytes": 455190
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 1.499595,
+            "rows": 1,
+            "bytes": 24194
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 151.94460800000002
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 31.504029000000003
+          }
+        ],
+        "sample_before_time": 1791767248006.993,
+        "sample_after_time": 1791767252126.5247,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "IO",
+            "wait_event": "WalSync",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [
+          {
+            "time": 1791767248006.993,
+            "sampling_ms": 2003.6011160000053,
+            "waits": [
+              {
+                "wait_event_type": "Client",
+                "wait_event": "ClientRead",
+                "sessions": 1
+              }
+            ]
+          }
+        ],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 22930,
+            "wal_fpi": 0,
+            "wal_bytes": 6530746,
+            "wal_buffers_full": 15,
+            "wal_write": 22,
+            "wal_sync": 7,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      },
+      {
+        "commit_id": 64,
+        "time": 1791767238095.7546,
+        "duration_ms": 181.857508,
+        "audit_events": 2546,
+        "stages": [
+          {
+            "kind": "persistence_audit_prepare",
+            "duration_ms": 3.175561,
+            "rows": 2546,
+            "role_rows": 2406,
+            "bytes": 2053042,
+            "role_bytes": 453453,
+            "runtime_bytes": 24194
+          },
+          {
+            "kind": "persistence_lock",
+            "duration_ms": 0.001738
+          },
+          {
+            "kind": "persistence_audit_records",
+            "duration_ms": 78.114857,
+            "rows": 2546,
+            "bytes": 2053042
+          },
+          {
+            "kind": "persistence_audit_roles",
+            "duration_ms": 58.748509,
+            "rows": 2406,
+            "bytes": 453453
+          },
+          {
+            "kind": "persistence_audit_runtime",
+            "duration_ms": 1.970509,
+            "rows": 1,
+            "bytes": 24194
+          },
+          {
+            "kind": "persistence_sql",
+            "duration_ms": 141.481367
+          },
+          {
+            "kind": "persistence_flush",
+            "duration_ms": 36.596545
+          }
+        ],
+        "sample_before_time": 1791767232130.288,
+        "sample_after_time": 1791767238118.5447,
+        "sample_before_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "sample_after_waits": [
+          {
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "sessions": 1
+          }
+        ],
+        "wait_samples_during_commit": [],
+        "sample_counter_deltas": {
+          "checkpointer": {
+            "num_timed": 0,
+            "num_requested": 0,
+            "restartpoints_timed": 0,
+            "restartpoints_req": 0,
+            "restartpoints_done": 0,
+            "write_time": 0,
+            "sync_time": 0,
+            "buffers_written": 0
+          },
+          "wal_stats": {
+            "wal_records": 24197,
+            "wal_fpi": 26,
+            "wal_bytes": 6944665,
+            "wal_buffers_full": 54,
+            "wal_write": 71,
+            "wal_sync": 16,
+            "wal_write_time": 0,
+            "wal_sync_time": 0
+          }
+        }
+      }
+    ],
+    "diagnostic_limits": "Nested spans overlap. Five-second sample counter changes establish temporal correlation only. I/O timing counters are meaningful only when the corresponding timing setting is enabled."
+  }
+]

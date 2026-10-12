@@ -74,18 +74,33 @@ pub(super) fn message_key(event: &Event) -> String {
         .clone()
         .unwrap_or_else(|| format!("packet:{}", event.packet_id.unwrap_or(0)))
 }
-pub(super) fn project(game: &mut Game, events: &[Event]) -> Vec<(Uuid, usize, Metadata)> {
+pub(super) struct Projection {
+    pub events: Vec<(Uuid, usize, Metadata)>,
+    pub heads: BTreeMap<Uuid, u64>,
+}
+
+/// Prepare proposed heads without publishing uncommitted sequences.
+pub(super) fn prepare(game: &Game, events: &[Event]) -> Projection {
+    let mut heads = game.audit.heads.clone();
+    let mut terminals: BTreeMap<Uuid, Vec<Uuid>> = BTreeMap::new();
+    for role in game.roles.values() {
+        terminals
+            .entry(role.location_unit_id)
+            .or_default()
+            .push(role.id);
+    }
     let mut projected = Vec::new();
     for (ordinal, event) in events.iter().enumerate() {
-        for role in game
-            .roles
-            .values()
-            .filter(|r| Some(r.location_unit_id) == event.terminal)
+        for role_id in event
+            .terminal
+            .and_then(|t| terminals.get(&t))
+            .into_iter()
+            .flatten()
         {
-            let head = game.audit.heads.entry(role.id).or_default();
+            let head = heads.entry(*role_id).or_default();
             *head = head.checked_add(1).expect("audit role sequence exhausted");
             projected.push((
-                role.id,
+                *role_id,
                 ordinal,
                 Metadata {
                     sequence: *head,
@@ -104,12 +119,17 @@ pub(super) fn project(game: &mut Game, events: &[Event]) -> Vec<(Uuid, usize, Me
             ));
         }
     }
-    projected
+    Projection {
+        events: projected,
+        heads,
+    }
 }
 pub(super) fn flush_volatile(game: &mut Game) {
     collect(game);
     let events = std::mem::take(&mut game.audit.pending);
-    for (role, _, event) in project(game, &events) {
+    let prepared = prepare(game, &events);
+    game.audit.heads = prepared.heads;
+    for (role, _, event) in prepared.events {
         game.audit.history.push_back((role, event));
     }
     while game.audit.history.len() > CAPACITY {
@@ -315,7 +335,7 @@ mod tests {
     }
     #[test]
     fn audit_has_terminal_local_sequences_and_never_reveals_routes() {
-        let mut game = game_for(command_link_exercise_scenario());
+        let game = game_for(command_link_exercise_scenario());
         let role = game.roles.values().next().unwrap().clone();
         let events = vec![
             Event {
@@ -347,7 +367,7 @@ mod tests {
                 reason: None,
             },
         ];
-        let projected = project(&mut game, &events);
+        let projected = prepare(&game, &events).events;
         let local: Vec<_> = projected
             .iter()
             .filter(|(id, _, _)| *id == role.id)
@@ -359,6 +379,63 @@ mod tests {
         let json = serde_json::to_value(&local[0].2).unwrap();
         assert!(
             json.get("from").is_none() && json.get("to").is_none() && json.get("payload").is_none()
+        );
+    }
+    #[test]
+    fn prepared_projection_preserves_shared_terminal_order_without_publishing_heads() {
+        let mut game = game_for(command_link_exercise_scenario());
+        let mut roles = game.roles.values().cloned().collect::<Vec<_>>();
+        roles.sort_by_key(|role| role.id);
+        let terminal = roles[0].location_unit_id;
+        game.roles.get_mut(&roles[1].id).unwrap().location_unit_id = terminal;
+        game.audit.heads.insert(roles[0].id, 7);
+        let before = game.audit.heads.clone();
+        let event = |packet, terminal| Event {
+            physical: None,
+            kind: Kind::Received,
+            at_ns: 1,
+            packet_id: Some(packet),
+            bytes: 20,
+            context: Default::default(),
+            terminal,
+            reason: Some("local".into()),
+        };
+        let events = vec![
+            event(10, Some(terminal)),
+            event(11, None),
+            event(12, Some(terminal)),
+        ];
+        let prepared = prepare(&game, &events);
+        assert_eq!(game.audit.heads, before);
+        assert_eq!(prepared.events.len(), 4);
+        assert_eq!(
+            prepared
+                .events
+                .iter()
+                .map(|(role, ordinal, e)| (*role, *ordinal, e.sequence, e.packet_id))
+                .collect::<Vec<_>>(),
+            vec![
+                (roles[0].id, 0, 8, Some(10)),
+                (roles[1].id, 0, 1, Some(10)),
+                (roles[0].id, 2, 9, Some(12)),
+                (roles[1].id, 2, 2, Some(12))
+            ]
+        );
+        assert_eq!(prepared.heads[&roles[0].id], 9);
+        let empty = prepare(&game, &[]);
+        assert!(empty.events.is_empty());
+        assert_eq!(empty.heads, before);
+        // The volatile publisher uses exactly the same preparation and stable sort.
+        game.audit.pending = events;
+        flush_volatile(&mut game);
+        assert_eq!(game.audit.heads, prepared.heads);
+        assert_eq!(
+            game.audit
+                .history
+                .iter()
+                .map(|(_, e)| e.packet_id)
+                .collect::<Vec<_>>(),
+            vec![Some(10), Some(10), Some(12), Some(12)]
         );
     }
     #[test]

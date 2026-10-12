@@ -90,7 +90,7 @@ export async function analyze(directory, start, end) {
     if (row.kind.startsWith('persistence_') || ['mutation_boundary', 'durability_gate'].includes(row.kind)) {
       if (row.success) {
         const stage = `${row.kind}${row.source ? `:${row.source}` : ''}`;
-        for (const key of ['duration_ms', 'bytes', 'boundaries', 'checkpoints', 'journal_bytes', 'snapshot_submitted_bytes', 'archived_events', 'audit_events', 'audit_bytes']) {
+        for (const key of ['duration_ms', 'bytes', 'boundaries', 'checkpoints', 'journal_bytes', 'snapshot_submitted_bytes', 'archived_events', 'audit_events', 'audit_bytes', 'rows', 'role_rows', 'role_bytes', 'runtime_bytes', 'runtime_rows']) {
           add('server', `${stage}_${key}`, row[key]);
           if (row.game_id) add(group, `${stage}_${key}`, row[key]);
         }

@@ -7,6 +7,14 @@ acceptance, attempts, reassembly, acknowledgement, duplicate suppression,
 rejection and termination. Raw packet payloads are not archived by this feature.
 Existing C2 message bodies continue to be stored once in the lifecycle archive.
 
+Durable capture prepares encoded JSON and terminal-local projections before opening
+the database transaction, then batches audit writes across the games in that
+existing commit boundary. Stored JSON omits absent optional fields; decoding
+restores the same values and public API fields. Proposed role sequence heads become visible only after
+commit succeeds. Schema, cursor semantics, retention floors, and fail-closed
+behavior are unchanged. Preparation and SQL stages are measured separately by the
+opt-in local performance trace.
+
 ## Durability and recovery
 
 With PostgreSQL, private observations, terminal-local projections and packet

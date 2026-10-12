@@ -37,6 +37,11 @@ provider with two fixture objects. It does not read `.env` or use real catalog
 credentials. Existing development services are not restarted. The release binary
 must be rebuilt after Rust changes; its SHA-256 is recorded with repository state.
 
+`--binary /absolute/path/to/server` selects a preserved release binary for a
+before/after comparison; its SHA-256 is recorded instead of the default binary.
+The repository revision and dirty flag describe the current checkout, so retain
+the matching source fingerprint separately when using a preserved binary.
+
 `--clients N` fills additional games using the profile's seat distribution
 (up to 200 clients). `--seed`, `--warmup`, `--duration`, and `--reconnect-every`
 are configurable. Defaults are mixed/50 clients, seed 12787750, 60 seconds of
@@ -187,6 +192,28 @@ rows, failures, eligible backlog and oldest eligible age; the analyzer preserves
 these in `summary.json.audit` and timing metrics. The short harness's
 `--archive-retention-days N` configures and records the opt-in PostgreSQL policy;
 the default is 0.
+
+Audit writes also emit `persistence_audit_prepare`, `persistence_audit_records`,
+`persistence_audit_roles`, and `persistence_audit_runtime` spans. A process-local
+`commit_id` associates them with SQL, final-flush and overall commit spans.
+Preparation includes projection and JSON encoding before the transaction; its
+cost remains inside the overall commit and server-cycle timing. Optimized spans
+record private/role/runtime row and encoded byte counts. Private `audit_bytes`
+counts the encoded private rows as compact JSON arrays, including punctuation;
+role/runtime bytes are separate. Sparse storage omits absent optional fields,
+so compare byte counts as encoded representation sizes, not packet payload sizes. These overlapping spans must not be summed.
+
+Five-second PostgreSQL samples additionally preserve `pg_stat_checkpointer`,
+`pg_stat_wal`, and `pg_stat_io` counters, including statistics-reset timestamps.
+Optimized runs also record aggregate client-backend wait-event counts without
+query text, connection identities or credentials. These are instantaneous samples,
+so a missing wait observation does not exclude a stall between samples.
+Recorded settings include WAL/checkpoint sizes and I/O timing switches. Sampling
+does not enable timing, reset counters, change checkpoints, or relax durability.
+Compare cumulative counters only across samples with unchanged reset timestamps;
+zero timing counters with timing disabled do not prove an absence of I/O waits.
+Sample-level coincidence with a commit stall is correlation, not a root-cause
+proof. Legacy traces without these fields remain readable.
 
 Five-second database samples contain database/table/index sizes, WAL growth since
 container readiness, and Docker container CPU/memory/block-I/O measurements.

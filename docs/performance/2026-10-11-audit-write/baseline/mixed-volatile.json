@@ -1,0 +1,4685 @@
+{
+  "metadata": {
+    "schema_version": 2,
+    "measurement_version": 3,
+    "clock": "epoch anchored to monotonic process time",
+    "storage": "volatile",
+    "archive_retention_days": 0,
+    "retention_sample_seconds": 5,
+    "profile": "mixed",
+    "layout": [
+      [
+        "regional-campaign.v1",
+        11
+      ],
+      [
+        "regional-campaign.v1",
+        11
+      ],
+      [
+        "regional-campaign.v1",
+        11
+      ],
+      [
+        "global-crisis.v2",
+        13
+      ],
+      [
+        "global-crisis.v2",
+        4
+      ]
+    ],
+    "seed": 12787750,
+    "warmup_seconds": 60,
+    "measured_seconds": 300,
+    "reconnect_every_seconds": 60,
+    "started_at": "2026-10-11T23:35:43.810Z",
+    "revision": "256b9f10a3d8932903da840ac8d242dc439a2543",
+    "dirty": true,
+    "c3mesh_revision": "2f13199e665806b5d0ac0f0f4db07eb436e0a008",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "node": "v24.15.0",
+    "os": "linux",
+    "os_release": "6.6.87.2-microsoft-standard-WSL2",
+    "cpu": "AMD Ryzen 7 9800X3D 8-Core Processor",
+    "logical_cpus": 16,
+    "memory_bytes": 25199570944,
+    "binary_sha256": "689628e1ae6dc8a70048a56dd0744b966cc6cfd7ce7114a649d46d50fa00a1a6",
+    "protocol": "1 Hz full snapshots; state/planning HTTP plus network WebSocket, no browser rendering; encoded HTTP body bytes when Content-Length is present, otherwise decoded bytes",
+    "clock_ticks_per_second": 100,
+    "catalog": {
+      "checksum": "921b372e7d355a3eec9b42a1fb6ba66bb05321c8aafc2a57b6e0a72bccfd138d",
+      "object_count": 2
+    },
+    "games": [
+      {
+        "id": "deb6d0dd-52b5-4105-bf31-ce07aa5b488a",
+        "title": "Performance 0",
+        "status": "lobby",
+        "host_player_id": "8d3bf5d0-d19b-44c9-91c8-8ed980f9f5ab",
+        "player_roles_available": 9,
+        "space_catalog_enabled": false,
+        "scenario_id": "regional-campaign.v1",
+        "scenario_version": 2,
+        "communications_catalog_checksum": "b8b62fadfef0c2445462e73d6b3cc964ba42bc59d07a30a60276e3d16e1df583",
+        "message_pack_checksum": "0fac91603a24eb07c7586f3e005b02dc36fb2cebc99d020020e05d98b9f78ba4",
+        "network_policy_id": "fifo.v1",
+        "network_seed": 12787750,
+        "operational_error": null,
+        "mission_complete": false,
+        "settling_reports": false
+      },
+      {
+        "id": "6cdff274-ff04-42ed-9b78-4b5be58c90d9",
+        "title": "Performance 1",
+        "status": "lobby",
+        "host_player_id": "8500bece-6b13-499e-880e-9feb31539a7d",
+        "player_roles_available": 9,
+        "space_catalog_enabled": false,
+        "scenario_id": "regional-campaign.v1",
+        "scenario_version": 2,
+        "communications_catalog_checksum": "b8b62fadfef0c2445462e73d6b3cc964ba42bc59d07a30a60276e3d16e1df583",
+        "message_pack_checksum": "0fac91603a24eb07c7586f3e005b02dc36fb2cebc99d020020e05d98b9f78ba4",
+        "network_policy_id": "fifo.v1",
+        "network_seed": 12787750,
+        "operational_error": null,
+        "mission_complete": false,
+        "settling_reports": false
+      },
+      {
+        "id": "122f3708-09e8-4b5d-8426-73e3c0f716f4",
+        "title": "Performance 2",
+        "status": "lobby",
+        "host_player_id": "77ce64bf-41fb-46be-be7b-cb6ec6e51c1e",
+        "player_roles_available": 9,
+        "space_catalog_enabled": false,
+        "scenario_id": "regional-campaign.v1",
+        "scenario_version": 2,
+        "communications_catalog_checksum": "b8b62fadfef0c2445462e73d6b3cc964ba42bc59d07a30a60276e3d16e1df583",
+        "message_pack_checksum": "0fac91603a24eb07c7586f3e005b02dc36fb2cebc99d020020e05d98b9f78ba4",
+        "network_policy_id": "fifo.v1",
+        "network_seed": 12787750,
+        "operational_error": null,
+        "mission_complete": false,
+        "settling_reports": false
+      },
+      {
+        "id": "bf9f79df-4865-4efd-a341-3d663e077b02",
+        "title": "Performance 3",
+        "status": "lobby",
+        "host_player_id": "8d54a4b1-5054-4972-a7b6-21182ff47580",
+        "player_roles_available": 13,
+        "space_catalog_enabled": true,
+        "scenario_id": "global-crisis.v2",
+        "scenario_version": 2,
+        "communications_catalog_checksum": "b8b62fadfef0c2445462e73d6b3cc964ba42bc59d07a30a60276e3d16e1df583",
+        "message_pack_checksum": "0fac91603a24eb07c7586f3e005b02dc36fb2cebc99d020020e05d98b9f78ba4",
+        "network_policy_id": "fifo.v1",
+        "network_seed": 12787750,
+        "operational_error": null,
+        "mission_complete": false,
+        "settling_reports": false
+      },
+      {
+        "id": "0bbf393c-7aaa-4b6c-b5fa-1e34ed2cb433",
+        "title": "Performance 4",
+        "status": "lobby",
+        "host_player_id": "1f19c00e-ef1a-4d32-94d6-be7b016ea42a",
+        "player_roles_available": 13,
+        "space_catalog_enabled": true,
+        "scenario_id": "global-crisis.v2",
+        "scenario_version": 2,
+        "communications_catalog_checksum": "b8b62fadfef0c2445462e73d6b3cc964ba42bc59d07a30a60276e3d16e1df583",
+        "message_pack_checksum": "0fac91603a24eb07c7586f3e005b02dc36fb2cebc99d020020e05d98b9f78ba4",
+        "network_policy_id": "fifo.v1",
+        "network_seed": 12787750,
+        "operational_error": null,
+        "mission_complete": false,
+        "settling_reports": false
+      }
+    ],
+    "clients": [
+      {
+        "index": 0,
+        "game_id": "deb6d0dd-52b5-4105-bf31-ce07aa5b488a",
+        "role_id": "00000000-0000-0000-0000-0000000000d3"
+      },
+      {
+        "index": 1,
+        "game_id": "deb6d0dd-52b5-4105-bf31-ce07aa5b488a",
+        "role_id": "00000000-0000-0000-0000-0000000000c9"
+      },
+      {
+        "index": 2,
+        "game_id": "deb6d0dd-52b5-4105-bf31-ce07aa5b488a",
+        "role_id": "00000000-0000-0000-0000-0000000000ca"
+      },
+      {
+        "index": 3,
+        "game_id": "deb6d0dd-52b5-4105-bf31-ce07aa5b488a",
+        "role_id": "00000000-0000-0000-0000-0000000000cb"
+      },
+      {
+        "index": 4,
+        "game_id": "deb6d0dd-52b5-4105-bf31-ce07aa5b488a",
+        "role_id": "00000000-0000-0000-0000-0000000000cc"
+      },
+      {
+        "index": 5,
+        "game_id": "deb6d0dd-52b5-4105-bf31-ce07aa5b488a",
+        "role_id": "00000000-0000-0000-0000-0000000000cd"
+      },
+      {
+        "index": 6,
+        "game_id": "deb6d0dd-52b5-4105-bf31-ce07aa5b488a",
+        "role_id": "00000000-0000-0000-0000-0000000000ce"
+      },
+      {
+        "index": 7,
+        "game_id": "deb6d0dd-52b5-4105-bf31-ce07aa5b488a",
+        "role_id": "00000000-0000-0000-0000-0000000000d4"
+      },
+      {
+        "index": 8,
+        "game_id": "deb6d0dd-52b5-4105-bf31-ce07aa5b488a",
+        "role_id": "00000000-0000-0000-0000-0000000000db"
+      },
+      {
+        "index": 9,
+        "game_id": "deb6d0dd-52b5-4105-bf31-ce07aa5b488a",
+        "role_id": "00000000-0000-0000-0000-000000002329",
+        "observer_kind": "controller"
+      },
+      {
+        "index": 10,
+        "game_id": "deb6d0dd-52b5-4105-bf31-ce07aa5b488a",
+        "role_id": "00000000-0000-0000-0000-00000000232a",
+        "observer_kind": "monitor"
+      },
+      {
+        "index": 11,
+        "game_id": "6cdff274-ff04-42ed-9b78-4b5be58c90d9",
+        "role_id": "00000000-0000-0000-0000-0000000000d3"
+      },
+      {
+        "index": 12,
+        "game_id": "6cdff274-ff04-42ed-9b78-4b5be58c90d9",
+        "role_id": "00000000-0000-0000-0000-0000000000c9"
+      },
+      {
+        "index": 13,
+        "game_id": "6cdff274-ff04-42ed-9b78-4b5be58c90d9",
+        "role_id": "00000000-0000-0000-0000-0000000000ca"
+      },
+      {
+        "index": 14,
+        "game_id": "6cdff274-ff04-42ed-9b78-4b5be58c90d9",
+        "role_id": "00000000-0000-0000-0000-0000000000cb"
+      },
+      {
+        "index": 15,
+        "game_id": "6cdff274-ff04-42ed-9b78-4b5be58c90d9",
+        "role_id": "00000000-0000-0000-0000-0000000000cc"
+      },
+      {
+        "index": 16,
+        "game_id": "6cdff274-ff04-42ed-9b78-4b5be58c90d9",
+        "role_id": "00000000-0000-0000-0000-0000000000cd"
+      },
+      {
+        "index": 17,
+        "game_id": "6cdff274-ff04-42ed-9b78-4b5be58c90d9",
+        "role_id": "00000000-0000-0000-0000-0000000000ce"
+      },
+      {
+        "index": 18,
+        "game_id": "6cdff274-ff04-42ed-9b78-4b5be58c90d9",
+        "role_id": "00000000-0000-0000-0000-0000000000d4"
+      },
+      {
+        "index": 19,
+        "game_id": "6cdff274-ff04-42ed-9b78-4b5be58c90d9",
+        "role_id": "00000000-0000-0000-0000-0000000000db"
+      },
+      {
+        "index": 20,
+        "game_id": "6cdff274-ff04-42ed-9b78-4b5be58c90d9",
+        "role_id": "00000000-0000-0000-0000-000000002329",
+        "observer_kind": "controller"
+      },
+      {
+        "index": 21,
+        "game_id": "6cdff274-ff04-42ed-9b78-4b5be58c90d9",
+        "role_id": "00000000-0000-0000-0000-00000000232a",
+        "observer_kind": "monitor"
+      },
+      {
+        "index": 22,
+        "game_id": "122f3708-09e8-4b5d-8426-73e3c0f716f4",
+        "role_id": "00000000-0000-0000-0000-0000000000d3"
+      },
+      {
+        "index": 23,
+        "game_id": "122f3708-09e8-4b5d-8426-73e3c0f716f4",
+        "role_id": "00000000-0000-0000-0000-0000000000c9"
+      },
+      {
+        "index": 24,
+        "game_id": "122f3708-09e8-4b5d-8426-73e3c0f716f4",
+        "role_id": "00000000-0000-0000-0000-0000000000ca"
+      },
+      {
+        "index": 25,
+        "game_id": "122f3708-09e8-4b5d-8426-73e3c0f716f4",
+        "role_id": "00000000-0000-0000-0000-0000000000cb"
+      },
+      {
+        "index": 26,
+        "game_id": "122f3708-09e8-4b5d-8426-73e3c0f716f4",
+        "role_id": "00000000-0000-0000-0000-0000000000cc"
+      },
+      {
+        "index": 27,
+        "game_id": "122f3708-09e8-4b5d-8426-73e3c0f716f4",
+        "role_id": "00000000-0000-0000-0000-0000000000cd"
+      },
+      {
+        "index": 28,
+        "game_id": "122f3708-09e8-4b5d-8426-73e3c0f716f4",
+        "role_id": "00000000-0000-0000-0000-0000000000ce"
+      },
+      {
+        "index": 29,
+        "game_id": "122f3708-09e8-4b5d-8426-73e3c0f716f4",
+        "role_id": "00000000-0000-0000-0000-0000000000d4"
+      },
+      {
+        "index": 30,
+        "game_id": "122f3708-09e8-4b5d-8426-73e3c0f716f4",
+        "role_id": "00000000-0000-0000-0000-0000000000db"
+      },
+      {
+        "index": 31,
+        "game_id": "122f3708-09e8-4b5d-8426-73e3c0f716f4",
+        "role_id": "00000000-0000-0000-0000-000000002329",
+        "observer_kind": "controller"
+      },
+      {
+        "index": 32,
+        "game_id": "122f3708-09e8-4b5d-8426-73e3c0f716f4",
+        "role_id": "00000000-0000-0000-0000-00000000232a",
+        "observer_kind": "monitor"
+      },
+      {
+        "index": 33,
+        "game_id": "bf9f79df-4865-4efd-a341-3d663e077b02",
+        "role_id": "00000000-0000-0000-0000-00000000006f"
+      },
+      {
+        "index": 34,
+        "game_id": "bf9f79df-4865-4efd-a341-3d663e077b02",
+        "role_id": "00000000-0000-0000-0000-000000000065"
+      },
+      {
+        "index": 35,
+        "game_id": "bf9f79df-4865-4efd-a341-3d663e077b02",
+        "role_id": "00000000-0000-0000-0000-000000000066"
+      },
+      {
+        "index": 36,
+        "game_id": "bf9f79df-4865-4efd-a341-3d663e077b02",
+        "role_id": "00000000-0000-0000-0000-000000000067"
+      },
+      {
+        "index": 37,
+        "game_id": "bf9f79df-4865-4efd-a341-3d663e077b02",
+        "role_id": "00000000-0000-0000-0000-000000000068"
+      },
+      {
+        "index": 38,
+        "game_id": "bf9f79df-4865-4efd-a341-3d663e077b02",
+        "role_id": "00000000-0000-0000-0000-000000000069"
+      },
+      {
+        "index": 39,
+        "game_id": "bf9f79df-4865-4efd-a341-3d663e077b02",
+        "role_id": "00000000-0000-0000-0000-00000000006a"
+      },
+      {
+        "index": 40,
+        "game_id": "bf9f79df-4865-4efd-a341-3d663e077b02",
+        "role_id": "00000000-0000-0000-0000-00000000006b"
+      },
+      {
+        "index": 41,
+        "game_id": "bf9f79df-4865-4efd-a341-3d663e077b02",
+        "role_id": "00000000-0000-0000-0000-00000000006c"
+      },
+      {
+        "index": 42,
+        "game_id": "bf9f79df-4865-4efd-a341-3d663e077b02",
+        "role_id": "00000000-0000-0000-0000-00000000006d"
+      },
+      {
+        "index": 43,
+        "game_id": "bf9f79df-4865-4efd-a341-3d663e077b02",
+        "role_id": "00000000-0000-0000-0000-00000000006e"
+      },
+      {
+        "index": 44,
+        "game_id": "bf9f79df-4865-4efd-a341-3d663e077b02",
+        "role_id": "00000000-0000-0000-0000-000000000070"
+      },
+      {
+        "index": 45,
+        "game_id": "bf9f79df-4865-4efd-a341-3d663e077b02",
+        "role_id": "00000000-0000-0000-0000-000000000071"
+      },
+      {
+        "index": 46,
+        "game_id": "0bbf393c-7aaa-4b6c-b5fa-1e34ed2cb433",
+        "role_id": "00000000-0000-0000-0000-00000000006f"
+      },
+      {
+        "index": 47,
+        "game_id": "0bbf393c-7aaa-4b6c-b5fa-1e34ed2cb433",
+        "role_id": "00000000-0000-0000-0000-000000000065"
+      },
+      {
+        "index": 48,
+        "game_id": "0bbf393c-7aaa-4b6c-b5fa-1e34ed2cb433",
+        "role_id": "00000000-0000-0000-0000-000000000066"
+      },
+      {
+        "index": 49,
+        "game_id": "0bbf393c-7aaa-4b6c-b5fa-1e34ed2cb433",
+        "role_id": "00000000-0000-0000-0000-000000000067"
+      }
+    ],
+    "measurement_start_unix_ms": 1791761805562.6938,
+    "measurement_end_unix_ms": 1791762105562.6938,
+    "measurement_completed": true
+  },
+  "summary": {
+    "valid": true,
+    "errors": [],
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 120982
+    },
+    "measured_seconds": 300,
+    "intent_observations": {
+      "executed": 50,
+      "queued": 50,
+      "awaiting_execution": 49
+    },
+    "committed_games": {
+      "0bbf393c-7aaa-4b6c-b5fa-1e34ed2cb433": 300,
+      "122f3708-09e8-4b5d-8426-73e3c0f716f4": 300,
+      "6cdff274-ff04-42ed-9b78-4b5be58c90d9": 300,
+      "bf9f79df-4865-4efd-a341-3d663e077b02": 300,
+      "deb6d0dd-52b5-4105-bf31-ce07aa5b488a": 300
+    },
+    "audit": {
+      "events": 0,
+      "bytes": 0,
+      "cleanup": []
+    },
+    "metrics": {
+      "server": {
+        "durability_gate:websocket_duration_ms": {
+          "samples": 13062,
+          "mean": 0.044543234956361935,
+          "p50": 0.1,
+          "p95": 0.2,
+          "max": 12.637766,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "lock_wait_ms": {
+          "samples": 54785,
+          "mean": 0.15118111198321837,
+          "p50": 0.1,
+          "p95": 1.2000000000000002,
+          "max": 38.238643,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "lock_hold_ms": {
+          "samples": 54785,
+          "mean": 0.6546698573149518,
+          "p50": 0.1,
+          "p95": 2.2,
+          "max": 39.059575,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "durability_gate:observer_duration_ms": {
+          "samples": 1786,
+          "mean": 0.11727974412094068,
+          "p50": 0.1,
+          "p95": 0.6000000000000001,
+          "max": 22.060219,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "durability_gate:simulation_duration_ms": {
+          "samples": 300,
+          "mean": 0.0014811566666666671,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.006794,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "cycle_duration_ms": {
+          "samples": 300,
+          "mean": 15.54444174666668,
+          "p50": 12.5,
+          "p95": 33,
+          "max": 38.766850999999996,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "cycle_schedule_delay_ms": {
+          "samples": 300,
+          "mean": 1.035801576666666,
+          "p50": 1.1,
+          "p95": 2.1,
+          "max": 3.018961,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "cycle_scheduled_to_committed_ms": {
+          "samples": 300,
+          "mean": 16.579114726666667,
+          "p50": 13.5,
+          "p95": 33.9,
+          "max": 39.98467,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/main.rs:2901:write": {
+        "wait_ms": {
+          "samples": 13062,
+          "mean": 0.020152155182972427,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 6.954346,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 13062,
+          "mean": 0.723778298958815,
+          "p50": 0.30000000000000004,
+          "p95": 2.1,
+          "max": 7.248277,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "game:deb6d0dd-52b5-4105-bf31-ce07aa5b488a": {
+        "websocket_build_including_lock_ms": {
+          "samples": 2632,
+          "mean": 0.14559046770516743,
+          "p50": 0.1,
+          "p95": 0.5,
+          "max": 4.059211,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "websocket_serialization_ms": {
+          "samples": 2632,
+          "mean": 0.033970230623100305,
+          "p50": 0.1,
+          "p95": 0.2,
+          "max": 0.277684,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "websocket_bytes": {
+          "samples": 2632,
+          "mean": 28247.314589665653,
+          "p50": 5716,
+          "p95": 139989,
+          "max": 211825,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "http_build_ms": {
+          "samples": 2617,
+          "mean": 0.08267574627435995,
+          "p50": 0.1,
+          "p95": 0.5,
+          "max": 0.844472,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "http_serialization_ms": {
+          "samples": 2617,
+          "mean": 0.028948956056553288,
+          "p50": 0.1,
+          "p95": 0.2,
+          "max": 0.261997,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "http_bytes": {
+          "samples": 2617,
+          "mean": 24689.589224302636,
+          "p50": 6745,
+          "p95": 120964,
+          "max": 144538,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "observer_websocket_build_ms": {
+          "samples": 586,
+          "mean": 0.08823968600682595,
+          "p50": 0.1,
+          "p95": 0.2,
+          "max": 0.19704100000000002,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "observer_websocket_serialization_ms": {
+          "samples": 586,
+          "mean": 0.027851803754266224,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.09514399999999999,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "observer_websocket_bytes": {
+          "samples": 586,
+          "mean": 28620.97610921502,
+          "p50": 28561,
+          "p95": 28831,
+          "max": 28832,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "tick_duration_ms": {
+          "samples": 300,
+          "mean": 2.10253874,
+          "p50": 1.3,
+          "p95": 7.1000000000000005,
+          "max": 9.397002,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "tick_schedule_delay_ms": {
+          "samples": 300,
+          "mean": 13.795295093333337,
+          "p50": 11.8,
+          "p95": 24.200000000000003,
+          "max": 29.109616000000003,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 7990,
+          "mean": 1.362981215894967,
+          "p50": 0.8,
+          "p95": 4,
+          "max": 39.219429999997374,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 7990,
+          "mean": 10758.034042553192,
+          "p50": 6719,
+          "p95": 66249,
+          "max": 144538,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 1305,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "lock:crates/server/src/planning.rs:221:write": {
+        "wait_ms": {
+          "samples": 12984,
+          "mean": 0.267657745378926,
+          "p50": 0.1,
+          "p95": 2.1,
+          "max": 36.242520999999996,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 12984,
+          "mean": 0.7304625217960619,
+          "p50": 0.30000000000000004,
+          "p95": 2.1,
+          "max": 4.054575000000001,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/main.rs:1107:read": {
+        "wait_ms": {
+          "samples": 6495,
+          "mean": 0.14279787898383825,
+          "p50": 0.1,
+          "p95": 0.5,
+          "max": 31.753524,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 6495,
+          "mean": 0.009770188144726704,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.148026,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/main.rs:1220:read": {
+        "wait_ms": {
+          "samples": 6495,
+          "mean": 0.11504266312548485,
+          "p50": 0.1,
+          "p95": 0.30000000000000004,
+          "max": 31.303724999999996,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 6495,
+          "mean": 0.0025446708237105487,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.037757,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/main.rs:2031:write": {
+        "wait_ms": {
+          "samples": 12973,
+          "mean": 0.20238736560548654,
+          "p50": 0.1,
+          "p95": 1.9000000000000001,
+          "max": 38.238643,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 12973,
+          "mean": 0.9181843772450465,
+          "p50": 0.30000000000000004,
+          "p95": 2.5,
+          "max": 6.6601919999999994,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/observers.rs:266:write": {
+        "wait_ms": {
+          "samples": 1786,
+          "mean": 0.09037420716685278,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 18.629032,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 1786,
+          "mean": 0.14028693337066062,
+          "p50": 0.2,
+          "p95": 0.30000000000000004,
+          "max": 0.479804,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "game:6cdff274-ff04-42ed-9b78-4b5be58c90d9": {
+        "websocket_build_including_lock_ms": {
+          "samples": 2630,
+          "mean": 0.13534101254752856,
+          "p50": 0.1,
+          "p95": 0.5,
+          "max": 4.7831660000000005,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "websocket_serialization_ms": {
+          "samples": 2630,
+          "mean": 0.03412622205323189,
+          "p50": 0.1,
+          "p95": 0.2,
+          "max": 0.45848,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "websocket_bytes": {
+          "samples": 2630,
+          "mean": 27927.67300380228,
+          "p50": 5716,
+          "p95": 140000,
+          "max": 211867,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "http_build_ms": {
+          "samples": 2612,
+          "mean": 0.07772240352220518,
+          "p50": 0.1,
+          "p95": 0.4,
+          "max": 0.784946,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "http_serialization_ms": {
+          "samples": 2612,
+          "mean": 0.0278955065084227,
+          "p50": 0.1,
+          "p95": 0.2,
+          "max": 0.249496,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "http_bytes": {
+          "samples": 2612,
+          "mean": 24417.181470137824,
+          "p50": 6745,
+          "p95": 118732,
+          "max": 144538,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "tick_duration_ms": {
+          "samples": 300,
+          "mean": 2.125262683333334,
+          "p50": 1.3,
+          "p95": 7.300000000000001,
+          "max": 9.858889,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "tick_schedule_delay_ms": {
+          "samples": 300,
+          "mean": 7.55953578666667,
+          "p50": 6.5,
+          "p95": 13.100000000000001,
+          "max": 17.136308,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "observer_websocket_build_ms": {
+          "samples": 600,
+          "mean": 0.07632662499999997,
+          "p50": 0.1,
+          "p95": 0.2,
+          "max": 0.235441,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "observer_websocket_serialization_ms": {
+          "samples": 600,
+          "mean": 0.02957938666666669,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.105428,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "observer_websocket_bytes": {
+          "samples": 600,
+          "mean": 28620.72333333333,
+          "p50": 28561,
+          "p95": 28831,
+          "max": 28832,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "request_ms": {
+          "samples": 7975,
+          "mean": 1.351188091159778,
+          "p50": 0.8,
+          "p95": 4.2,
+          "max": 38.06476599999587,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 7975,
+          "mean": 10666.175673981192,
+          "p50": 6719,
+          "p95": 64576,
+          "max": 144538,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 1305,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "game:bf9f79df-4865-4efd-a341-3d663e077b02": {
+        "http_build_ms": {
+          "samples": 3865,
+          "mean": 1.6214780791720513,
+          "p50": 1.6,
+          "p95": 2.2,
+          "max": 5.673883999999999,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "http_serialization_ms": {
+          "samples": 3865,
+          "mean": 0.3990895371280726,
+          "p50": 0.4,
+          "p95": 0.5,
+          "max": 1.285977,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "http_bytes": {
+          "samples": 3865,
+          "mean": 684035.8913324709,
+          "p50": 684048,
+          "p95": 684053,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "tick_duration_ms": {
+          "samples": 300,
+          "mean": 4.063293806666667,
+          "p50": 4.1000000000000005,
+          "p95": 5,
+          "max": 6.053564,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "tick_schedule_delay_ms": {
+          "samples": 300,
+          "mean": 9.708429763333335,
+          "p50": 7.800000000000001,
+          "p95": 20.3,
+          "max": 24.524047,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "websocket_build_including_lock_ms": {
+          "samples": 3900,
+          "mean": 1.7054305258974323,
+          "p50": 1.6,
+          "p95": 2.4000000000000004,
+          "max": 8.91595,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "websocket_serialization_ms": {
+          "samples": 3900,
+          "mean": 0.3901979246153853,
+          "p50": 0.4,
+          "p95": 0.5,
+          "max": 0.959565,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "websocket_bytes": {
+          "samples": 3900,
+          "mean": 687251.8523076923,
+          "p50": 684056,
+          "p95": 717381,
+          "max": 750867,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "request_ms": {
+          "samples": 11781,
+          "mean": 3.669019083864006,
+          "p50": 2.4000000000000004,
+          "p95": 8.9,
+          "max": 41.909259000007296,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 11781,
+          "mean": 229415.77251506664,
+          "p50": 471,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 1937,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "game:0bbf393c-7aaa-4b6c-b5fa-1e34ed2cb433": {
+        "tick_duration_ms": {
+          "samples": 300,
+          "mean": 4.158511756666669,
+          "p50": 4.2,
+          "p95": 4.9,
+          "max": 6.219753,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "tick_schedule_delay_ms": {
+          "samples": 300,
+          "mean": 1.0425952466666668,
+          "p50": 1.1,
+          "p95": 2.1,
+          "max": 3.0239,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "http_build_ms": {
+          "samples": 1188,
+          "mean": 1.715999885521885,
+          "p50": 1.6,
+          "p95": 2.4000000000000004,
+          "max": 3.464578,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "http_serialization_ms": {
+          "samples": 1188,
+          "mean": 0.39501321885521884,
+          "p50": 0.4,
+          "p95": 0.5,
+          "max": 0.791,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "http_bytes": {
+          "samples": 1188,
+          "mean": 684035.8846801347,
+          "p50": 684048,
+          "p95": 684053,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "websocket_build_including_lock_ms": {
+          "samples": 1200,
+          "mean": 1.869596770833336,
+          "p50": 1.8,
+          "p95": 2.5,
+          "max": 5.397367,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "websocket_serialization_ms": {
+          "samples": 1200,
+          "mean": 0.3882937024999996,
+          "p50": 0.4,
+          "p95": 0.5,
+          "max": 0.931376,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "websocket_bytes": {
+          "samples": 1200,
+          "mean": 694477.005,
+          "p50": 684057,
+          "p95": 739737,
+          "max": 750889,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "request_ms": {
+          "samples": 3652,
+          "mean": 3.7766647097480956,
+          "p50": 2.5,
+          "p95": 9.1,
+          "max": 49.34969600001932,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 3652,
+          "mean": 227579.4926067908,
+          "p50": 366,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 600,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "game:122f3708-09e8-4b5d-8426-73e3c0f716f4": {
+        "tick_duration_ms": {
+          "samples": 300,
+          "mean": 2.310284556666667,
+          "p50": 1.5,
+          "p95": 7.9,
+          "max": 10.483486000000001,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "tick_schedule_delay_ms": {
+          "samples": 300,
+          "mean": 5.2254503299999975,
+          "p50": 5.2,
+          "p95": 6.5,
+          "max": 7.946273000000001,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "websocket_build_including_lock_ms": {
+          "samples": 2700,
+          "mean": 0.1292022800000002,
+          "p50": 0.1,
+          "p95": 0.5,
+          "max": 3.1666429999999997,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "websocket_serialization_ms": {
+          "samples": 2700,
+          "mean": 0.035500735925925904,
+          "p50": 0.1,
+          "p95": 0.2,
+          "max": 0.340448,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "websocket_bytes": {
+          "samples": 2700,
+          "mean": 28148.19185185185,
+          "p50": 5716,
+          "p95": 139963,
+          "max": 213128,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "http_build_ms": {
+          "samples": 2691,
+          "mean": 0.07675430434782617,
+          "p50": 0.1,
+          "p95": 0.4,
+          "max": 0.6246929999999999,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "http_serialization_ms": {
+          "samples": 2691,
+          "mean": 0.028205152359717614,
+          "p50": 0.1,
+          "p95": 0.2,
+          "max": 0.227189,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "http_bytes": {
+          "samples": 2691,
+          "mean": 24615.08435525827,
+          "p50": 6745,
+          "p95": 118753,
+          "max": 145867,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "observer_websocket_build_ms": {
+          "samples": 600,
+          "mean": 0.08811136666666669,
+          "p50": 0.1,
+          "p95": 0.2,
+          "max": 0.215836,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "observer_websocket_serialization_ms": {
+          "samples": 600,
+          "mean": 0.028594598333333294,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.243195,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "observer_websocket_bytes": {
+          "samples": 600,
+          "mean": 28620.72333333333,
+          "p50": 28561,
+          "p95": 28831,
+          "max": 28832,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "request_ms": {
+          "samples": 8218,
+          "mean": 1.171082050012357,
+          "p50": 0.8,
+          "p95": 3.8000000000000003,
+          "max": 17.817174999974668,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 8218,
+          "mean": 10734.51557556583,
+          "p50": 6720,
+          "p95": 66248,
+          "max": 145867,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 1348,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "lock:crates/server/src/main.rs:3108:write": {
+        "wait_ms": {
+          "samples": 300,
+          "mean": 0.0023038299999999985,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.625661,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 300,
+          "mean": 15.601047886666647,
+          "p50": 12.5,
+          "p95": 33,
+          "max": 39.059575,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/intents.rs:333:read": {
+        "wait_ms": {
+          "samples": 99,
+          "mean": 0.06544075757575758,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 2.164432,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 99,
+          "mean": 0.0053561919191919185,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.047327999999999995,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/leases.rs:274:write": {
+        "wait_ms": {
+          "samples": 499,
+          "mean": 0.12292483567134259,
+          "p50": 0.1,
+          "p95": 0.5,
+          "max": 5.884384000000001,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 499,
+          "mean": 0.0028264929859719437,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.006901,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/main.rs:1095:write": {
+        "wait_ms": {
+          "samples": 50,
+          "mean": 0.25690788000000003,
+          "p50": 0.1,
+          "p95": 2.5,
+          "max": 5.829218,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 50,
+          "mean": 0.061216760000000016,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.095352,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/leases.rs:240:write": {
+        "wait_ms": {
+          "samples": 20,
+          "mean": 0.0002471,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.00042899999999999997,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 20,
+          "mean": 0.0031391500000000003,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.005213,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/main.rs:2861:read": {
+        "wait_ms": {
+          "samples": 18,
+          "mean": 0.008754722222222225,
+          "p50": 0.1,
+          "p95": 0.2,
+          "max": 0.154312,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 18,
+          "mean": 0.0021794999999999996,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.003828,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/observers.rs:235:write": {
+        "wait_ms": {
+          "samples": 2,
+          "mean": 0.395056,
+          "p50": 0.1,
+          "p95": 0.8,
+          "max": 0.7899400000000001,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 2,
+          "mean": 0.10272300000000001,
+          "p50": 0.1,
+          "p95": 0.2,
+          "max": 0.113683,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/observers.rs:251:read": {
+        "wait_ms": {
+          "samples": 2,
+          "mean": 0.000172,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.000172,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 2,
+          "mean": 0.0019320000000000001,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.002235,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "client:5": {
+        "stream_gap_ms": {
+          "samples": 290,
+          "mean": 1000.0068771888469,
+          "p50": 1000,
+          "p95": 1001.8000000000001,
+          "max": 1003.531005859375,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 882,
+          "mean": 1.2238163854875348,
+          "p50": 0.7000000000000001,
+          "p95": 3.8000000000000003,
+          "max": 33.1427969999786,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 882,
+          "mean": 4649.985260770975,
+          "p50": 377,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 10.106866000016453,
+          "p50": 10.200000000000001,
+          "p95": 10.200000000000001,
+          "max": 10.106866000016453,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 291,
+          "mean": 19809.408934707903,
+          "p50": 19752,
+          "p95": 27104,
+          "max": 27454,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:40": {
+        "request_ms": {
+          "samples": 904,
+          "mean": 3.666568752212947,
+          "p50": 2.4000000000000004,
+          "p95": 8.8,
+          "max": 27.186183000012534,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 904,
+          "mean": 229804.56415929203,
+          "p50": 864,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.99720703125,
+          "p50": 1000.1,
+          "p95": 1001.5,
+          "max": 1002.866455078125,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1376521.64,
+          "p50": 1369106,
+          "p95": 1398688,
+          "max": 1399541,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/planning": {
+        "request_ms": {
+          "samples": 12984,
+          "mean": 2.0058906544980535,
+          "p50": 2,
+          "p95": 4.7,
+          "max": 39.22870000000694,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 12984,
+          "mean": 601.8864756623536,
+          "p50": 133,
+          "p95": 7061,
+          "max": 7061,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:41": {
+        "request_ms": {
+          "samples": 904,
+          "mean": 3.6724244336291307,
+          "p50": 2.4000000000000004,
+          "p95": 9.3,
+          "max": 26.231051999988267,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 904,
+          "mean": 229802.3650442478,
+          "p50": 665,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 1000.0001350911458,
+          "p50": 1000,
+          "p95": 1001.5,
+          "max": 1002.882568359375,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1376515.0133333334,
+          "p50": 1368907,
+          "p95": 1398688,
+          "max": 1399143,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:47": {
+        "request_ms": {
+          "samples": 906,
+          "mean": 3.8189831214124412,
+          "p50": 2.5,
+          "p95": 9.3,
+          "max": 32.23045699999784,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 906,
+          "mean": 229345.80022075056,
+          "p50": 2216,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 150,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 1000.0005973307292,
+          "p50": 1000,
+          "p95": 1001.6,
+          "max": 1003.350830078125,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1376668.2366666666,
+          "p50": 1370459,
+          "p95": 1398688,
+          "max": 1398694,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/authority": {
+        "request_ms": {
+          "samples": 6495,
+          "mean": 1.166810834180261,
+          "p50": 0.8,
+          "p95": 3.4000000000000004,
+          "max": 33.358600000006845,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 6495,
+          "mean": 20703.699615088528,
+          "p50": 14461,
+          "p95": 30443,
+          "max": 30443,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/authority/requests": {
+        "request_ms": {
+          "samples": 6495,
+          "mean": 0.5980382939182841,
+          "p50": 0.4,
+          "p95": 2.3000000000000003,
+          "max": 31.693664999998873,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 6495,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 6495,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:46": {
+        "request_ms": {
+          "samples": 935,
+          "mean": 3.8208082021384646,
+          "p50": 2.7,
+          "p95": 9.1,
+          "max": 49.34969600001932,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 935,
+          "mean": 222222.4513368984,
+          "p50": 336,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 150,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9982999674479,
+          "p50": 1000,
+          "p95": 1001.3000000000001,
+          "max": 1004.447265625,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1418369.6266666667,
+          "p50": 1423919,
+          "p95": 1460276,
+          "max": 1465837,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:6": {
+        "stream_gap_ms": {
+          "samples": 290,
+          "mean": 999.9986715382543,
+          "p50": 1000.1,
+          "p95": 1001.9000000000001,
+          "max": 1005.796142578125,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 882,
+          "mean": 1.2887501337875098,
+          "p50": 0.7000000000000001,
+          "p95": 4,
+          "max": 32.62820099998498,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 882,
+          "mean": 4649.648526077098,
+          "p50": 377,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 10.413908999995328,
+          "p50": 10.5,
+          "p95": 10.5,
+          "max": 10.413908999995328,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 291,
+          "mean": 19805.168384879726,
+          "p50": 19742,
+          "p95": 27092,
+          "max": 27446,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:0": {
+        "request_ms": {
+          "samples": 911,
+          "mean": 1.5479185565309028,
+          "p50": 1.1,
+          "p95": 4.2,
+          "max": 33.05443499999819,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 911,
+          "mean": 30646.346871569705,
+          "p50": 357,
+          "p95": 128787,
+          "max": 144467,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 1000.0030800578503,
+          "p50": 1000,
+          "p95": 1001.1,
+          "max": 1002.61328125,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 10.414530000009108,
+          "p50": 10.5,
+          "p95": 10.5,
+          "max": 10.414530000009108,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 290,
+          "mean": 225498.9275862069,
+          "p50": 223089,
+          "p95": 353728,
+          "max": 371176,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:48": {
+        "request_ms": {
+          "samples": 906,
+          "mean": 3.7460817980145675,
+          "p50": 2.6,
+          "p95": 8.8,
+          "max": 25.151924000005238,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 906,
+          "mean": 229345.26821192054,
+          "p50": 2168,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 150,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9997005208334,
+          "p50": 1000,
+          "p95": 1001.8000000000001,
+          "max": 1004.62646484375,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1376666.6033333333,
+          "p50": 1370410,
+          "p95": 1398688,
+          "max": 1398694,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:7": {
+        "stream_gap_ms": {
+          "samples": 290,
+          "mean": 999.9983482623923,
+          "p50": 1000,
+          "p95": 1002,
+          "max": 1004.967529296875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 882,
+          "mean": 1.296933803855281,
+          "p50": 0.7000000000000001,
+          "p95": 4,
+          "max": 32.330486999999266,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 882,
+          "mean": 4667.600907029479,
+          "p50": 354,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 10.357018000009703,
+          "p50": 10.4,
+          "p95": 10.4,
+          "max": 10.357018000009703,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 291,
+          "mean": 19921.408934707903,
+          "p50": 19904,
+          "p95": 27193,
+          "max": 27541,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "generator": {
+        "schedule_lag_ms": {
+          "samples": 300,
+          "mean": 0.23921793619791668,
+          "p50": 0.2,
+          "p95": 0.9,
+          "max": 1.8388671875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "client:43": {
+        "request_ms": {
+          "samples": 904,
+          "mean": 3.5334279789827003,
+          "p50": 2.4000000000000004,
+          "p95": 8.6,
+          "max": 26.580385999986902,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 904,
+          "mean": 229798.83738938053,
+          "p50": 346,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 1000.0004638671875,
+          "p50": 1000.1,
+          "p95": 1001.6,
+          "max": 1003.445068359375,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1376504.3833333333,
+          "p50": 1368584,
+          "p95": 1398688,
+          "max": 1398824,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:42": {
+        "request_ms": {
+          "samples": 904,
+          "mean": 3.5857326714596347,
+          "p50": 2.3000000000000003,
+          "p95": 9.4,
+          "max": 16.336760000005597,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 904,
+          "mean": 229799.7853982301,
+          "p50": 432,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.998974609375,
+          "p50": 1000,
+          "p95": 1001.6,
+          "max": 1004.84765625,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1376507.24,
+          "p50": 1368674,
+          "p95": 1398688,
+          "max": 1399109,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/state": {
+        "request_ms": {
+          "samples": 12972,
+          "mean": 3.8585281981961805,
+          "p50": 2.4000000000000004,
+          "p95": 9.200000000000001,
+          "max": 49.34969600001932,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 12972,
+          "mean": 281404.4733271662,
+          "p50": 50611,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:49": {
+        "request_ms": {
+          "samples": 905,
+          "mean": 3.7193094298339355,
+          "p50": 2.4000000000000004,
+          "p95": 9.4,
+          "max": 31.968041000000085,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 905,
+          "mean": 229578.12928176796,
+          "p50": 341,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 150,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9988989257813,
+          "p50": 1000,
+          "p95": 1001.5,
+          "max": 1003.043212890625,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1376604.5766666667,
+          "p50": 1368579,
+          "p95": 1398688,
+          "max": 1398694,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:2": {
+        "request_ms": {
+          "samples": 882,
+          "mean": 1.228897891155927,
+          "p50": 0.7000000000000001,
+          "p95": 3.6,
+          "max": 39.219429999997374,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 882,
+          "mean": 4652.551020408163,
+          "p50": 585,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 999.9995919725886,
+          "p50": 1000,
+          "p95": 1002.2,
+          "max": 1014.009033203125,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 9.403833999997005,
+          "p50": 9.5,
+          "p95": 9.5,
+          "max": 9.403833999997005,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 290,
+          "mean": 19865.8,
+          "p50": 19997,
+          "p95": 27077,
+          "max": 27106,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:8": {
+        "stream_gap_ms": {
+          "samples": 290,
+          "mean": 1000.004890389278,
+          "p50": 1000.1,
+          "p95": 1001.5,
+          "max": 1003.864501953125,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 881,
+          "mean": 1.4951001816123806,
+          "p50": 1.1,
+          "p95": 4.1000000000000005,
+          "max": 19.024133000013535,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 881,
+          "mean": 30921.183881952325,
+          "p50": 363,
+          "p95": 126488,
+          "max": 144538,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 10.690235999994911,
+          "p50": 10.700000000000001,
+          "p95": 10.700000000000001,
+          "max": 10.690235999994911,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 291,
+          "mean": 179009.5738831615,
+          "p50": 182427,
+          "p95": 283038,
+          "max": 303023,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:9": {
+        "stream_gap_ms": {
+          "samples": 290,
+          "mean": 999.9993904903017,
+          "p50": 1000.1,
+          "p95": 1001.7,
+          "max": 1003.8310546875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 12,
+          "mean": 1.343243000004198,
+          "p50": 0.6000000000000001,
+          "p95": 6.800000000000001,
+          "max": 6.714315000019269,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 12,
+          "mean": 2642.6666666666665,
+          "p50": 262,
+          "p95": 28830,
+          "max": 28830,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 10.675458999990951,
+          "p50": 10.700000000000001,
+          "p95": 10.700000000000001,
+          "max": 10.675458999990951,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 291,
+          "mean": 28730.20274914089,
+          "p50": 28561,
+          "p95": 28831,
+          "max": 57922,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:3": {
+        "request_ms": {
+          "samples": 882,
+          "mean": 1.3802155113382857,
+          "p50": 0.8,
+          "p95": 4,
+          "max": 18.96000299998559,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 882,
+          "mean": 4648.843537414966,
+          "p50": 370,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 1000.0001013732699,
+          "p50": 1000.1,
+          "p95": 1002.8000000000001,
+          "max": 1013.744873046875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 7.297516000020551,
+          "p50": 7.300000000000001,
+          "p95": 7.300000000000001,
+          "max": 7.297516000020551,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 290,
+          "mean": 19851.31724137931,
+          "p50": 19761,
+          "p95": 27067,
+          "max": 27092,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:44": {
+        "request_ms": {
+          "samples": 904,
+          "mean": 3.563048590707316,
+          "p50": 2.3000000000000003,
+          "p95": 8.8,
+          "max": 19.303064000006998,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 904,
+          "mean": 229800.2267699115,
+          "p50": 471,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 1000.0025838216146,
+          "p50": 1000.1,
+          "p95": 1001.6,
+          "max": 1004.098388671875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1376508.57,
+          "p50": 1368712,
+          "p95": 1398688,
+          "max": 1398694,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:1": {
+        "request_ms": {
+          "samples": 882,
+          "mean": 1.499053800453417,
+          "p50": 0.8,
+          "p95": 4.1000000000000005,
+          "max": 32.82430800003931,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 882,
+          "mean": 6931.624716553288,
+          "p50": 6770,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 1000.004919982699,
+          "p50": 1000.1,
+          "p95": 1002.6,
+          "max": 1006.8818359375,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 7.77958000000217,
+          "p50": 7.800000000000001,
+          "p95": 7.800000000000001,
+          "max": 7.77958000000217,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 290,
+          "mean": 26796.727586206896,
+          "p50": 27031,
+          "p95": 34005,
+          "max": 34033,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:45": {
+        "request_ms": {
+          "samples": 904,
+          "mean": 3.5378013495574203,
+          "p50": 2.2,
+          "p95": 8.6,
+          "max": 31.44465099996887,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 904,
+          "mean": 229800.2046460177,
+          "p50": 470,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9969978841145,
+          "p50": 1000.1,
+          "p95": 1001.6,
+          "max": 1007.840576171875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1376508.5033333334,
+          "p50": 1368708,
+          "p95": 1398688,
+          "max": 1398694,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:4": {
+        "request_ms": {
+          "samples": 882,
+          "mean": 1.3083923265303528,
+          "p50": 0.7000000000000001,
+          "p95": 3.8000000000000003,
+          "max": 19.93413999999757,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 882,
+          "mean": 4644.396825396825,
+          "p50": 374,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 999.998572326449,
+          "p50": 1000.1,
+          "p95": 1002.2,
+          "max": 1010.236328125,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 9.113354999979492,
+          "p50": 9.200000000000001,
+          "p95": 9.200000000000001,
+          "max": 9.113354999979492,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 290,
+          "mean": 19824.18275862069,
+          "p50": 19723,
+          "p95": 27039,
+          "max": 27413,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:10": {
+        "stream_gap_ms": {
+          "samples": 290,
+          "mean": 999.9941061085668,
+          "p50": 1000,
+          "p95": 1001.5,
+          "max": 1003.911865234375,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 12,
+          "mean": 0.7815953333374637,
+          "p50": 0.7000000000000001,
+          "p95": 2,
+          "max": 1.9508309999946505,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 12,
+          "mean": 2634.4166666666665,
+          "p50": 253,
+          "p95": 28830,
+          "max": 28830,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 5.037504000007175,
+          "p50": 5.1000000000000005,
+          "p95": 5.1000000000000005,
+          "max": 5.037504000007175,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 291,
+          "mean": 28729.852233676975,
+          "p50": 28561,
+          "p95": 28831,
+          "max": 57913,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:11": {
+        "stream_gap_ms": {
+          "samples": 290,
+          "mean": 1000.0037370352909,
+          "p50": 1000.1,
+          "p95": 1001.7,
+          "max": 1003.95068359375,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 911,
+          "mean": 1.5058723940720342,
+          "p50": 1,
+          "p95": 4.1000000000000005,
+          "max": 33.358600000006845,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 911,
+          "mean": 30208.718990120746,
+          "p50": 357,
+          "p95": 128787,
+          "max": 144467,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 7.740482000022894,
+          "p50": 7.800000000000001,
+          "p95": 7.800000000000001,
+          "max": 7.740482000022894,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 291,
+          "mean": 221369.09621993126,
+          "p50": 215310,
+          "p95": 353775,
+          "max": 371697,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:12": {
+        "stream_gap_ms": {
+          "samples": 290,
+          "mean": 1000.0051959859913,
+          "p50": 1000.1,
+          "p95": 1001.8000000000001,
+          "max": 1006.260009765625,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 882,
+          "mean": 1.3737129716563792,
+          "p50": 0.7000000000000001,
+          "p95": 4.4,
+          "max": 32.23378100000264,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 882,
+          "mean": 6931.645124716553,
+          "p50": 6770,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 6.479656999988947,
+          "p50": 6.5,
+          "p95": 6.5,
+          "max": 6.479656999988947,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 291,
+          "mean": 26724.35738831615,
+          "p50": 26992,
+          "p95": 34005,
+          "max": 34696,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:13": {
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 1000.0014462586505,
+          "p50": 1000,
+          "p95": 1002.1,
+          "max": 1004.640380859375,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 881,
+          "mean": 1.3919025970482977,
+          "p50": 0.7000000000000001,
+          "p95": 4.3,
+          "max": 38.06476599999587,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 881,
+          "mean": 4650.2122587968215,
+          "p50": 585,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 5.307172000000719,
+          "p50": 5.4,
+          "p95": 5.4,
+          "max": 5.307172000000719,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 290,
+          "mean": 19842.58275862069,
+          "p50": 19962,
+          "p95": 27077,
+          "max": 27662,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:14": {
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 1000.0005972575151,
+          "p50": 1000.1,
+          "p95": 1001.9000000000001,
+          "max": 1006.319580078125,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 880,
+          "mean": 1.4258158863637949,
+          "p50": 0.8,
+          "p95": 4.4,
+          "max": 15.281242000011844,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 880,
+          "mean": 4651.596590909091,
+          "p50": 370,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 5.953941000014311,
+          "p50": 6,
+          "p95": 6,
+          "max": 5.953941000014311,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 290,
+          "mean": 19827.541379310343,
+          "p50": 19733,
+          "p95": 27067,
+          "max": 27437,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:33": {
+        "request_ms": {
+          "samples": 934,
+          "mean": 3.744644143470429,
+          "p50": 2.8000000000000003,
+          "p95": 8.700000000000001,
+          "max": 39.43306699999084,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 934,
+          "mean": 223160.37687366168,
+          "p50": 336,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9990063476563,
+          "p50": 1000,
+          "p95": 1001.6,
+          "max": 1003.885498046875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1420520.06,
+          "p50": 1423895,
+          "p95": 1459907,
+          "max": 1465498,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:15": {
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 1000.0034610523898,
+          "p50": 1000,
+          "p95": 1001.8000000000001,
+          "max": 1003.4794921875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 880,
+          "mean": 1.3192593136361872,
+          "p50": 0.7000000000000001,
+          "p95": 4.3,
+          "max": 16.693557000005967,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 880,
+          "mean": 4647.125,
+          "p50": 374,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 6.653048000007402,
+          "p50": 6.7,
+          "p95": 6.7,
+          "max": 6.653048000007402,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 290,
+          "mean": 19800.362068965518,
+          "p50": 19692,
+          "p95": 27040,
+          "max": 27413,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:34": {
+        "request_ms": {
+          "samples": 904,
+          "mean": 3.839011383849353,
+          "p50": 2.6,
+          "p95": 9.1,
+          "max": 41.909259000007296,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 904,
+          "mean": 229819.5221238938,
+          "p50": 2216,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9993147786458,
+          "p50": 1000,
+          "p95": 1001.6,
+          "max": 1005.6064453125,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1376566.7333333334,
+          "p50": 1368249,
+          "p95": 1398690,
+          "max": 1400904,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:16": {
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 1000.0006327381597,
+          "p50": 1000,
+          "p95": 1001.7,
+          "max": 1003.472412109375,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 880,
+          "mean": 1.2786521022720494,
+          "p50": 0.8,
+          "p95": 4.3,
+          "max": 8.17643799999496,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 880,
+          "mean": 4652.704545454545,
+          "p50": 377,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 6.637716999975964,
+          "p50": 6.7,
+          "p95": 6.7,
+          "max": 6.637716999975964,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 290,
+          "mean": 19834.110344827586,
+          "p50": 19750,
+          "p95": 27077,
+          "max": 27454,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:35": {
+        "request_ms": {
+          "samples": 905,
+          "mean": 3.735015226519623,
+          "p50": 2.7,
+          "p95": 8.700000000000001,
+          "max": 21.523718000011286,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 905,
+          "mean": 230320.9082872928,
+          "p50": 2168,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9999064127604,
+          "p50": 1000.1,
+          "p95": 1001.6,
+          "max": 1002.735107421875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1378845.2933333332,
+          "p50": 1370402,
+          "p95": 1398690,
+          "max": 1400855,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:17": {
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 1000.0017748770005,
+          "p50": 1000.1,
+          "p95": 1001.5,
+          "max": 1003.092041015625,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 881,
+          "mean": 1.2400645959139753,
+          "p50": 0.7000000000000001,
+          "p95": 4.2,
+          "max": 8.208857999998145,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 881,
+          "mean": 4654.768444948922,
+          "p50": 377,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 6.536564000009093,
+          "p50": 6.6000000000000005,
+          "p95": 6.6000000000000005,
+          "max": 6.536564000009093,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 290,
+          "mean": 19853.21724137931,
+          "p50": 19740,
+          "p95": 27069,
+          "max": 27446,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:37": {
+        "request_ms": {
+          "samples": 904,
+          "mean": 3.741396506637223,
+          "p50": 2.5,
+          "p95": 9.4,
+          "max": 24.508405999979004,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 904,
+          "mean": 229817.39269911504,
+          "p50": 2023,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 1000.0007120768229,
+          "p50": 1000.1,
+          "p95": 1001.5,
+          "max": 1002.60107421875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1376560.2966666666,
+          "p50": 1370264,
+          "p95": 1398690,
+          "max": 1400710,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:18": {
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 1000.0000008447772,
+          "p50": 1000,
+          "p95": 1001.8000000000001,
+          "max": 1003.369873046875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 880,
+          "mean": 1.1992755340907604,
+          "p50": 0.7000000000000001,
+          "p95": 4,
+          "max": 9.695054000010714,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 880,
+          "mean": 4670.2875,
+          "p50": 354,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 6.619735999964178,
+          "p50": 6.7,
+          "p95": 6.7,
+          "max": 6.619735999964178,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 290,
+          "mean": 19946.06551724138,
+          "p50": 19902,
+          "p95": 27193,
+          "max": 27541,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:36": {
+        "request_ms": {
+          "samples": 904,
+          "mean": 3.711883137168244,
+          "p50": 2.5,
+          "p95": 8.6,
+          "max": 39.22870000000694,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 904,
+          "mean": 230555.31747787612,
+          "p50": 341,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.998594563802,
+          "p50": 1000,
+          "p95": 1001.5,
+          "max": 1004.99560546875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1378783.91,
+          "p50": 1368577,
+          "p95": 1398690,
+          "max": 1399028,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:19": {
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 1000.0055273775411,
+          "p50": 1000.1,
+          "p95": 1001.5,
+          "max": 1004.501953125,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 880,
+          "mean": 1.4370987318179356,
+          "p50": 1.1,
+          "p95": 3.9000000000000004,
+          "max": 16.37432900001295,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 880,
+          "mean": 30498.807954545453,
+          "p50": 363,
+          "p95": 126488,
+          "max": 144538,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 7.538477999973111,
+          "p50": 7.6000000000000005,
+          "p95": 7.6000000000000005,
+          "max": 7.538477999973111,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 291,
+          "mean": 175771.99312714775,
+          "p50": 173702,
+          "p95": 283038,
+          "max": 303023,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:38": {
+        "request_ms": {
+          "samples": 903,
+          "mean": 3.7017245658912157,
+          "p50": 2.5,
+          "p95": 9.4,
+          "max": 31.787475000019185,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 903,
+          "mean": 230071.68438538205,
+          "p50": 2017,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9970369466146,
+          "p50": 1000.1,
+          "p95": 1001.5,
+          "max": 1003.90185546875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1376559.6566666667,
+          "p50": 1370258,
+          "p95": 1398690,
+          "max": 1400700,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:20": {
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 1000.0001017252604,
+          "p50": 1000,
+          "p95": 1020.2,
+          "max": 1030.763671875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 10,
+          "mean": 0.6249995999896782,
+          "p50": 0.6000000000000001,
+          "p95": 0.8,
+          "max": 0.755535999982385,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 10,
+          "mean": 262,
+          "p50": 262,
+          "p95": 262,
+          "max": 262,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 28629.456666666665,
+          "p50": 28561,
+          "p95": 28832,
+          "max": 29093,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:21": {
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 1000.0013704427083,
+          "p50": 1000,
+          "p95": 1002.7,
+          "max": 1008.342041015625,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 10,
+          "mean": 0.6357961999980034,
+          "p50": 0.7000000000000001,
+          "p95": 0.9,
+          "max": 0.827493000018876,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 10,
+          "mean": 253,
+          "p50": 253,
+          "p95": 253,
+          "max": 253,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 28629.156666666666,
+          "p50": 28561,
+          "p95": 28832,
+          "max": 29084,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:39": {
+        "request_ms": {
+          "samples": 903,
+          "mean": 3.6620150952381616,
+          "p50": 2.3000000000000003,
+          "p95": 8.6,
+          "max": 34.930466999998316,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 903,
+          "mean": 230061.88704318937,
+          "p50": 1132,
+          "p95": 684051,
+          "max": 684055,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 1000.0002612304687,
+          "p50": 1000,
+          "p95": 1001.4000000000001,
+          "max": 1008.75830078125,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 1376530.1666666667,
+          "p50": 1369374,
+          "p95": 1398688,
+          "max": 1399809,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:22": {
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9996305338542,
+          "p50": 1000,
+          "p95": 1001.5,
+          "max": 1003.42724609375,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 938,
+          "mean": 1.3424858496808327,
+          "p50": 1,
+          "p95": 3.8000000000000003,
+          "max": 10.911995000002207,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 938,
+          "mean": 30402.901918976546,
+          "p50": 336,
+          "p95": 128783,
+          "max": 144467,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 150,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 222864.30333333334,
+          "p50": 222040,
+          "p95": 353749,
+          "max": 372958,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:23": {
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9972802734375,
+          "p50": 1000,
+          "p95": 1001.4000000000001,
+          "max": 1003.01171875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 908,
+          "mean": 1.085799155286474,
+          "p50": 0.8,
+          "p95": 3.7,
+          "max": 9.817511999979615,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 908,
+          "mean": 6941.357929515419,
+          "p50": 6770,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 150,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 26724.31,
+          "p50": 19571,
+          "p95": 34033,
+          "max": 34724,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:24": {
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9983658854167,
+          "p50": 1000,
+          "p95": 1001.5,
+          "max": 1003.79443359375,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 908,
+          "mean": 1.1043994383265707,
+          "p50": 0.7000000000000001,
+          "p95": 4,
+          "max": 9.809445999999298,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 908,
+          "mean": 4659.031938325991,
+          "p50": 585,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 150,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 19817.056666666667,
+          "p50": 12643,
+          "p95": 27105,
+          "max": 27690,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:25": {
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9970833333333,
+          "p50": 1000,
+          "p95": 1001.4000000000001,
+          "max": 1002.433349609375,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 908,
+          "mean": 1.059071318282155,
+          "p50": 0.7000000000000001,
+          "p95": 3.7,
+          "max": 10.25430800000322,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 908,
+          "mean": 4655.612334801762,
+          "p50": 370,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 150,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 19803.5,
+          "p50": 12629,
+          "p95": 27091,
+          "max": 27461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:26": {
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.998856608073,
+          "p50": 1000,
+          "p95": 1001.6,
+          "max": 1003.88330078125,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 908,
+          "mean": 1.052204382158716,
+          "p50": 0.7000000000000001,
+          "p95": 3.7,
+          "max": 8.551754999993136,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 908,
+          "mean": 4651.175110132159,
+          "p50": 374,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 150,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 19776.46,
+          "p50": 12601,
+          "p95": 27063,
+          "max": 27437,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:27": {
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.999208170573,
+          "p50": 1000,
+          "p95": 1001.5,
+          "max": 1002.490234375,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 908,
+          "mean": 1.2581109394266181,
+          "p50": 0.8,
+          "p95": 4,
+          "max": 8.541272000002209,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 908,
+          "mean": 4656.741189427313,
+          "p50": 377,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 150,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 19810.123333333333,
+          "p50": 12643,
+          "p95": 27105,
+          "max": 27482,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:28": {
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9977514648438,
+          "p50": 1000,
+          "p95": 1001.4000000000001,
+          "max": 1002.828369140625,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 908,
+          "mean": 1.1401074482379316,
+          "p50": 0.8,
+          "p95": 3.6,
+          "max": 8.669093000004068,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 908,
+          "mean": 4656.4140969163,
+          "p50": 377,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 150,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 19805.926666666666,
+          "p50": 12631,
+          "p95": 27093,
+          "max": 27470,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:29": {
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9973567708333,
+          "p50": 1000,
+          "p95": 1001.7,
+          "max": 1003.89990234375,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 906,
+          "mean": 1.1015670794707693,
+          "p50": 0.7000000000000001,
+          "p95": 4,
+          "max": 7.8638519999803975,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 906,
+          "mean": 4668.700883002208,
+          "p50": 354,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 19873.796666666665,
+          "p50": 12757,
+          "p95": 27219,
+          "max": 27573,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:30": {
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 1000.0024552408854,
+          "p50": 1000,
+          "p95": 1001.5,
+          "max": 1003.672607421875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 906,
+          "mean": 1.3953937030906014,
+          "p50": 1.1,
+          "p95": 3.7,
+          "max": 17.817174999974668,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 906,
+          "mean": 30930.763796909494,
+          "p50": 363,
+          "p95": 126482,
+          "max": 145867,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 149,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 178895.24666666667,
+          "p50": 180140,
+          "p95": 283030,
+          "max": 302661,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:31": {
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9993522135417,
+          "p50": 1000.1,
+          "p95": 1001.3000000000001,
+          "max": 1004.327880859375,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 10,
+          "mean": 1.0429381999958423,
+          "p50": 1,
+          "p95": 2.1,
+          "max": 2.0980600000184495,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 10,
+          "mean": 262,
+          "p50": 262,
+          "p95": 262,
+          "max": 262,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 28629.456666666665,
+          "p50": 28561,
+          "p95": 28832,
+          "max": 29093,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:32": {
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 1000.0028637695312,
+          "p50": 1000,
+          "p95": 1001.5,
+          "max": 1004.25439453125,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "request_ms": {
+          "samples": 10,
+          "mean": 0.8703754000001936,
+          "p50": 0.7000000000000001,
+          "p95": 3.3000000000000003,
+          "max": 3.24237500000163,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 10,
+          "mean": 253,
+          "p50": 253,
+          "p95": 253,
+          "max": 253,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 28629.156666666666,
+          "p50": 28561,
+          "p95": 28832,
+          "max": 29084,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/roles/:id/intents/:id": {
+        "request_ms": {
+          "samples": 99,
+          "mean": 0.9508700808053049,
+          "p50": 0.6000000000000001,
+          "p95": 3.5,
+          "max": 5.88275099999737,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 99,
+          "mean": 352.6666666666667,
+          "p50": 366,
+          "p95": 370,
+          "max": 370,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/roles/:id/renew": {
+        "request_ms": {
+          "samples": 499,
+          "mean": 1.058773480961904,
+          "p50": 0.7000000000000001,
+          "p95": 3.5,
+          "max": 16.37432900001295,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 499,
+          "mean": 639.4569138276553,
+          "p50": 377,
+          "p95": 2168,
+          "max": 2216,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/roles/:id/intent": {
+        "request_ms": {
+          "samples": 50,
+          "mean": 1.4859752600025968,
+          "p50": 0.9,
+          "p95": 6.1000000000000005,
+          "max": 9.572228000033647,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 50,
+          "mean": 122,
+          "p50": 122,
+          "p95": 122,
+          "max": 122,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/roles/:id/resume": {
+        "request_ms": {
+          "samples": 20,
+          "mean": 2.1243973499993443,
+          "p50": 2,
+          "p95": 2.8000000000000003,
+          "max": 3.5817510000197217,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 20,
+          "mean": 410.55,
+          "p50": 370,
+          "p95": 691,
+          "max": 691,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/truth": {
+        "request_ms": {
+          "samples": 2,
+          "mean": 3.8663145000027725,
+          "p50": 1.1,
+          "p95": 6.800000000000001,
+          "max": 6.714315000019269,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 2,
+          "mean": 28830,
+          "p50": 28830,
+          "p95": 28830,
+          "max": 28830,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      }
+    },
+    "measurement_version": 3,
+    "storage": "volatile",
+    "budgets": {
+      "regional": [],
+      "reconnect": [
+        {
+          "client": "client:5",
+          "max_ms": 10.106866000016453,
+          "met": true
+        },
+        {
+          "client": "client:6",
+          "max_ms": 10.413908999995328,
+          "met": true
+        },
+        {
+          "client": "client:0",
+          "max_ms": 10.414530000009108,
+          "met": true
+        },
+        {
+          "client": "client:7",
+          "max_ms": 10.357018000009703,
+          "met": true
+        },
+        {
+          "client": "client:2",
+          "max_ms": 9.403833999997005,
+          "met": true
+        },
+        {
+          "client": "client:8",
+          "max_ms": 10.690235999994911,
+          "met": true
+        },
+        {
+          "client": "client:9",
+          "max_ms": 10.675458999990951,
+          "met": true
+        },
+        {
+          "client": "client:3",
+          "max_ms": 7.297516000020551,
+          "met": true
+        },
+        {
+          "client": "client:1",
+          "max_ms": 7.77958000000217,
+          "met": true
+        },
+        {
+          "client": "client:4",
+          "max_ms": 9.113354999979492,
+          "met": true
+        },
+        {
+          "client": "client:10",
+          "max_ms": 5.037504000007175,
+          "met": true
+        },
+        {
+          "client": "client:11",
+          "max_ms": 7.740482000022894,
+          "met": true
+        },
+        {
+          "client": "client:12",
+          "max_ms": 6.479656999988947,
+          "met": true
+        },
+        {
+          "client": "client:13",
+          "max_ms": 5.307172000000719,
+          "met": true
+        },
+        {
+          "client": "client:14",
+          "max_ms": 5.953941000014311,
+          "met": true
+        },
+        {
+          "client": "client:15",
+          "max_ms": 6.653048000007402,
+          "met": true
+        },
+        {
+          "client": "client:16",
+          "max_ms": 6.637716999975964,
+          "met": true
+        },
+        {
+          "client": "client:17",
+          "max_ms": 6.536564000009093,
+          "met": true
+        },
+        {
+          "client": "client:18",
+          "max_ms": 6.619735999964178,
+          "met": true
+        },
+        {
+          "client": "client:19",
+          "max_ms": 7.538477999973111,
+          "met": true
+        }
+      ]
+    }
+  },
+  "resources": {
+    "samples": 59,
+    "first": {
+      "time": 1791761805618.9832,
+      "phase": "warmup",
+      "kind": "resource",
+      "server_rss_bytes": 164540416,
+      "server_cpu_seconds": 10.29,
+      "audit_bytes": 153590,
+      "generator_rss_bytes": 249679872,
+      "generator_cpu": {
+        "user": 11731477,
+        "system": 3556260
+      }
+    },
+    "last": {
+      "time": 1791762102825.9592,
+      "phase": "measurement",
+      "kind": "resource",
+      "server_rss_bytes": 206352384,
+      "server_cpu_seconds": 60.26,
+      "audit_bytes": 413193,
+      "generator_rss_bytes": 329838592,
+      "generator_cpu": {
+        "user": 61469825,
+        "system": 20827423
+      }
+    },
+    "server_rss_bytes": {
+      "first": 164540416,
+      "last": 206352384,
+      "peak": 206352384
+    },
+    "server_cpu_seconds": {
+      "first": 10.29,
+      "last": 60.26,
+      "peak": 60.26
+    },
+    "generator_rss_bytes": {
+      "first": 249679872,
+      "last": 329838592,
+      "peak": 343109632
+    },
+    "audit_bytes": {
+      "first": 153590,
+      "last": 413193,
+      "peak": 413193
+    }
+  },
+  "database": {
+    "samples": 0,
+    "first": null,
+    "last": null,
+    "database_bytes": null,
+    "wal_bytes": null
+  },
+  "retention": {
+    "game:0bbf393c-7aaa-4b6c-b5fa-1e34ed2cb433": {
+      "samples": 53,
+      "first": {
+        "time": 1791761809896.5803,
+        "tick": 66,
+        "radio_tick": 66,
+        "counts": {
+          "simulation.network.devices": 4992,
+          "simulation.network.interference_contributions": 0,
+          "simulation.network.interference_entries": 4992,
+          "simulation.network.mobility_entries": 4992,
+          "simulation.network.pending_events": 0,
+          "simulation.network.pending_receptions": 0,
+          "simulation.network.retained_from_ns": 66000000000,
+          "simulation.pending_fragment_events": 0,
+          "simulation.pending_network_events": 0,
+          "simulation.transport_completed_ids": 0,
+          "simulation.transport_events": 0,
+          "simulation.transport_fragments": 0,
+          "simulation.transport_messages": 0,
+          "simulation.transport_payload_bytes": 0,
+          "server.audit_correlations": 0,
+          "server.audit_history_events": 21,
+          "server.audit_pending_events": 0,
+          "server.authority_events": 0,
+          "server.authority_requests": 0,
+          "server.intent_receipts": 3,
+          "server.network_encoded_payload_bytes": 18318,
+          "server.network_message_events": 21,
+          "server.network_messages": 11,
+          "server.packet_messages": 0,
+          "server.pending_deliveries": 0
+        }
+      },
+      "last": {
+        "time": 1791762102892.8035,
+        "tick": 359,
+        "radio_tick": 359,
+        "counts": {
+          "simulation.network.devices": 4992,
+          "simulation.network.interference_contributions": 0,
+          "simulation.network.interference_entries": 4992,
+          "simulation.network.mobility_entries": 4992,
+          "simulation.network.pending_events": 0,
+          "simulation.network.pending_receptions": 0,
+          "simulation.network.retained_from_ns": 359000000000,
+          "simulation.pending_fragment_events": 0,
+          "simulation.pending_network_events": 0,
+          "simulation.transport_completed_ids": 0,
+          "simulation.transport_events": 0,
+          "simulation.transport_fragments": 0,
+          "simulation.transport_messages": 0,
+          "simulation.transport_payload_bytes": 0,
+          "server.audit_correlations": 0,
+          "server.audit_history_events": 39,
+          "server.audit_pending_events": 0,
+          "server.authority_events": 0,
+          "server.authority_requests": 0,
+          "server.intent_receipts": 12,
+          "server.network_encoded_payload_bytes": 39640,
+          "server.network_message_events": 39,
+          "server.network_messages": 29,
+          "server.packet_messages": 0,
+          "server.pending_deliveries": 0
+        }
+      },
+      "peak": {
+        "simulation.network.devices": 4992,
+        "simulation.network.interference_contributions": 0,
+        "simulation.network.interference_entries": 4992,
+        "simulation.network.mobility_entries": 4992,
+        "simulation.network.pending_events": 0,
+        "simulation.network.pending_receptions": 0,
+        "simulation.network.retained_from_ns": 359000000000,
+        "simulation.pending_fragment_events": 0,
+        "simulation.pending_network_events": 0,
+        "simulation.transport_completed_ids": 0,
+        "simulation.transport_events": 0,
+        "simulation.transport_fragments": 0,
+        "simulation.transport_messages": 0,
+        "simulation.transport_payload_bytes": 0,
+        "server.audit_correlations": 0,
+        "server.audit_history_events": 39,
+        "server.audit_pending_events": 0,
+        "server.authority_events": 0,
+        "server.authority_requests": 0,
+        "server.intent_receipts": 12,
+        "server.network_encoded_payload_bytes": 39640,
+        "server.network_message_events": 39,
+        "server.network_messages": 29,
+        "server.packet_messages": 0,
+        "server.pending_deliveries": 0
+      }
+    },
+    "game:122f3708-09e8-4b5d-8426-73e3c0f716f4": {
+      "samples": 53,
+      "first": {
+        "time": 1791761809896.6108,
+        "tick": 66,
+        "radio_tick": 66,
+        "counts": {
+          "simulation.network.devices": 156,
+          "simulation.network.interference_contributions": 4,
+          "simulation.network.interference_entries": 156,
+          "simulation.network.mobility_entries": 156,
+          "simulation.network.pending_events": 108,
+          "simulation.network.pending_receptions": 34,
+          "simulation.network.retained_from_ns": 66000000000,
+          "simulation.pending_fragment_events": 0,
+          "simulation.pending_network_events": 0,
+          "simulation.transport_completed_ids": 1014,
+          "simulation.transport_events": 0,
+          "simulation.transport_fragments": 786,
+          "simulation.transport_messages": 78,
+          "simulation.transport_payload_bytes": 373720,
+          "server.audit_correlations": 786,
+          "server.audit_history_events": 10000,
+          "server.audit_pending_events": 0,
+          "server.authority_events": 2,
+          "server.authority_requests": 0,
+          "server.intent_receipts": 3,
+          "server.network_encoded_payload_bytes": 7078,
+          "server.network_message_events": 6,
+          "server.network_messages": 6,
+          "server.packet_messages": 0,
+          "server.pending_deliveries": 0
+        }
+      },
+      "last": {
+        "time": 1791762102892.8325,
+        "tick": 359,
+        "radio_tick": 359,
+        "counts": {
+          "simulation.network.devices": 156,
+          "simulation.network.interference_contributions": 4,
+          "simulation.network.interference_entries": 156,
+          "simulation.network.mobility_entries": 156,
+          "simulation.network.pending_events": 4,
+          "simulation.network.pending_receptions": 3,
+          "simulation.network.retained_from_ns": 359000000000,
+          "simulation.pending_fragment_events": 3,
+          "simulation.pending_network_events": 0,
+          "simulation.transport_completed_ids": 5612,
+          "simulation.transport_events": 0,
+          "simulation.transport_fragments": 4,
+          "simulation.transport_messages": 4,
+          "simulation.transport_payload_bytes": 19018,
+          "server.audit_correlations": 4,
+          "server.audit_history_events": 10000,
+          "server.audit_pending_events": 0,
+          "server.authority_events": 2,
+          "server.authority_requests": 0,
+          "server.intent_receipts": 12,
+          "server.network_encoded_payload_bytes": 28400,
+          "server.network_message_events": 24,
+          "server.network_messages": 24,
+          "server.packet_messages": 0,
+          "server.pending_deliveries": 0
+        }
+      },
+      "peak": {
+        "simulation.network.devices": 156,
+        "simulation.network.interference_contributions": 4,
+        "simulation.network.interference_entries": 156,
+        "simulation.network.mobility_entries": 156,
+        "simulation.network.pending_events": 108,
+        "simulation.network.pending_receptions": 34,
+        "simulation.network.retained_from_ns": 359000000000,
+        "simulation.pending_fragment_events": 34,
+        "simulation.pending_network_events": 0,
+        "simulation.transport_completed_ids": 5612,
+        "simulation.transport_events": 0,
+        "simulation.transport_fragments": 786,
+        "simulation.transport_messages": 78,
+        "simulation.transport_payload_bytes": 375748,
+        "server.audit_correlations": 786,
+        "server.audit_history_events": 10000,
+        "server.audit_pending_events": 0,
+        "server.authority_events": 2,
+        "server.authority_requests": 0,
+        "server.intent_receipts": 12,
+        "server.network_encoded_payload_bytes": 28400,
+        "server.network_message_events": 24,
+        "server.network_messages": 24,
+        "server.packet_messages": 0,
+        "server.pending_deliveries": 0
+      }
+    },
+    "game:6cdff274-ff04-42ed-9b78-4b5be58c90d9": {
+      "samples": 53,
+      "first": {
+        "time": 1791761809896.6174,
+        "tick": 66,
+        "radio_tick": 66,
+        "counts": {
+          "simulation.network.devices": 156,
+          "simulation.network.interference_contributions": 4,
+          "simulation.network.interference_entries": 156,
+          "simulation.network.mobility_entries": 156,
+          "simulation.network.pending_events": 108,
+          "simulation.network.pending_receptions": 34,
+          "simulation.network.retained_from_ns": 66000000000,
+          "simulation.pending_fragment_events": 0,
+          "simulation.pending_network_events": 0,
+          "simulation.transport_completed_ids": 1014,
+          "simulation.transport_events": 0,
+          "simulation.transport_fragments": 786,
+          "simulation.transport_messages": 78,
+          "simulation.transport_payload_bytes": 373720,
+          "server.audit_correlations": 786,
+          "server.audit_history_events": 10000,
+          "server.audit_pending_events": 0,
+          "server.authority_events": 2,
+          "server.authority_requests": 0,
+          "server.intent_receipts": 3,
+          "server.network_encoded_payload_bytes": 7078,
+          "server.network_message_events": 6,
+          "server.network_messages": 6,
+          "server.packet_messages": 0,
+          "server.pending_deliveries": 0
+        }
+      },
+      "last": {
+        "time": 1791762102892.8398,
+        "tick": 359,
+        "radio_tick": 359,
+        "counts": {
+          "simulation.network.devices": 156,
+          "simulation.network.interference_contributions": 4,
+          "simulation.network.interference_entries": 156,
+          "simulation.network.mobility_entries": 156,
+          "simulation.network.pending_events": 4,
+          "simulation.network.pending_receptions": 3,
+          "simulation.network.retained_from_ns": 359000000000,
+          "simulation.pending_fragment_events": 3,
+          "simulation.pending_network_events": 0,
+          "simulation.transport_completed_ids": 5612,
+          "simulation.transport_events": 0,
+          "simulation.transport_fragments": 4,
+          "simulation.transport_messages": 4,
+          "simulation.transport_payload_bytes": 19018,
+          "server.audit_correlations": 4,
+          "server.audit_history_events": 10000,
+          "server.audit_pending_events": 0,
+          "server.authority_events": 2,
+          "server.authority_requests": 0,
+          "server.intent_receipts": 12,
+          "server.network_encoded_payload_bytes": 28400,
+          "server.network_message_events": 24,
+          "server.network_messages": 24,
+          "server.packet_messages": 0,
+          "server.pending_deliveries": 0
+        }
+      },
+      "peak": {
+        "simulation.network.devices": 156,
+        "simulation.network.interference_contributions": 4,
+        "simulation.network.interference_entries": 156,
+        "simulation.network.mobility_entries": 156,
+        "simulation.network.pending_events": 108,
+        "simulation.network.pending_receptions": 34,
+        "simulation.network.retained_from_ns": 359000000000,
+        "simulation.pending_fragment_events": 34,
+        "simulation.pending_network_events": 0,
+        "simulation.transport_completed_ids": 5612,
+        "simulation.transport_events": 0,
+        "simulation.transport_fragments": 786,
+        "simulation.transport_messages": 78,
+        "simulation.transport_payload_bytes": 375748,
+        "server.audit_correlations": 786,
+        "server.audit_history_events": 10000,
+        "server.audit_pending_events": 0,
+        "server.authority_events": 2,
+        "server.authority_requests": 0,
+        "server.intent_receipts": 12,
+        "server.network_encoded_payload_bytes": 28400,
+        "server.network_message_events": 24,
+        "server.network_messages": 24,
+        "server.packet_messages": 0,
+        "server.pending_deliveries": 0
+      }
+    },
+    "game:bf9f79df-4865-4efd-a341-3d663e077b02": {
+      "samples": 53,
+      "first": {
+        "time": 1791761809896.663,
+        "tick": 66,
+        "radio_tick": 66,
+        "counts": {
+          "simulation.network.devices": 4992,
+          "simulation.network.interference_contributions": 0,
+          "simulation.network.interference_entries": 4992,
+          "simulation.network.mobility_entries": 4992,
+          "simulation.network.pending_events": 0,
+          "simulation.network.pending_receptions": 0,
+          "simulation.network.retained_from_ns": 66000000000,
+          "simulation.pending_fragment_events": 0,
+          "simulation.pending_network_events": 0,
+          "simulation.transport_completed_ids": 0,
+          "simulation.transport_events": 0,
+          "simulation.transport_fragments": 0,
+          "simulation.transport_messages": 0,
+          "simulation.transport_payload_bytes": 0,
+          "server.audit_correlations": 0,
+          "server.audit_history_events": 21,
+          "server.audit_pending_events": 0,
+          "server.authority_events": 0,
+          "server.authority_requests": 0,
+          "server.intent_receipts": 3,
+          "server.network_encoded_payload_bytes": 18318,
+          "server.network_message_events": 21,
+          "server.network_messages": 11,
+          "server.packet_messages": 0,
+          "server.pending_deliveries": 0
+        }
+      },
+      "last": {
+        "time": 1791762102892.8813,
+        "tick": 359,
+        "radio_tick": 359,
+        "counts": {
+          "simulation.network.devices": 4992,
+          "simulation.network.interference_contributions": 0,
+          "simulation.network.interference_entries": 4992,
+          "simulation.network.mobility_entries": 4992,
+          "simulation.network.pending_events": 0,
+          "simulation.network.pending_receptions": 0,
+          "simulation.network.retained_from_ns": 359000000000,
+          "simulation.pending_fragment_events": 0,
+          "simulation.pending_network_events": 0,
+          "simulation.transport_completed_ids": 0,
+          "simulation.transport_events": 0,
+          "simulation.transport_fragments": 0,
+          "simulation.transport_messages": 0,
+          "simulation.transport_payload_bytes": 0,
+          "server.audit_correlations": 0,
+          "server.audit_history_events": 39,
+          "server.audit_pending_events": 0,
+          "server.authority_events": 0,
+          "server.authority_requests": 0,
+          "server.intent_receipts": 12,
+          "server.network_encoded_payload_bytes": 39640,
+          "server.network_message_events": 39,
+          "server.network_messages": 29,
+          "server.packet_messages": 0,
+          "server.pending_deliveries": 0
+        }
+      },
+      "peak": {
+        "simulation.network.devices": 4992,
+        "simulation.network.interference_contributions": 0,
+        "simulation.network.interference_entries": 4992,
+        "simulation.network.mobility_entries": 4992,
+        "simulation.network.pending_events": 0,
+        "simulation.network.pending_receptions": 0,
+        "simulation.network.retained_from_ns": 359000000000,
+        "simulation.pending_fragment_events": 0,
+        "simulation.pending_network_events": 0,
+        "simulation.transport_completed_ids": 0,
+        "simulation.transport_events": 0,
+        "simulation.transport_fragments": 0,
+        "simulation.transport_messages": 0,
+        "simulation.transport_payload_bytes": 0,
+        "server.audit_correlations": 0,
+        "server.audit_history_events": 39,
+        "server.audit_pending_events": 0,
+        "server.authority_events": 0,
+        "server.authority_requests": 0,
+        "server.intent_receipts": 12,
+        "server.network_encoded_payload_bytes": 39640,
+        "server.network_message_events": 39,
+        "server.network_messages": 29,
+        "server.packet_messages": 0,
+        "server.pending_deliveries": 0
+      }
+    },
+    "game:deb6d0dd-52b5-4105-bf31-ce07aa5b488a": {
+      "samples": 53,
+      "first": {
+        "time": 1791761809896.6897,
+        "tick": 66,
+        "radio_tick": 66,
+        "counts": {
+          "simulation.network.devices": 156,
+          "simulation.network.interference_contributions": 4,
+          "simulation.network.interference_entries": 156,
+          "simulation.network.mobility_entries": 156,
+          "simulation.network.pending_events": 108,
+          "simulation.network.pending_receptions": 34,
+          "simulation.network.retained_from_ns": 66000000000,
+          "simulation.pending_fragment_events": 0,
+          "simulation.pending_network_events": 0,
+          "simulation.transport_completed_ids": 1014,
+          "simulation.transport_events": 0,
+          "simulation.transport_fragments": 786,
+          "simulation.transport_messages": 78,
+          "simulation.transport_payload_bytes": 373720,
+          "server.audit_correlations": 786,
+          "server.audit_history_events": 10000,
+          "server.audit_pending_events": 0,
+          "server.authority_events": 2,
+          "server.authority_requests": 0,
+          "server.intent_receipts": 3,
+          "server.network_encoded_payload_bytes": 7078,
+          "server.network_message_events": 6,
+          "server.network_messages": 6,
+          "server.packet_messages": 0,
+          "server.pending_deliveries": 0
+        }
+      },
+      "last": {
+        "time": 1791762102892.8892,
+        "tick": 359,
+        "radio_tick": 359,
+        "counts": {
+          "simulation.network.devices": 156,
+          "simulation.network.interference_contributions": 4,
+          "simulation.network.interference_entries": 156,
+          "simulation.network.mobility_entries": 156,
+          "simulation.network.pending_events": 4,
+          "simulation.network.pending_receptions": 3,
+          "simulation.network.retained_from_ns": 359000000000,
+          "simulation.pending_fragment_events": 3,
+          "simulation.pending_network_events": 0,
+          "simulation.transport_completed_ids": 5612,
+          "simulation.transport_events": 0,
+          "simulation.transport_fragments": 4,
+          "simulation.transport_messages": 4,
+          "simulation.transport_payload_bytes": 19018,
+          "server.audit_correlations": 4,
+          "server.audit_history_events": 10000,
+          "server.audit_pending_events": 0,
+          "server.authority_events": 2,
+          "server.authority_requests": 0,
+          "server.intent_receipts": 12,
+          "server.network_encoded_payload_bytes": 28400,
+          "server.network_message_events": 24,
+          "server.network_messages": 24,
+          "server.packet_messages": 0,
+          "server.pending_deliveries": 0
+        }
+      },
+      "peak": {
+        "simulation.network.devices": 156,
+        "simulation.network.interference_contributions": 4,
+        "simulation.network.interference_entries": 156,
+        "simulation.network.mobility_entries": 156,
+        "simulation.network.pending_events": 108,
+        "simulation.network.pending_receptions": 34,
+        "simulation.network.retained_from_ns": 359000000000,
+        "simulation.pending_fragment_events": 34,
+        "simulation.pending_network_events": 0,
+        "simulation.transport_completed_ids": 5612,
+        "simulation.transport_events": 0,
+        "simulation.transport_fragments": 786,
+        "simulation.transport_messages": 78,
+        "simulation.transport_payload_bytes": 375748,
+        "server.audit_correlations": 786,
+        "server.audit_history_events": 10000,
+        "server.audit_pending_events": 0,
+        "server.authority_events": 2,
+        "server.authority_requests": 0,
+        "server.intent_receipts": 12,
+        "server.network_encoded_payload_bytes": 28400,
+        "server.network_message_events": 24,
+        "server.network_messages": 24,
+        "server.packet_messages": 0,
+        "server.pending_deliveries": 0
+      }
+    }
+  },
+  "raw_artifacts": "tmp/performance/audit-write-20261011/baseline/mixed-volatile"
+}

@@ -1,5 +1,11 @@
 # Performance measurements
 
+The [October 11 audit write-path checkpoint](2026-10-11-audit-write-results.md)
+records schema-compatible preparation, sparse JSON and cross-game batch writes,
+with 19 complete short-run traces and finer PostgreSQL diagnostics. Regional
+p95 and sampled storage growth improve, but intermittent final-flush stalls leave
+maximum-cycle acceptance open. No long soak was run.
+
 The [October 11 communications audit checkpoint](2026-10-11-audit-results.md)
 records functional validation and the cost of durable metadata history. Regional
 PostgreSQL maximum-cycle acceptance remains open; no long soak was run.

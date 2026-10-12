@@ -1,0 +1,12 @@
+{
+  "revision": "256b9f10a3d8932903da840ac8d242dc439a2543",
+  "binary_sha256": "689628e1ae6dc8a70048a56dd0744b966cc6cfd7ce7114a649d46d50fa00a1a6",
+  "files": {
+    "crates/server/src/storage.rs": "6c77a886749396d7a6ff685a6406bcb2f160cddab5e945e86cee943255ee9ea4",
+    "crates/server/src/audit.rs": "3ecdc54e4aa185454180060e5b35b657d2cde6365402a744decb9cc49774441e",
+    "crates/server/src/performance.rs": "7909ade5dd011966ccce9dd263e14ef23814cfb17ec260a96c362ff653c4bb91",
+    "web/scripts/performance-lib.mjs": "834837d988fea3de07d6a306ca88dfc8cbe971e9920d0685c541d29bc07f4e68",
+    "web/scripts/performance-postgres.mjs": "8c4153bbdbb05546007b749b2abbef713a757f299b5fff0de67eb609bda8d646",
+    "web/scripts/performance-server.mjs": "ef8d9681f49198e5658cdf6d49cb0ca2d80f36968c7946798478e54ea2558745"
+  }
+}

@@ -248,6 +248,16 @@ async fn durable_audit_survives_recovery_and_retention_protects_pending_packets(
 #[tokio::test]
 #[ignore = "requires TEST_DATABASE_URL and PostgreSQL CREATEDB permission"]
 async fn audit_insert_failure_rolls_back_command_and_public_history() {
+    for table in [
+        "communications_audit",
+        "communications_audit_roles",
+        "communications_audit_runtime",
+    ] {
+        assert_audit_failure_rolls_back(table).await;
+    }
+}
+
+async fn assert_audit_failure_rolls_back(table: &str) {
     let database = Database::new().await;
     let mut fixture = durable_fixture(&database).await;
     let state = &mut fixture.state;
@@ -273,9 +283,9 @@ async fn audit_insert_failure_rolls_back_command_and_public_history() {
     let target = state.games.read().await[&id].roles[&role_id].command_units[0];
     let client = database.client().await;
     client
-        .batch_execute(
-            "ALTER TABLE communications_audit ADD CONSTRAINT reject_audit CHECK(false) NOT VALID",
-        )
+        .batch_execute(&format!(
+            "ALTER TABLE {table} ADD CONSTRAINT reject_audit CHECK(false) NOT VALID"
+        ))
         .await
         .unwrap();
     let intent = PlayerIntent {
@@ -475,6 +485,206 @@ async fn archive_cleanup_is_bounded_transactional_and_keeps_shared_message_bodie
     assert_eq!(bodies, 0);
     assert_eq!(store.audit_backlog(&games, 1).await.unwrap(), (0, 0));
     drop(games);
+    drop(fixture);
+    database.close().await;
+}
+
+#[tokio::test]
+#[ignore = "requires TEST_DATABASE_URL and PostgreSQL CREATEDB permission"]
+async fn multi_game_audit_batch_publishes_heads_only_after_commit_and_recovers_once() {
+    let database = Database::new().await;
+    let mut fixture = durable_fixture(&database).await;
+    let state = &mut fixture.state;
+    let (cookie, csrf, _) = new_guest(state).await;
+    let mut ids = Vec::new();
+    let mut paths = Vec::new();
+    for _ in 0..2 {
+        let (prefix, role) = create_game(state, &cookie, &csrf).await;
+        let held = claim_seat(state, &prefix, &role, &cookie, &csrf).await;
+        paths.push(format!(
+            "{prefix}/network/audit?role_id={role}&lease_generation={}",
+            held["lease_generation"].as_u64().unwrap()
+        ));
+        ids.push(prefix.rsplit('/').next().unwrap().parse::<Uuid>().unwrap());
+    }
+    let client = database.client().await;
+    let store = state.durability.store.as_ref().unwrap().clone();
+    let journal_before: i64 = client
+        .query_one("SELECT COUNT(*) FROM game_events", &[])
+        .await
+        .unwrap()
+        .get(0);
+    {
+        let mut games = state.games.write().await;
+        let mut changes = Vec::new();
+        let mut heads = BTreeMap::new();
+        for id in &ids {
+            let game = games.get_mut(id).unwrap();
+            heads.insert(*id, game.audit.heads.clone());
+            let terminal = game.roles.values().next().unwrap().location_unit_id;
+            game.audit.pending.push(sim_core::audit::Event {
+                physical: None,
+                kind: sim_core::audit::Kind::Attempt,
+                at_ns: 1,
+                packet_id: Some(77),
+                bytes: 40,
+                context: Default::default(),
+                terminal: Some(terminal),
+                reason: Some("quoted \"metadata\" \n unicode α".into()),
+            });
+            let mut second = game.audit.pending.last().unwrap().clone();
+            second.packet_id = Some(78);
+            game.audit.pending.push(second);
+            let mut private = game.audit.pending.last().unwrap().clone();
+            private.terminal = None;
+            game.audit.pending.push(private);
+            changes.push(recovery::Boundary::new(game, None, None, "batch_fixture").unwrap());
+        }
+        let pending = ids
+            .iter()
+            .map(|id| (*id, serde_json::to_value(&games[id].audit.pending).unwrap()))
+            .collect::<BTreeMap<_, _>>();
+        for table in [
+            "communications_audit",
+            "communications_audit_roles",
+            "communications_audit_runtime",
+        ] {
+            client
+                .batch_execute(&format!(
+                    "ALTER TABLE {table} ADD CONSTRAINT reject_batch CHECK(false) NOT VALID"
+                ))
+                .await
+                .unwrap();
+            assert!(store.commit(&changes, &mut games, None).await.is_err());
+            for id in &ids {
+                assert_eq!(games[id].audit.heads, heads[id]);
+                assert_eq!(
+                    serde_json::to_value(&games[id].audit.pending).unwrap(),
+                    pending[id]
+                );
+            }
+            let count: i64 = client
+                .query_one("SELECT COUNT(*) FROM communications_audit", &[])
+                .await
+                .unwrap()
+                .get(0);
+            assert_eq!(count, 0);
+            let journal_after: i64 = client
+                .query_one("SELECT COUNT(*) FROM game_events", &[])
+                .await
+                .unwrap()
+                .get(0);
+            assert_eq!(
+                journal_after, journal_before,
+                "audit failure rolls back every game journal boundary"
+            );
+            let roles_after: i64 = client
+                .query_one("SELECT COUNT(*) FROM communications_audit_roles", &[])
+                .await
+                .unwrap()
+                .get(0);
+            assert_eq!(roles_after, 0);
+            client
+                .batch_execute(&format!("ALTER TABLE {table} DROP CONSTRAINT reject_batch"))
+                .await
+                .unwrap();
+        }
+        store.commit(&changes, &mut games, None).await.unwrap();
+        for id in &ids {
+            assert!(games[id].audit.pending.is_empty());
+            assert_ne!(games[id].audit.heads, heads[id]);
+        }
+        // No-event commits preserve audit runtime tuple versions and retained coverage/floors.
+        let versions = client
+            .query(
+                "SELECT game_id,xmin::TEXT FROM communications_audit_runtime ORDER BY game_id",
+                &[],
+            )
+            .await
+            .unwrap()
+            .iter()
+            .map(|r| (r.get::<_, Uuid>(0), r.get::<_, String>(1)))
+            .collect::<Vec<_>>();
+        let empty = ids
+            .iter()
+            .map(|id| {
+                recovery::Boundary::new(games.get_mut(id).unwrap(), None, None, "empty_batch")
+                    .unwrap()
+            })
+            .collect::<Vec<_>>();
+        store.commit(&empty, &mut games, None).await.unwrap();
+        let after = client
+            .query(
+                "SELECT game_id,xmin::TEXT FROM communications_audit_runtime ORDER BY game_id",
+                &[],
+            )
+            .await
+            .unwrap()
+            .iter()
+            .map(|r| (r.get::<_, Uuid>(0), r.get::<_, String>(1)))
+            .collect::<Vec<_>>();
+        assert_eq!(versions, after);
+    }
+    let before = client.query("SELECT game_id,role_id,sequence,detail FROM communications_audit_roles ORDER BY game_id,role_id,sequence", &[]).await.unwrap().iter().map(|r| (r.get::<_,Uuid>(0),r.get::<_,Uuid>(1),r.get::<_,i64>(2),r.get::<_,Value>(3))).collect::<Vec<_>>();
+    assert_eq!(
+        before.len(),
+        8,
+        "two local events at each terminal serving two roles"
+    );
+    assert!(before
+        .iter()
+        .all(|r| r.3["reason"] == "quoted \"metadata\" \n unicode α"));
+    let mut pages = Vec::new();
+    for path in &paths {
+        let first = call(
+            state,
+            "GET",
+            &format!("{path}&limit=1"),
+            &cookie,
+            &csrf,
+            Value::Null,
+        )
+        .await
+        .2;
+        assert_eq!(first["events"].as_array().unwrap().len(), 1);
+        assert_eq!(first["events"][0]["packet_id"], 77);
+        assert_eq!(first["next_cursor"], 1);
+        let next = call(
+            state,
+            "GET",
+            &format!("{path}&limit=1&cursor=1&packet_id=78&kind=attempt"),
+            &cookie,
+            &csrf,
+            Value::Null,
+        )
+        .await
+        .2;
+        assert_eq!(next["events"][0]["sequence"], 2);
+        assert!(next["next_cursor"].is_null());
+        pages.push(first);
+    }
+    drop(store);
+    restart(state, &database).await.unwrap();
+    let after = client.query("SELECT game_id,role_id,sequence,detail FROM communications_audit_roles ORDER BY game_id,role_id,sequence", &[]).await.unwrap().iter().map(|r| (r.get::<_,Uuid>(0),r.get::<_,Uuid>(1),r.get::<_,i64>(2),r.get::<_,Value>(3))).collect::<Vec<_>>();
+    assert_eq!(before, after);
+    for (path, page) in paths.iter().zip(pages) {
+        assert_eq!(
+            call(
+                state,
+                "GET",
+                &format!("{path}&limit=1"),
+                &cookie,
+                &csrf,
+                Value::Null
+            )
+            .await
+            .2,
+            page
+        );
+    }
+    for (id, role, _, _) in before {
+        assert_eq!(state.games.read().await[&id].audit.heads[&role], 2);
+    }
     drop(fixture);
     database.close().await;
 }

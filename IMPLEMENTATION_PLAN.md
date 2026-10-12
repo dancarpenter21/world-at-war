@@ -1,5 +1,30 @@
 # World At War Implementation Plan
 
+## Communications audit write-path checkpoint — 2026-10-11
+
+Audit preparation now indexes terminal roles, borrows captures and encodes sparse
+JSON before opening the transaction. Private events, role projections and runtime
+state are batched across the games in the existing atomic boundary; proposed role
+sequence heads publish only after successful commit. Database schema, public audit
+metadata, retention/recovery behavior and canonical hashes remain compatible.
+
+Opt-in stage timings and PostgreSQL checkpoint/WAL/I/O/wait samples isolate the
+remaining durability cost. All 18 independent five-minute matrix profiles and a
+75-second retention smoke have complete traces with zero client errors, failed
+durable operations or dropped samples. Regional durable p95 improves from 165.7
+to 134.4–150.0 ms and encoded/storage growth decreases. Maximum-cycle acceptance
+remains open: the first optimized regional run reaches 2,400.3 ms, although its
+reverse-order repetition passes at 163.4 ms; the retention smoke also exceeds the
+maximum budget. Final flush dominates the largest stall, with nearby `WalSync`
+observations; the underlying storage/checkpoint cause remains unproven.
+
+Validation passes 215 fast Rust, 14 PostgreSQL, 45 frontend, 61 browser and 16
+harness tests, plus formatting, strict Clippy, Rust 1.89 and dependency-pin checks.
+All four core projection hashes match the preceding checkpoint. See the
+[measurements, diagnostics and limits](docs/performance/2026-10-11-audit-write-results.md).
+This completes the scoped write-path optimization and measurement increment,
+not regional maximum-cycle or long-term acceptance. No long soak was run.
+
 ## Communications metadata audit checkpoint — 2026-10-11
 
 C2, internal knowledge reports, reliable fragments, acknowledgements and IFTU

@@ -1,0 +1,3534 @@
+{
+  "metadata": {
+    "schema_version": 2,
+    "measurement_version": 3,
+    "clock": "epoch anchored to monotonic process time",
+    "storage": "postgres",
+    "archive_retention_days": 0,
+    "retention_sample_seconds": 5,
+    "profile": "regional",
+    "layout": [
+      [
+        "regional-campaign.v1",
+        11
+      ]
+    ],
+    "seed": 12787750,
+    "warmup_seconds": 60,
+    "measured_seconds": 300,
+    "reconnect_every_seconds": 60,
+    "started_at": "2026-10-12T00:32:28.608Z",
+    "revision": "256b9f10a3d8932903da840ac8d242dc439a2543",
+    "dirty": true,
+    "c3mesh_revision": "2f13199e665806b5d0ac0f0f4db07eb436e0a008",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "node": "v24.15.0",
+    "os": "linux",
+    "os_release": "6.6.87.2-microsoft-standard-WSL2",
+    "cpu": "AMD Ryzen 7 9800X3D 8-Core Processor",
+    "logical_cpus": 16,
+    "memory_bytes": 25199570944,
+    "binary_sha256": "ba26b24e494e6764c399211d5fe2cbb91a3ee0d6d5f9002dda762d6d0a4dc07b",
+    "protocol": "1 Hz full snapshots; state/planning HTTP plus network WebSocket, no browser rendering; encoded HTTP body bytes when Content-Length is present, otherwise decoded bytes",
+    "postgres": {
+      "container_name": "waw-perf-f13121ca-b36c-4a07-a8da-8801cdbf9b41",
+      "volume_name": "waw-perf-f13121ca-b36c-4a07-a8da-8801cdbf9b41-data",
+      "image_id": "sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
+      "image_digests": [
+        "postgres@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
+      ],
+      "settings": {
+        "version": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+        "fsync": "on",
+        "synchronous_commit": "on",
+        "full_page_writes": "on",
+        "shared_buffers": "128MB",
+        "checkpoint_timeout": "5min",
+        "max_wal_size": "1GB",
+        "wal_buffers": "4MB",
+        "track_io_timing": "off",
+        "track_wal_io_timing": "off"
+      },
+      "storage": "fresh Docker named volume",
+      "sample_seconds": 5
+    },
+    "clock_ticks_per_second": 100,
+    "games": [
+      {
+        "id": "7975d032-324e-4dbf-85c4-7ea358a7b2ea",
+        "title": "Performance 0",
+        "status": "lobby",
+        "host_player_id": "e7a83bdf-72d5-4c35-927e-81286faba15c",
+        "player_roles_available": 9,
+        "space_catalog_enabled": false,
+        "scenario_id": "regional-campaign.v1",
+        "scenario_version": 2,
+        "communications_catalog_checksum": "b8b62fadfef0c2445462e73d6b3cc964ba42bc59d07a30a60276e3d16e1df583",
+        "message_pack_checksum": "0fac91603a24eb07c7586f3e005b02dc36fb2cebc99d020020e05d98b9f78ba4",
+        "network_policy_id": "fifo.v1",
+        "network_seed": 12787750,
+        "operational_error": null,
+        "mission_complete": false,
+        "settling_reports": false
+      }
+    ],
+    "clients": [
+      {
+        "index": 0,
+        "game_id": "7975d032-324e-4dbf-85c4-7ea358a7b2ea",
+        "role_id": "00000000-0000-0000-0000-0000000000d3"
+      },
+      {
+        "index": 1,
+        "game_id": "7975d032-324e-4dbf-85c4-7ea358a7b2ea",
+        "role_id": "00000000-0000-0000-0000-0000000000c9"
+      },
+      {
+        "index": 2,
+        "game_id": "7975d032-324e-4dbf-85c4-7ea358a7b2ea",
+        "role_id": "00000000-0000-0000-0000-0000000000ca"
+      },
+      {
+        "index": 3,
+        "game_id": "7975d032-324e-4dbf-85c4-7ea358a7b2ea",
+        "role_id": "00000000-0000-0000-0000-0000000000cb"
+      },
+      {
+        "index": 4,
+        "game_id": "7975d032-324e-4dbf-85c4-7ea358a7b2ea",
+        "role_id": "00000000-0000-0000-0000-0000000000cc"
+      },
+      {
+        "index": 5,
+        "game_id": "7975d032-324e-4dbf-85c4-7ea358a7b2ea",
+        "role_id": "00000000-0000-0000-0000-0000000000cd"
+      },
+      {
+        "index": 6,
+        "game_id": "7975d032-324e-4dbf-85c4-7ea358a7b2ea",
+        "role_id": "00000000-0000-0000-0000-0000000000ce"
+      },
+      {
+        "index": 7,
+        "game_id": "7975d032-324e-4dbf-85c4-7ea358a7b2ea",
+        "role_id": "00000000-0000-0000-0000-0000000000d4"
+      },
+      {
+        "index": 8,
+        "game_id": "7975d032-324e-4dbf-85c4-7ea358a7b2ea",
+        "role_id": "00000000-0000-0000-0000-0000000000db"
+      },
+      {
+        "index": 9,
+        "game_id": "7975d032-324e-4dbf-85c4-7ea358a7b2ea",
+        "role_id": "00000000-0000-0000-0000-000000002329",
+        "observer_kind": "controller"
+      },
+      {
+        "index": 10,
+        "game_id": "7975d032-324e-4dbf-85c4-7ea358a7b2ea",
+        "role_id": "00000000-0000-0000-0000-00000000232a",
+        "observer_kind": "monitor"
+      }
+    ],
+    "catalog": null,
+    "measurement_start_unix_ms": 1791765211737.214,
+    "measurement_end_unix_ms": 1791765511737.214,
+    "measurement_completed": true
+  },
+  "summary": {
+    "valid": true,
+    "errors": [],
+    "trace": {
+      "dropped": 0,
+      "kind": "trace_end",
+      "schema_version": 1,
+      "written": 42464
+    },
+    "measured_seconds": 300,
+    "intent_observations": {
+      "executed": 10,
+      "queued": 9
+    },
+    "committed_games": {
+      "7975d032-324e-4dbf-85c4-7ea358a7b2ea": 300
+    },
+    "audit": {
+      "events": 237199,
+      "bytes": 161107587,
+      "cleanup": []
+    },
+    "metrics": {
+      "server": {
+        "durability_gate:http_duration_ms": {
+          "samples": 7969,
+          "mean": 2.3433841637595476,
+          "p50": 0.1,
+          "p95": 2.2,
+          "max": 142.59834800000002,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_encode_duration_ms": {
+          "samples": 1257,
+          "mean": 2.9836867008750985,
+          "p50": 2.7,
+          "p95": 5.6000000000000005,
+          "max": 12.124613,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_encode_bytes": {
+          "samples": 1257,
+          "mean": 2261878.912490056,
+          "p50": 2108847,
+          "p95": 4025521,
+          "max": 4088007,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "lock_wait_ms": {
+          "samples": 11743,
+          "mean": 0.00023080464957847178,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.126148,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "lock_hold_ms": {
+          "samples": 11743,
+          "mean": 1.8284705947372828,
+          "p50": 0.1,
+          "p95": 0.7000000000000001,
+          "max": 163.463066,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_hash_duration_ms": {
+          "samples": 419,
+          "mean": 1.0894940095465397,
+          "p50": 1.1,
+          "p95": 2.1,
+          "max": 2.604041,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_hash_bytes": {
+          "samples": 419,
+          "mean": 2262263.8257756564,
+          "p50": 2108847,
+          "p95": 4025521,
+          "max": 4088007,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "persistence_audit_prepare_duration_ms": {
+          "samples": 419,
+          "mean": 0.5483376038186154,
+          "p50": 0.2,
+          "p95": 2.6,
+          "max": 3.608117,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_audit_prepare_bytes": {
+          "samples": 419,
+          "mean": 384504.98090692126,
+          "p50": 25482,
+          "p95": 2058111,
+          "max": 2058303,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "persistence_audit_prepare_rows": {
+          "samples": 419,
+          "mean": 566.1073985680191,
+          "p50": 98,
+          "p95": 2546,
+          "max": 2547,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_audit_prepare_role_rows": {
+          "samples": 419,
+          "mean": 536.3221957040573,
+          "p50": 94,
+          "p95": 2406,
+          "max": 2407,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_audit_prepare_role_bytes": {
+          "samples": 419,
+          "mean": 100820.13365155131,
+          "p50": 13841,
+          "p95": 459932,
+          "max": 460078,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "persistence_audit_prepare_runtime_bytes": {
+          "samples": 419,
+          "mean": 50083.988066825776,
+          "p50": 1283,
+          "p95": 164731,
+          "max": 164731,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "persistence_lock_duration_ms": {
+          "samples": 419,
+          "mean": 0.0011802124105011933,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.024652,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_audit_runtime_duration_ms": {
+          "samples": 419,
+          "mean": 1.1486693770883047,
+          "p50": 0.7000000000000001,
+          "p95": 2.9000000000000004,
+          "max": 3.583425,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_audit_runtime_bytes": {
+          "samples": 419,
+          "mean": 50083.988066825776,
+          "p50": 1283,
+          "p95": 164731,
+          "max": 164731,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "persistence_audit_runtime_rows": {
+          "samples": 419,
+          "mean": 1,
+          "p50": 1,
+          "p95": 1,
+          "max": 1,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_sql_duration_ms": {
+          "samples": 419,
+          "mean": 33.10429671121718,
+          "p50": 25.5,
+          "p95": 97.60000000000001,
+          "max": 124.705124,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_flush_duration_ms": {
+          "samples": 419,
+          "mean": 2.9369854176610963,
+          "p50": 2,
+          "p95": 13.8,
+          "max": 18.751251,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_commit_duration_ms": {
+          "samples": 419,
+          "mean": 36.744450176610975,
+          "p50": 27.400000000000002,
+          "p95": 107.30000000000001,
+          "max": 136.016969,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_commit_boundaries": {
+          "samples": 419,
+          "mean": 1,
+          "p50": 1,
+          "p95": 1,
+          "max": 1,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_commit_checkpoints": {
+          "samples": 419,
+          "mean": 0.2935560859188544,
+          "p50": 0,
+          "p95": 1,
+          "max": 1,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_commit_journal_bytes": {
+          "samples": 419,
+          "mean": 834923.553699284,
+          "p50": 2277,
+          "p95": 4008721,
+          "max": 4053489,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "persistence_commit_snapshot_submitted_bytes": {
+          "samples": 419,
+          "mean": 847910.813842482,
+          "p50": 0,
+          "p95": 4008721,
+          "max": 4053489,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "persistence_commit_archived_events": {
+          "samples": 419,
+          "mean": 0.045346062052505964,
+          "p50": 0,
+          "p95": 0,
+          "max": 1,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_commit_audit_events": {
+          "samples": 419,
+          "mean": 566.1073985680191,
+          "p50": 98,
+          "p95": 2546,
+          "max": 2547,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_commit_audit_bytes": {
+          "samples": 419,
+          "mean": 384504.98090692126,
+          "p50": 25482,
+          "p95": 2058111,
+          "max": 2058303,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "mutation_boundary_duration_ms": {
+          "samples": 119,
+          "mean": 51.401998781512596,
+          "p50": 49.300000000000004,
+          "p95": 70.7,
+          "max": 83.209118,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "durability_gate:simulation_duration_ms": {
+          "samples": 300,
+          "mean": 1.157708716666667,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 72.423746,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_audit_records_duration_ms": {
+          "samples": 309,
+          "mean": 12.50593432038835,
+          "p50": 5.800000000000001,
+          "p95": 48.6,
+          "max": 59.363005,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_audit_records_bytes": {
+          "samples": 309,
+          "mean": 521383.0647249191,
+          "p50": 277697,
+          "p95": 2058111,
+          "max": 2058303,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "persistence_audit_records_rows": {
+          "samples": 309,
+          "mean": 767.6343042071197,
+          "p50": 393,
+          "p95": 2546,
+          "max": 2547,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_audit_roles_duration_ms": {
+          "samples": 309,
+          "mean": 13.992610944983811,
+          "p50": 8,
+          "p95": 47,
+          "max": 67.883409,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_audit_roles_bytes": {
+          "samples": 309,
+          "mean": 136710.79611650485,
+          "p50": 70217,
+          "p95": 459932,
+          "max": 460078,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "persistence_audit_roles_rows": {
+          "samples": 309,
+          "mean": 727.2459546925567,
+          "p50": 381,
+          "p95": 2406,
+          "max": 2407,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "cycle_duration_ms": {
+          "samples": 300,
+          "mean": 47.85475616333332,
+          "p50": 29.6,
+          "p95": 134.4,
+          "max": 163.432515,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "cycle_schedule_delay_ms": {
+          "samples": 300,
+          "mean": 3.1744606166666665,
+          "p50": 1.8,
+          "p95": 4.7,
+          "max": 73.044445,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "cycle_scheduled_to_committed_ms": {
+          "samples": 300,
+          "mean": 51.02779644000001,
+          "p50": 31.700000000000003,
+          "p95": 134.9,
+          "max": 164.52185799999998,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "durability_gate:websocket_duration_ms": {
+          "samples": 2636,
+          "mean": 1.4815815944613056,
+          "p50": 0.1,
+          "p95": 0.8,
+          "max": 130.494804,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "durability_gate:observer_duration_ms": {
+          "samples": 600,
+          "mean": 0.6624671816666667,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 88.258448,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "game:7975d032-324e-4dbf-85c4-7ea358a7b2ea": {
+        "persistence_encode_duration_ms": {
+          "samples": 1257,
+          "mean": 2.9836867008750985,
+          "p50": 2.7,
+          "p95": 5.6000000000000005,
+          "max": 12.124613,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "persistence_encode_bytes": {
+          "samples": 1257,
+          "mean": 2261878.912490056,
+          "p50": 2108847,
+          "p95": 4025521,
+          "max": 4088007,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "tick_duration_ms": {
+          "samples": 300,
+          "mean": 2.3164063433333317,
+          "p50": 1.4000000000000001,
+          "p95": 8.5,
+          "max": 9.698094000000001,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "tick_schedule_delay_ms": {
+          "samples": 300,
+          "mean": 6.493230700000004,
+          "p50": 5.5,
+          "p95": 8.9,
+          "max": 75.249199,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "websocket_build_including_lock_ms": {
+          "samples": 2636,
+          "mean": 0.12320968437025778,
+          "p50": 0.1,
+          "p95": 0.5,
+          "max": 1.447978,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "websocket_serialization_ms": {
+          "samples": 2636,
+          "mean": 0.04041931752655528,
+          "p50": 0.1,
+          "p95": 0.2,
+          "max": 0.375112,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "websocket_bytes": {
+          "samples": 2636,
+          "mean": 28370.80462822458,
+          "p50": 5716,
+          "p95": 139929,
+          "max": 209138,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "http_build_ms": {
+          "samples": 2610,
+          "mean": 0.05658961685823752,
+          "p50": 0.1,
+          "p95": 0.30000000000000004,
+          "max": 0.761277,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "http_serialization_ms": {
+          "samples": 2610,
+          "mean": 0.03203222183908051,
+          "p50": 0.1,
+          "p95": 0.2,
+          "max": 0.310023,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "http_bytes": {
+          "samples": 2610,
+          "mean": 24859.65325670498,
+          "p50": 6745,
+          "p95": 118773,
+          "max": 144467,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "observer_websocket_build_ms": {
+          "samples": 600,
+          "mean": 0.09655475000000009,
+          "p50": 0.1,
+          "p95": 0.2,
+          "max": 0.23461900000000002,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "observer_websocket_serialization_ms": {
+          "samples": 600,
+          "mean": 0.03260240166666669,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.094608,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "observer_websocket_bytes": {
+          "samples": 600,
+          "mean": 28620.64,
+          "p50": 28561,
+          "p95": 28831,
+          "max": 28832,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "request_ms": {
+          "samples": 7960,
+          "mean": 4.73923597964864,
+          "p50": 1.5,
+          "p95": 11.200000000000001,
+          "max": 208.86213799996767,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 7960,
+          "mean": 10831.564070351758,
+          "p50": 6720,
+          "p95": 66282,
+          "max": 144467,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 1310,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "lock:crates/server/src/recovery.rs:262:read": {
+        "wait_ms": {
+          "samples": 119,
+          "mean": 0.0002168991596638655,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.00042899999999999997,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 119,
+          "mean": 3.558270621848738,
+          "p50": 3.8000000000000003,
+          "p95": 5.4,
+          "max": 6.283406,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/leases.rs:274:write": {
+        "wait_ms": {
+          "samples": 102,
+          "mean": 0.0002478627450980393,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.000576,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 102,
+          "mean": 0.003248460784313725,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.048523000000000004,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/recovery.rs:270:write": {
+        "wait_ms": {
+          "samples": 119,
+          "mean": 0.00018289075630252097,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.000283,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 119,
+          "mean": 47.77438857983195,
+          "p50": 46.2,
+          "p95": 65.7,
+          "max": 77.35270700000001,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/main.rs:1107:read": {
+        "wait_ms": {
+          "samples": 1310,
+          "mean": 0.00020388320610687118,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.000585,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 1310,
+          "mean": 0.009197341984732824,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.110142,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/main.rs:1220:read": {
+        "wait_ms": {
+          "samples": 1310,
+          "mean": 0.00019316106870229116,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.0005020000000000001,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 1310,
+          "mean": 0.002848063358778626,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.11733700000000001,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/main.rs:3108:write": {
+        "wait_ms": {
+          "samples": 300,
+          "mean": 0.0007751599999999999,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.126148,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 300,
+          "mean": 47.880703206666695,
+          "p50": 29.6,
+          "p95": 134.4,
+          "max": 163.463066,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/main.rs:2901:write": {
+        "wait_ms": {
+          "samples": 2636,
+          "mean": 0.0002635018968133525,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.020386,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 2636,
+          "mean": 0.10269441502276158,
+          "p50": 0.1,
+          "p95": 0.4,
+          "max": 1.424341,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/planning.rs:221:write": {
+        "wait_ms": {
+          "samples": 2602,
+          "mean": 0.00019796425826287597,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.000647,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 2602,
+          "mean": 0.10181034934665642,
+          "p50": 0.1,
+          "p95": 0.5,
+          "max": 0.958896,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/main.rs:2031:write": {
+        "wait_ms": {
+          "samples": 2610,
+          "mean": 0.00019624865900383224,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.001491,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 2610,
+          "mean": 0.13410677854406133,
+          "p50": 0.1,
+          "p95": 0.5,
+          "max": 1.036508,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/observers.rs:266:write": {
+        "wait_ms": {
+          "samples": 600,
+          "mean": 0.0002571866666666662,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.000869,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 600,
+          "mean": 0.1609911833333334,
+          "p50": 0.2,
+          "p95": 0.30000000000000004,
+          "max": 0.35626800000000003,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/intents.rs:333:read": {
+        "wait_ms": {
+          "samples": 10,
+          "mean": 0.00020429999999999998,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.00046199999999999995,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 10,
+          "mean": 0.0056143,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.007351,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/main.rs:1095:write": {
+        "wait_ms": {
+          "samples": 9,
+          "mean": 0.0002938888888888889,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.0006209999999999999,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 9,
+          "mean": 0.055441222222222225,
+          "p50": 0.1,
+          "p95": 0.30000000000000004,
+          "max": 0.227748,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/leases.rs:240:write": {
+        "wait_ms": {
+          "samples": 8,
+          "mean": 0.0002855,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.00046199999999999995,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 8,
+          "mean": 0.0028491249999999997,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.0040550000000000004,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "lock:crates/server/src/main.rs:2861:read": {
+        "wait_ms": {
+          "samples": 8,
+          "mean": 0.000202375,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.00040699999999999997,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "hold_ms": {
+          "samples": 8,
+          "mean": 0.002205875,
+          "p50": 0.1,
+          "p95": 0.1,
+          "max": 0.004058999999999999,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "client:5": {
+        "request_ms": {
+          "samples": 877,
+          "mean": 4.636081839224945,
+          "p50": 1.4000000000000001,
+          "p95": 7.800000000000001,
+          "max": 190.71194399998058,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 877,
+          "mean": 4660.354618015964,
+          "p50": 377,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 999.9837676051578,
+          "p50": 1000.1,
+          "p95": 1003.1,
+          "max": 1121.905029296875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 140.47146000000066,
+          "p50": 140.5,
+          "p95": 140.5,
+          "max": 140.47146000000066,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 290,
+          "mean": 19809.144827586206,
+          "p50": 12643,
+          "p95": 27105,
+          "max": 34252,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/roles/:id/renew": {
+        "request_ms": {
+          "samples": 101,
+          "mean": 80.65909516831708,
+          "p50": 69.3,
+          "p95": 147.5,
+          "max": 208.86213799996767,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 101,
+          "mean": 393.7722772277228,
+          "p50": 370,
+          "p95": 691,
+          "max": 691,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:6": {
+        "request_ms": {
+          "samples": 877,
+          "mean": 4.475379729760767,
+          "p50": 1.5,
+          "p95": 6.800000000000001,
+          "max": 144.52620500000194,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 877,
+          "mean": 4659.994298745724,
+          "p50": 377,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 999.9579664184148,
+          "p50": 1000,
+          "p95": 1002.2,
+          "max": 1054.26806640625,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 153.93582899996545,
+          "p50": 154,
+          "p95": 154,
+          "max": 153.93582899996545,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 290,
+          "mean": 19804.844827586207,
+          "p50": 12631,
+          "p95": 27093,
+          "max": 34231,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:7": {
+        "request_ms": {
+          "samples": 877,
+          "mean": 4.555793631698992,
+          "p50": 1.4000000000000001,
+          "p95": 7.6000000000000005,
+          "max": 208.86213799996767,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 877,
+          "mean": 4677.96921322691,
+          "p50": 354,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 999.9233618079585,
+          "p50": 1000,
+          "p95": 1002,
+          "max": 1054.454833984375,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 153.64590699999826,
+          "p50": 153.70000000000002,
+          "p95": 153.70000000000002,
+          "max": 153.64590699999826,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 290,
+          "mean": 19921.006896551724,
+          "p50": 12757,
+          "p95": 27219,
+          "max": 34392,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "generator": {
+        "schedule_lag_ms": {
+          "samples": 300,
+          "mean": 0.9620654296875,
+          "p50": 0.7000000000000001,
+          "p95": 3.1,
+          "max": 4.3857421875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        }
+      },
+      "client:8": {
+        "request_ms": {
+          "samples": 906,
+          "mean": 4.451834881898358,
+          "p50": 1.7000000000000002,
+          "p95": 7.2,
+          "max": 135.68049299996346,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 906,
+          "mean": 30715.90949227373,
+          "p50": 363,
+          "p95": 126481,
+          "max": 141996,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 150,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9004923502604,
+          "p50": 1000.1,
+          "p95": 1001.9000000000001,
+          "max": 1108.188232421875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 300,
+          "mean": 177859.57,
+          "p50": 174691,
+          "p95": 283039,
+          "max": 415262,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:9": {
+        "request_ms": {
+          "samples": 10,
+          "mean": 89.91411720000106,
+          "p50": 71,
+          "p95": 160.4,
+          "max": 160.31359400000656,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 10,
+          "mean": 262,
+          "p50": 262,
+          "p95": 262,
+          "max": 262,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9706632486979,
+          "p50": 1000,
+          "p95": 1001.3000000000001,
+          "max": 1088.773681640625,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 298,
+          "mean": 28821.51677852349,
+          "p50": 28561,
+          "p95": 28832,
+          "max": 57701,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:1": {
+        "request_ms": {
+          "samples": 877,
+          "mean": 4.355316272520994,
+          "p50": 1.5,
+          "p95": 12.100000000000001,
+          "max": 147.37685699999565,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 877,
+          "mean": 6938.860889395667,
+          "p50": 6770,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 1000.0084950800173,
+          "p50": 1000,
+          "p95": 1014.8000000000001,
+          "max": 1092.387939453125,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 134.82144799997332,
+          "p50": 134.9,
+          "p95": 134.9,
+          "max": 134.82144799997332,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 291,
+          "mean": 26607.31271477663,
+          "p50": 20156,
+          "p95": 34033,
+          "max": 34724,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/authority": {
+        "request_ms": {
+          "samples": 1310,
+          "mean": 4.586678838167838,
+          "p50": 1.7000000000000002,
+          "p95": 7.6000000000000005,
+          "max": 129.46923599997535,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 1310,
+          "mean": 14461,
+          "p50": 14461,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:4": {
+        "request_ms": {
+          "samples": 876,
+          "mean": 4.429824062785987,
+          "p50": 1.5,
+          "p95": 8.5,
+          "max": 127.00497100001667,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 876,
+          "mean": 4659.674657534247,
+          "p50": 374,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 999.9253782912522,
+          "p50": 999.8000000000001,
+          "p95": 1003.5,
+          "max": 1121.87158203125,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 140.7945989999862,
+          "p50": 140.8,
+          "p95": 140.8,
+          "max": 140.7945989999862,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 290,
+          "mean": 19774.20344827586,
+          "p50": 12601,
+          "p95": 27063,
+          "max": 34186,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:3": {
+        "request_ms": {
+          "samples": 877,
+          "mean": 4.549489611175175,
+          "p50": 1.5,
+          "p95": 7.1000000000000005,
+          "max": 135.9823589999869,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 877,
+          "mean": 4659.192702394526,
+          "p50": 370,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 999.9570920739619,
+          "p50": 1000,
+          "p95": 1003.8000000000001,
+          "max": 1130.174560546875,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 143.66252299997723,
+          "p50": 143.70000000000002,
+          "p95": 143.70000000000002,
+          "max": 143.66252299997723,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 291,
+          "mean": 19734.374570446736,
+          "p50": 12629,
+          "p95": 27091,
+          "max": 27461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/authority/requests": {
+        "request_ms": {
+          "samples": 1310,
+          "mean": 1.3210401603062385,
+          "p50": 0.8,
+          "p95": 2.4000000000000004,
+          "max": 69.53859700000612,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 1310,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 1310,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:10": {
+        "request_ms": {
+          "samples": 10,
+          "mean": 93.6987580999972,
+          "p50": 75.3,
+          "p95": 147.4,
+          "max": 147.36747900000773,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 10,
+          "mean": 253,
+          "p50": 253,
+          "p95": 253,
+          "max": 253,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 300,
+          "mean": 999.9354654947916,
+          "p50": 1000,
+          "p95": 1001.6,
+          "max": 1069.027587890625,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 295,
+          "mean": 29114.31186440678,
+          "p50": 28561,
+          "p95": 28832,
+          "max": 57692,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:2": {
+        "request_ms": {
+          "samples": 877,
+          "mean": 4.335751296465865,
+          "p50": 1.4000000000000001,
+          "p95": 7.6000000000000005,
+          "max": 128.26208300003782,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 877,
+          "mean": 4662.70125427594,
+          "p50": 585,
+          "p95": 14461,
+          "max": 14461,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 1000.0116241349481,
+          "p50": 999.9000000000001,
+          "p95": 1004.2,
+          "max": 1129.9033203125,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 144.0203830000246,
+          "p50": 144.1,
+          "p95": 144.1,
+          "max": 144.0203830000246,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 291,
+          "mean": 19748.144329896906,
+          "p50": 13122,
+          "p95": 27105,
+          "max": 27690,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "client:0": {
+        "request_ms": {
+          "samples": 896,
+          "mean": 4.884095876116256,
+          "p50": 1.7000000000000002,
+          "p95": 29,
+          "max": 171.86383399995975,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 896,
+          "mean": 30989.290178571428,
+          "p50": 357,
+          "p95": 128787,
+          "max": 144467,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "encoded_http_bytes": {
+          "samples": 145,
+          "mean": 2,
+          "p50": 2,
+          "p95": 2,
+          "max": 2,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        },
+        "stream_gap_ms": {
+          "samples": 289,
+          "mean": 999.9923496972318,
+          "p50": 999.9000000000001,
+          "p95": 1015.6,
+          "max": 1093.447509765625,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "reconnect_ms": {
+          "samples": 1,
+          "mean": 135.9167750000197,
+          "p50": 136,
+          "p95": 136,
+          "max": 135.9167750000197,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "received_bytes_per_active_second": {
+          "samples": 291,
+          "mean": 223949.0206185567,
+          "p50": 223011,
+          "p95": 352877,
+          "max": 368166,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/planning": {
+        "request_ms": {
+          "samples": 2602,
+          "mean": 3.8680954615686542,
+          "p50": 1.6,
+          "p95": 5.1000000000000005,
+          "max": 131.27859400003217,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 2602,
+          "mean": 899.684473481937,
+          "p50": 133,
+          "p95": 7061,
+          "max": 7061,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/state": {
+        "request_ms": {
+          "samples": 2610,
+          "mean": 3.997614014176464,
+          "p50": 1.6,
+          "p95": 5.4,
+          "max": 131.07068499998422,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 2610,
+          "mean": 24859.65325670498,
+          "p50": 6745,
+          "p95": 118773,
+          "max": 144467,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/roles/:id/intents/:id": {
+        "request_ms": {
+          "samples": 10,
+          "mean": 1.0236810000038532,
+          "p50": 1.1,
+          "p95": 1.2000000000000002,
+          "max": 1.1436529999991762,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 10,
+          "mean": 369.2,
+          "p50": 370,
+          "p95": 370,
+          "max": 370,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/roles/:id/intent": {
+        "request_ms": {
+          "samples": 9,
+          "mean": 62.78874588887912,
+          "p50": 50.1,
+          "p95": 171.9,
+          "max": 171.86383399995975,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 9,
+          "mean": 122,
+          "p50": 122,
+          "p95": 122,
+          "max": 122,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      },
+      "http:/v1/games/:id/roles/:id/resume": {
+        "request_ms": {
+          "samples": 8,
+          "mean": 95.5931758749939,
+          "p50": 81.7,
+          "p95": 150.8,
+          "max": 150.7177939999965,
+          "histogram_resolution": 0.1,
+          "histogram_ceiling": 10000
+        },
+        "decoded_http_bytes": {
+          "samples": 8,
+          "mean": 435.625,
+          "p50": 374,
+          "p95": 691,
+          "max": 691,
+          "histogram_resolution": 1,
+          "histogram_ceiling": 10000000
+        }
+      }
+    },
+    "measurement_version": 3,
+    "storage": "postgres",
+    "budgets": {
+      "regional": [
+        {
+          "game_id": "7975d032-324e-4dbf-85c4-7ea358a7b2ea",
+          "p95_ms": 134.4,
+          "max_ms": 163.432515,
+          "met": true
+        }
+      ],
+      "reconnect": [
+        {
+          "client": "client:5",
+          "max_ms": 140.47146000000066,
+          "met": true
+        },
+        {
+          "client": "client:6",
+          "max_ms": 153.93582899996545,
+          "met": true
+        },
+        {
+          "client": "client:7",
+          "max_ms": 153.64590699999826,
+          "met": true
+        },
+        {
+          "client": "client:1",
+          "max_ms": 134.82144799997332,
+          "met": true
+        },
+        {
+          "client": "client:4",
+          "max_ms": 140.7945989999862,
+          "met": true
+        },
+        {
+          "client": "client:3",
+          "max_ms": 143.66252299997723,
+          "met": true
+        },
+        {
+          "client": "client:2",
+          "max_ms": 144.0203830000246,
+          "met": true
+        },
+        {
+          "client": "client:0",
+          "max_ms": 135.9167750000197,
+          "met": true
+        }
+      ]
+    }
+  },
+  "resources": {
+    "samples": 60,
+    "first": {
+      "time": 1791765212852.8699,
+      "phase": "measurement",
+      "kind": "resource",
+      "server_rss_bytes": 183508992,
+      "server_cpu_seconds": 1.6,
+      "audit_bytes": 0,
+      "generator_rss_bytes": 143159296,
+      "generator_cpu": {
+        "user": 1733879,
+        "system": 482297
+      }
+    },
+    "last": {
+      "time": 1791765508234.0505,
+      "phase": "measurement",
+      "kind": "resource",
+      "server_rss_bytes": 187809792,
+      "server_cpu_seconds": 10.47,
+      "audit_bytes": 0,
+      "generator_rss_bytes": 177135616,
+      "generator_cpu": {
+        "user": 8260590,
+        "system": 2230277
+      }
+    },
+    "server_rss_bytes": {
+      "first": 183508992,
+      "last": 187809792,
+      "peak": 213827584
+    },
+    "server_cpu_seconds": {
+      "first": 1.6,
+      "last": 10.47,
+      "peak": 10.47
+    },
+    "generator_rss_bytes": {
+      "first": 143159296,
+      "last": 177135616,
+      "peak": 179015680
+    },
+    "audit_bytes": {
+      "first": 0,
+      "last": 0,
+      "peak": 0
+    }
+  },
+  "database": {
+    "samples": 60,
+    "first": {
+      "time": 1791765212863.4575,
+      "phase": "measurement",
+      "kind": "database_resource",
+      "database_bytes": 78673587,
+      "checkpointer": {
+        "num_timed": 0,
+        "num_requested": 1,
+        "restartpoints_timed": 0,
+        "restartpoints_req": 0,
+        "restartpoints_done": 0,
+        "write_time": 29,
+        "sync_time": 95,
+        "buffers_written": 923,
+        "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+      },
+      "wal_stats": {
+        "wal_records": 311684,
+        "wal_fpi": 1548,
+        "wal_bytes": 92286037,
+        "wal_buffers_full": 444,
+        "wal_write": 1363,
+        "wal_sync": 159,
+        "wal_write_time": 0,
+        "wal_sync_time": 0,
+        "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+      },
+      "io_stats": [
+        {
+          "backend_type": "client backend",
+          "object": "relation",
+          "context": "bulkread",
+          "reads": 920,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": 14,
+          "evictions": 0,
+          "reuses": 135,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "client backend",
+          "object": "relation",
+          "context": "bulkwrite",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "client backend",
+          "object": "relation",
+          "context": "normal",
+          "reads": 465,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 8460,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 987622,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": 0,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "client backend",
+          "object": "relation",
+          "context": "vacuum",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "client backend",
+          "object": "temp relation",
+          "context": "normal",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": null,
+          "writeback_time": null,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "autovacuum launcher",
+          "object": "relation",
+          "context": "bulkread",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "autovacuum launcher",
+          "object": "relation",
+          "context": "normal",
+          "reads": 1,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": 0,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "autovacuum worker",
+          "object": "relation",
+          "context": "bulkread",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "autovacuum worker",
+          "object": "relation",
+          "context": "normal",
+          "reads": 202,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 18,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 11141,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": 0,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "autovacuum worker",
+          "object": "relation",
+          "context": "vacuum",
+          "reads": 142,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 7885,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "background worker",
+          "object": "relation",
+          "context": "bulkread",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "background worker",
+          "object": "relation",
+          "context": "bulkwrite",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "background worker",
+          "object": "relation",
+          "context": "normal",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": 0,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "background worker",
+          "object": "relation",
+          "context": "vacuum",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "background worker",
+          "object": "temp relation",
+          "context": "normal",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": null,
+          "writeback_time": null,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "walsender",
+          "object": "relation",
+          "context": "bulkread",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "walsender",
+          "object": "relation",
+          "context": "bulkwrite",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "walsender",
+          "object": "relation",
+          "context": "normal",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": 0,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "walsender",
+          "object": "relation",
+          "context": "vacuum",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "walsender",
+          "object": "temp relation",
+          "context": "normal",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": null,
+          "writeback_time": null,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "slotsync worker",
+          "object": "relation",
+          "context": "bulkread",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "slotsync worker",
+          "object": "relation",
+          "context": "bulkwrite",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "slotsync worker",
+          "object": "relation",
+          "context": "normal",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": 0,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "slotsync worker",
+          "object": "relation",
+          "context": "vacuum",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "slotsync worker",
+          "object": "temp relation",
+          "context": "normal",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": null,
+          "writeback_time": null,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "standalone backend",
+          "object": "relation",
+          "context": "bulkread",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "standalone backend",
+          "object": "relation",
+          "context": "bulkwrite",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 8,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 7,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "standalone backend",
+          "object": "relation",
+          "context": "normal",
+          "reads": 537,
+          "read_time": 0,
+          "writes": 1015,
+          "write_time": 0,
+          "writebacks": 1015,
+          "writeback_time": 0,
+          "extends": 666,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 90967,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": 0,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "standalone backend",
+          "object": "relation",
+          "context": "vacuum",
+          "reads": 9,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 912,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "background writer",
+          "object": "relation",
+          "context": "normal",
+          "reads": null,
+          "read_time": null,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": null,
+          "evictions": null,
+          "reuses": null,
+          "fsyncs": 0,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "checkpointer",
+          "object": "relation",
+          "context": "normal",
+          "reads": null,
+          "read_time": null,
+          "writes": 923,
+          "write_time": 0,
+          "writebacks": 923,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": null,
+          "evictions": null,
+          "reuses": null,
+          "fsyncs": 299,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "startup",
+          "object": "relation",
+          "context": "bulkread",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "startup",
+          "object": "relation",
+          "context": "bulkwrite",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "startup",
+          "object": "relation",
+          "context": "normal",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": 0,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "startup",
+          "object": "relation",
+          "context": "vacuum",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        }
+      ],
+      "activity_waits": [
+        {
+          "wait_event_type": "Client",
+          "wait_event": "ClientRead",
+          "sessions": 1
+        }
+      ],
+      "wal_bytes": 86120936,
+      "relations": {
+        "game_seats": {
+          "total_bytes": 32768,
+          "table_bytes": 16384,
+          "index_bytes": 16384
+        },
+        "game_metadata": {
+          "total_bytes": 32768,
+          "table_bytes": 16384,
+          "index_bytes": 16384
+        },
+        "schema_migrations": {
+          "total_bytes": 32768,
+          "table_bytes": 16384,
+          "index_bytes": 16384
+        },
+        "communications_audit": {
+          "total_bytes": 43802624,
+          "table_bytes": 40648704,
+          "index_bytes": 3153920
+        },
+        "game_memberships": {
+          "total_bytes": 32768,
+          "table_bytes": 16384,
+          "index_bytes": 16384
+        },
+        "communications_audit_runtime": {
+          "total_bytes": 270336,
+          "table_bytes": 253952,
+          "index_bytes": 16384
+        },
+        "browser_sessions": {
+          "total_bytes": 65536,
+          "table_bytes": 16384,
+          "index_bytes": 49152
+        },
+        "network_events": {
+          "total_bytes": 65536,
+          "table_bytes": 16384,
+          "index_bytes": 49152
+        },
+        "games": {
+          "total_bytes": 3039232,
+          "table_bytes": 3022848,
+          "index_bytes": 16384
+        },
+        "communications_audit_roles": {
+          "total_bytes": 18849792,
+          "table_bytes": 14385152,
+          "index_bytes": 4464640
+        },
+        "network_messages": {
+          "total_bytes": 32768,
+          "table_bytes": 16384,
+          "index_bytes": 16384
+        },
+        "game_events": {
+          "total_bytes": 4407296,
+          "table_bytes": 4390912,
+          "index_bytes": 16384
+        },
+        "players": {
+          "total_bytes": 49152,
+          "table_bytes": 16384,
+          "index_bytes": 32768
+        }
+      },
+      "container_cpu_percent": "8.41%",
+      "container_memory": "112.4MiB / 23.47GiB",
+      "container_block_io": "0B / 279MB",
+      "sampling_ms": 1113.6268259999997
+    },
+    "last": {
+      "time": 1791765507966.6191,
+      "phase": "measurement",
+      "kind": "database_resource",
+      "database_bytes": 443414195,
+      "checkpointer": {
+        "num_timed": 1,
+        "num_requested": 1,
+        "restartpoints_timed": 0,
+        "restartpoints_req": 0,
+        "restartpoints_done": 0,
+        "write_time": 29,
+        "sync_time": 95,
+        "buffers_written": 2051,
+        "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+      },
+      "wal_stats": {
+        "wal_records": 1832581,
+        "wal_fpi": 1749,
+        "wal_bytes": 557740526,
+        "wal_buffers_full": 3391,
+        "wal_write": 4923,
+        "wal_sync": 704,
+        "wal_write_time": 0,
+        "wal_sync_time": 0,
+        "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+      },
+      "io_stats": [
+        {
+          "backend_type": "client backend",
+          "object": "relation",
+          "context": "bulkread",
+          "reads": 920,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": 14,
+          "evictions": 0,
+          "reuses": 135,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "client backend",
+          "object": "relation",
+          "context": "bulkwrite",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "client backend",
+          "object": "relation",
+          "context": "normal",
+          "reads": 859,
+          "read_time": 0,
+          "writes": 572,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 53205,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 6145061,
+          "evictions": 37920,
+          "reuses": null,
+          "fsyncs": 0,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "client backend",
+          "object": "relation",
+          "context": "vacuum",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "client backend",
+          "object": "temp relation",
+          "context": "normal",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": null,
+          "writeback_time": null,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "autovacuum launcher",
+          "object": "relation",
+          "context": "bulkread",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "autovacuum launcher",
+          "object": "relation",
+          "context": "normal",
+          "reads": 1,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": 0,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "autovacuum worker",
+          "object": "relation",
+          "context": "bulkread",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "autovacuum worker",
+          "object": "relation",
+          "context": "normal",
+          "reads": 502,
+          "read_time": 0,
+          "writes": 5,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 39,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 61609,
+          "evictions": 229,
+          "reuses": null,
+          "fsyncs": 0,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "autovacuum worker",
+          "object": "relation",
+          "context": "vacuum",
+          "reads": 44714,
+          "read_time": 0,
+          "writes": 83,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 95937,
+          "evictions": 776,
+          "reuses": 43796,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "background worker",
+          "object": "relation",
+          "context": "bulkread",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "background worker",
+          "object": "relation",
+          "context": "bulkwrite",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "background worker",
+          "object": "relation",
+          "context": "normal",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": 0,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "background worker",
+          "object": "relation",
+          "context": "vacuum",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "background worker",
+          "object": "temp relation",
+          "context": "normal",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": null,
+          "writeback_time": null,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "walsender",
+          "object": "relation",
+          "context": "bulkread",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "walsender",
+          "object": "relation",
+          "context": "bulkwrite",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "walsender",
+          "object": "relation",
+          "context": "normal",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": 0,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "walsender",
+          "object": "relation",
+          "context": "vacuum",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "walsender",
+          "object": "temp relation",
+          "context": "normal",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": null,
+          "writeback_time": null,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "slotsync worker",
+          "object": "relation",
+          "context": "bulkread",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "slotsync worker",
+          "object": "relation",
+          "context": "bulkwrite",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "slotsync worker",
+          "object": "relation",
+          "context": "normal",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": 0,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "slotsync worker",
+          "object": "relation",
+          "context": "vacuum",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "slotsync worker",
+          "object": "temp relation",
+          "context": "normal",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": null,
+          "writeback_time": null,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "standalone backend",
+          "object": "relation",
+          "context": "bulkread",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "standalone backend",
+          "object": "relation",
+          "context": "bulkwrite",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 8,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 7,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "standalone backend",
+          "object": "relation",
+          "context": "normal",
+          "reads": 537,
+          "read_time": 0,
+          "writes": 1015,
+          "write_time": 0,
+          "writebacks": 1015,
+          "writeback_time": 0,
+          "extends": 666,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 90967,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": 0,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "standalone backend",
+          "object": "relation",
+          "context": "vacuum",
+          "reads": 9,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 912,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "background writer",
+          "object": "relation",
+          "context": "normal",
+          "reads": null,
+          "read_time": null,
+          "writes": 39157,
+          "write_time": 0,
+          "writebacks": 39104,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": null,
+          "evictions": null,
+          "reuses": null,
+          "fsyncs": 0,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "checkpointer",
+          "object": "relation",
+          "context": "normal",
+          "reads": null,
+          "read_time": null,
+          "writes": 2051,
+          "write_time": 0,
+          "writebacks": 2043,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": null,
+          "evictions": null,
+          "reuses": null,
+          "fsyncs": 299,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "startup",
+          "object": "relation",
+          "context": "bulkread",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": null,
+          "extend_time": null,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "startup",
+          "object": "relation",
+          "context": "bulkwrite",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "startup",
+          "object": "relation",
+          "context": "normal",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": null,
+          "fsyncs": 0,
+          "fsync_time": 0,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        },
+        {
+          "backend_type": "startup",
+          "object": "relation",
+          "context": "vacuum",
+          "reads": 0,
+          "read_time": 0,
+          "writes": 0,
+          "write_time": 0,
+          "writebacks": 0,
+          "writeback_time": 0,
+          "extends": 0,
+          "extend_time": 0,
+          "op_bytes": 8192,
+          "hits": 0,
+          "evictions": 0,
+          "reuses": 0,
+          "fsyncs": null,
+          "fsync_time": null,
+          "stats_reset": "2026-10-12T00:32:29.445911+00:00"
+        }
+      ],
+      "activity_waits": [
+        {
+          "wait_event_type": "Client",
+          "wait_event": "ClientRead",
+          "sessions": 1
+        }
+      ],
+      "wal_bytes": 552308056,
+      "relations": {
+        "game_seats": {
+          "total_bytes": 32768,
+          "table_bytes": 16384,
+          "index_bytes": 16384
+        },
+        "game_metadata": {
+          "total_bytes": 32768,
+          "table_bytes": 16384,
+          "index_bytes": 16384
+        },
+        "schema_migrations": {
+          "total_bytes": 32768,
+          "table_bytes": 16384,
+          "index_bytes": 16384
+        },
+        "communications_audit": {
+          "total_bytes": 271187968,
+          "table_bytes": 251994112,
+          "index_bytes": 19193856
+        },
+        "game_memberships": {
+          "total_bytes": 32768,
+          "table_bytes": 16384,
+          "index_bytes": 16384
+        },
+        "communications_audit_runtime": {
+          "total_bytes": 581632,
+          "table_bytes": 565248,
+          "index_bytes": 16384
+        },
+        "browser_sessions": {
+          "total_bytes": 65536,
+          "table_bytes": 16384,
+          "index_bytes": 49152
+        },
+        "network_events": {
+          "total_bytes": 65536,
+          "table_bytes": 16384,
+          "index_bytes": 49152
+        },
+        "games": {
+          "total_bytes": 9175040,
+          "table_bytes": 9158656,
+          "index_bytes": 16384
+        },
+        "communications_audit_roles": {
+          "total_bytes": 117907456,
+          "table_bytes": 90251264,
+          "index_bytes": 27656192
+        },
+        "network_messages": {
+          "total_bytes": 90112,
+          "table_bytes": 73728,
+          "index_bytes": 16384
+        },
+        "game_events": {
+          "total_bytes": 36085760,
+          "table_bytes": 36044800,
+          "index_bytes": 40960
+        },
+        "players": {
+          "total_bytes": 49152,
+          "table_bytes": 16384,
+          "index_bytes": 32768
+        }
+      },
+      "container_cpu_percent": "2.62%",
+      "container_memory": "307.9MiB / 23.47GiB",
+      "container_block_io": "0B / 1.91GB",
+      "sampling_ms": 1150.202798000013
+    },
+    "database_bytes": {
+      "first": 78673587,
+      "last": 443414195,
+      "peak": 443414195
+    },
+    "wal_bytes": {
+      "first": 86120936,
+      "last": 552308056,
+      "peak": 552308056
+    }
+  },
+  "retention": {
+    "game:7975d032-324e-4dbf-85c4-7ea358a7b2ea": {
+      "samples": 54,
+      "first": {
+        "time": 1791765213087.445,
+        "tick": 62,
+        "radio_tick": 62,
+        "counts": {
+          "simulation.network.devices": 156,
+          "simulation.network.interference_contributions": 4,
+          "simulation.network.interference_entries": 156,
+          "simulation.network.mobility_entries": 156,
+          "simulation.network.pending_events": 77,
+          "simulation.network.pending_receptions": 34,
+          "simulation.network.retained_from_ns": 62000000000,
+          "simulation.pending_fragment_events": 34,
+          "simulation.pending_network_events": 0,
+          "simulation.transport_completed_ids": 936,
+          "simulation.transport_events": 0,
+          "simulation.transport_fragments": 114,
+          "simulation.transport_messages": 78,
+          "simulation.transport_payload_bytes": 373728,
+          "server.audit_correlations": 114,
+          "server.audit_history_events": 0,
+          "server.audit_pending_events": 0,
+          "server.authority_events": 2,
+          "server.authority_requests": 0,
+          "server.intent_receipts": 3,
+          "server.network_encoded_payload_bytes": 3539,
+          "server.network_message_events": 0,
+          "server.network_messages": 6,
+          "server.packet_messages": 0,
+          "server.pending_deliveries": 0
+        }
+      },
+      "last": {
+        "time": 1791765508995.1118,
+        "tick": 358,
+        "radio_tick": 358,
+        "counts": {
+          "simulation.network.devices": 156,
+          "simulation.network.interference_contributions": 4,
+          "simulation.network.interference_entries": 156,
+          "simulation.network.mobility_entries": 156,
+          "simulation.network.pending_events": 4,
+          "simulation.network.pending_receptions": 3,
+          "simulation.network.retained_from_ns": 358000000000,
+          "simulation.pending_fragment_events": 3,
+          "simulation.pending_network_events": 0,
+          "simulation.transport_completed_ids": 5612,
+          "simulation.transport_events": 0,
+          "simulation.transport_fragments": 4,
+          "simulation.transport_messages": 4,
+          "simulation.transport_payload_bytes": 19018,
+          "server.audit_correlations": 4,
+          "server.audit_history_events": 0,
+          "server.audit_pending_events": 0,
+          "server.authority_events": 2,
+          "server.authority_requests": 0,
+          "server.intent_receipts": 12,
+          "server.network_encoded_payload_bytes": 14200,
+          "server.network_message_events": 0,
+          "server.network_messages": 24,
+          "server.packet_messages": 0,
+          "server.pending_deliveries": 0
+        }
+      },
+      "peak": {
+        "simulation.network.devices": 156,
+        "simulation.network.interference_contributions": 4,
+        "simulation.network.interference_entries": 156,
+        "simulation.network.mobility_entries": 156,
+        "simulation.network.pending_events": 108,
+        "simulation.network.pending_receptions": 34,
+        "simulation.network.retained_from_ns": 358000000000,
+        "simulation.pending_fragment_events": 34,
+        "simulation.pending_network_events": 0,
+        "simulation.transport_completed_ids": 5612,
+        "simulation.transport_events": 0,
+        "simulation.transport_fragments": 786,
+        "simulation.transport_messages": 78,
+        "simulation.transport_payload_bytes": 375744,
+        "server.audit_correlations": 786,
+        "server.audit_history_events": 0,
+        "server.audit_pending_events": 0,
+        "server.authority_events": 2,
+        "server.authority_requests": 0,
+        "server.intent_receipts": 12,
+        "server.network_encoded_payload_bytes": 14200,
+        "server.network_message_events": 0,
+        "server.network_messages": 24,
+        "server.packet_messages": 0,
+        "server.pending_deliveries": 0
+      }
+    }
+  },
+  "raw_artifacts": "tmp/performance/audit-write-20261011/optimized-reverse/regional-postgres"
+}

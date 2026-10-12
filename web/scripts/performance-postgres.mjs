@@ -54,13 +54,19 @@ export class PerformancePostgres {
     if (!/^[0-9A-F]+\/[0-9A-F]+$/.test(this.initialLsn)) throw new Error('Invalid PostgreSQL WAL position');
     const settings = JSON.parse(await this.sql(`SELECT json_build_object('version',version(), 'fsync',current_setting('fsync'),
       'synchronous_commit',current_setting('synchronous_commit'), 'full_page_writes',current_setting('full_page_writes'),
-      'shared_buffers',current_setting('shared_buffers'), 'checkpoint_timeout',current_setting('checkpoint_timeout'));`));
+      'shared_buffers',current_setting('shared_buffers'), 'checkpoint_timeout',current_setting('checkpoint_timeout'), 'max_wal_size',current_setting('max_wal_size'),
+      'wal_buffers',current_setting('wal_buffers'), 'track_io_timing',current_setting('track_io_timing'),
+      'track_wal_io_timing',current_setting('track_wal_io_timing'));`));
     if (['fsync', 'synchronous_commit', 'full_page_writes'].some(k => settings[k] !== 'on')) throw new Error('PostgreSQL durability settings must be enabled');
     return { container_name: this.name, volume_name: this.volume, image_id: image.Id, image_digests: image.RepoDigests, settings, storage: 'fresh Docker named volume', sample_seconds: 5 };
   }
   async sample() {
     const started = performance.now();
     const values = JSON.parse(await this.sql(`SELECT json_build_object('database_bytes', pg_database_size(current_database()),
+      'checkpointer',(SELECT row_to_json(c) FROM pg_stat_checkpointer c),
+      'wal_stats',(SELECT row_to_json(w) FROM pg_stat_wal w),
+      'io_stats',(SELECT json_agg(i) FROM pg_stat_io i),
+      'activity_waits',(SELECT COALESCE(json_agg(w),'[]'::json) FROM (SELECT wait_event_type,wait_event,COUNT(*) AS sessions FROM pg_stat_activity WHERE backend_type='client backend' AND pid<>pg_backend_pid() GROUP BY wait_event_type,wait_event) w),
       'wal_bytes',pg_wal_lsn_diff(pg_current_wal_lsn(),'${this.initialLsn}'),
       'relations',COALESCE((SELECT json_object_agg(relname,json_build_object('total_bytes',pg_total_relation_size(relid),
         'table_bytes',pg_table_size(relid),'index_bytes',pg_indexes_size(relid))) FROM pg_stat_user_tables),'{}'::json));`));

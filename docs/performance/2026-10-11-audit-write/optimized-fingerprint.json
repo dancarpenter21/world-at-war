@@ -1,0 +1,14 @@
+{
+  "revision": "256b9f10a3d8932903da840ac8d242dc439a2543",
+  "binary_sha256": "ba26b24e494e6764c399211d5fe2cbb91a3ee0d6d5f9002dda762d6d0a4dc07b",
+  "files": {
+    "Cargo.toml": "bdd87c87047b0c9fa5d03f756a23218f5cb17eea7b89df912b1d38d5f693ab4b",
+    "Cargo.lock": "58be4450708de522c45d8b5734aadbda8501088f625aced7a9a62b6884bdf6a1",
+    "crates/server/src/storage.rs": "573ddd287a9b9edb5a02ca90ba969d35320d070ce5a3537f523d06ca289a2664",
+    "crates/server/src/audit.rs": "873c8c8e807b633bfbeb5aa8388d0ca1e7f59c0602ca7d89642318caa8aaf8ae",
+    "crates/server/src/performance.rs": "7909ade5dd011966ccce9dd263e14ef23814cfb17ec260a96c362ff653c4bb91",
+    "web/scripts/performance-lib.mjs": "980f9089612e18dddfd7dfd909b673980a5eb0f6fbebfdbf9c608ba9f7eb38b4",
+    "web/scripts/performance-postgres.mjs": "467a88554819bc37bbf9e4baa359fea666f0a659dc156f3bc067a6966d59eaa8",
+    "web/scripts/performance-server.mjs": "ef8d9681f49198e5658cdf6d49cb0ca2d80f36968c7946798478e54ea2558745"
+  }
+}
