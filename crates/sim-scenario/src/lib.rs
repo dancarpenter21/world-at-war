@@ -27,6 +27,8 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Scenario {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sensing: Option<sim_core::sensing::Configuration>,
     #[serde(default)]
     pub observer_seats: Vec<ObserverSeatDefinition>,
     #[serde(default)]
@@ -150,6 +152,21 @@ impl Scenario {
             if seat.name.trim().is_empty() || !seat_ids.insert(seat.id) {
                 return Err(ScenarioError::InvalidAuthority(
                     "observer seats need unique IDs and nonempty names".into(),
+                ));
+            }
+        }
+        if let Some(sensing) = &self.sensing {
+            sensing
+                .validate()
+                .map_err(ScenarioError::InvalidSimulation)?;
+            if sensing
+                .sensors
+                .keys()
+                .chain(sensing.signatures.keys())
+                .any(|id| !ids.contains(id))
+            {
+                return Err(ScenarioError::InvalidSimulation(
+                    "sensing references an unknown unit".into(),
                 ));
             }
         }
@@ -301,6 +318,16 @@ impl Scenario {
             simulation
                 .configure_iftu(config.clone())
                 .map_err(ScenarioError::InvalidSimulation)?;
+        }
+        if let Some(config) = &self.sensing {
+            simulation
+                .configure_sensing(config.clone(), seed, namespace)
+                .map_err(ScenarioError::InvalidSimulation)?;
+            if config.terrain_required {
+                simulation
+                    .rebase_ground_units()
+                    .map_err(ScenarioError::InvalidSimulation)?;
+            }
         }
         Ok(simulation)
     }
@@ -481,7 +508,7 @@ pub fn regional_campaign_scenario() -> Scenario {
         }
     }
     let (network, communication_links, simulator_options) = global_communications(&mut units);
-    Scenario { observer_seats: training_observers(), iftu: Some(campaign_iftu_configuration()), sensor_report_routes: vec![], combat: None, impact_report_routes: vec![], reporting_window_ticks: 0, campaign: Some(campaign), id: "regional-campaign.v1".into(), title: "Regional Joint Campaign".into(), description: "Two delegated sectors, competing joint plans, interception and strike under communications disruption. Offline training estimates.".into(), version: 2, requires_space_catalog: false, units, network, simulator_options, communication_links, authority, jamming_regions: vec![JammingRegion { active_from_tick: 0, active_until_tick: None, id: "sector-boundary-outage".into(), name: "Receiver interference near sector boundary".into(), center: GeoPose { latitude_deg: 38.1, longitude_deg: -76.55, altitude_m: 0.0 }, radius_m: 8000.0, band: FrequencyBand::new(960_000_000,1_215_000_000), jammed: 1.0 }] }
+    Scenario { sensing: None, observer_seats: training_observers(), iftu: Some(campaign_iftu_configuration()), sensor_report_routes: vec![], combat: None, impact_report_routes: vec![], reporting_window_ticks: 0, campaign: Some(campaign), id: "regional-campaign.v1".into(), title: "Regional Joint Campaign".into(), description: "Two delegated sectors, competing joint plans, interception and strike under communications disruption. Offline training estimates.".into(), version: 2, requires_space_catalog: false, units, network, simulator_options, communication_links, authority, jamming_regions: vec![JammingRegion { active_from_tick: 0, active_until_tick: None, id: "sector-boundary-outage".into(), name: "Receiver interference near sector boundary".into(), center: GeoPose { latitude_deg: 38.1, longitude_deg: -76.55, altitude_m: 0.0 }, radius_m: 8000.0, band: FrequencyBand::new(960_000_000,1_215_000_000), jammed: 1.0 }] }
 }
 
 pub fn global_crisis_scenario() -> Scenario {
@@ -592,6 +619,7 @@ pub fn global_crisis_scenario() -> Scenario {
     let authority = global_crisis_authority();
     let (network, communication_links, simulator_options) = global_communications(&mut units);
     Scenario {
+        sensing: None,
         observer_seats: vec![],
         iftu: None,
         campaign: None,
@@ -1378,7 +1406,7 @@ pub fn jammed_flight_scenario() -> Scenario {
     };
 
     Scenario {
-        observer_seats: vec![],
+        sensing: None,        observer_seats: vec![],
         iftu: None,        campaign: None,
         id: "jammed-flight.v1".into(),
         title: "Jammed Flight Test".into(),
@@ -1536,6 +1564,166 @@ pub fn iftu_exercise_scenario() -> Scenario {
         active_from_tick: 90,
         active_until_tick: Some(110),
     });
+    scenario
+}
+
+/// Explicit v2 rules upgrade; legacy constructors stay available for journal verification.
+pub fn upgrade_sensing(mut scenario: Scenario) -> Scenario {
+    use sim_core::sensing::{Configuration, Modality, Model, SensorSuite, Signature, Weather};
+    #[derive(Deserialize)]
+    struct Profile {
+        domain: Domain,
+        signature: Signature,
+        modalities: Vec<Modality>,
+    }
+    let profiles: Vec<Profile> = serde_json::from_str(include_str!(
+        "../../../data/sensing/platform-profiles.v1.json"
+    ))
+    .expect("committed fictional profiles");
+    let sensors = scenario
+        .units
+        .iter()
+        .filter_map(|unit| {
+            unit.sensor.map(|sensor| {
+                let profile = profiles
+                    .iter()
+                    .find(|profile| profile.domain == unit.domain)
+                    .expect("every domain has a profile");
+                (
+                    unit.id,
+                    SensorSuite {
+                        range_m: sensor.range_m,
+                        identification_range_m: sensor.identification_range_m,
+                        scan_interval_ticks: sensor.scan_interval_ticks,
+                        field_of_regard_deg: sensor.field_of_regard_deg,
+                        modalities: profile.modalities.clone(),
+                    },
+                )
+            })
+        })
+        .collect::<BTreeMap<_, _>>();
+    let signatures = scenario
+        .units
+        .iter()
+        .map(|unit| {
+            (
+                unit.id,
+                profiles
+                    .iter()
+                    .find(|profile| profile.domain == unit.domain)
+                    .expect("every domain has a profile")
+                    .signature
+                    .clone(),
+            )
+        })
+        .collect();
+    // Reuse the move policy's authorized operators and notification chain for emissions.
+    let policies: Vec<_> = scenario
+        .authority
+        .policies
+        .iter()
+        .filter(|p| p.action == ACTION_MOVE)
+        .filter_map(|p| {
+            let mut policy = p.clone();
+            policy.target_unit_ids.retain(|id| sensors.contains_key(id));
+            if policy.target_unit_ids.is_empty() {
+                return None;
+            }
+            policy.id = Uuid::new_v5(&p.id, b"radar-emission.v1");
+            policy.action = "set_radar_emission".into();
+            policy.name = "Control radar emissions".into();
+            Some(policy)
+        })
+        .collect();
+    for route in &mut scenario.sensor_report_routes {
+        route.interval_ticks = route
+            .interval_ticks
+            .max(Model::training().report_interval_ticks);
+    }
+    scenario.authority.policies.extend(policies);
+    scenario.authority.version += 1;
+    scenario.version += 1;
+    let radio_upgrades: BTreeMap<String, sim_core::sensing::RadioUpgrade> = serde_json::from_str(
+        include_str!("../../../data/sensing/scenario-upgrades.v1.json"),
+    )
+    .expect("committed training radio upgrades");
+    let radio_upgrade = radio_upgrades.get(&scenario.id).cloned();
+    if scenario.combat.is_some() {
+        scenario.reporting_window_ticks = scenario.reporting_window_ticks.max(30);
+    }
+    if let Some(radio) = &radio_upgrade {
+        for channel in &mut scenario.network.channels {
+            channel.bit_rate_bps = radio.bit_rate_bps;
+        }
+        for options in scenario.simulator_options.channels.values_mut() {
+            options.mtu_bytes = Some(radio.mtu_bytes);
+            options.queue.max_packets = Some(radio.queue_packets);
+            options.queue.max_bytes = Some(radio.queue_bytes);
+        }
+    }
+    scenario.sensing = Some(Configuration {
+        radio_upgrade,
+        model: Model::training(),
+        terrain_required: scenario.campaign.is_some(),
+        terrain_fixture: None,
+        sensors,
+        signatures,
+        weather: Weather::default(),
+        jammers: scenario.jamming_regions.clone(),
+    });
+    scenario
+}
+
+pub fn sensing_exercise_scenario() -> Scenario {
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Definition {
+        id: String,
+        title: String,
+        description: String,
+        provenance: String,
+        sensor_units: Vec<Uuid>,
+        sensor: Sensor,
+        positions: BTreeMap<Uuid, GeoPose>,
+        terrain: sim_geo::terrain::Grid,
+    }
+    let definition: Definition = serde_json::from_str(include_str!(
+        "../../../data/scenarios/sensing-kernel-exercise.v1.json"
+    ))
+    .expect("committed sensing exercise");
+    assert!(!definition.provenance.trim().is_empty());
+    let mut authored = sensor_relay_exercise_scenario();
+    for unit in &mut authored.units {
+        if definition.sensor_units.contains(&unit.id) {
+            unit.sensor = Some(definition.sensor);
+        }
+    }
+    let mut scenario = upgrade_sensing(authored);
+    scenario.id = definition.id;
+    scenario.title = definition.title;
+    scenario.description = definition.description;
+    scenario.observer_seats = training_observers();
+    scenario.sensing.as_mut().unwrap().terrain_fixture = Some(definition.terrain);
+    for unit in &mut scenario.units {
+        unit.position = *definition
+            .positions
+            .get(&unit.id)
+            .expect("every exercise unit has a position");
+        unit.velocity = Velocity::default();
+        unit.flight_path = None;
+    }
+    if let Some(role) = scenario
+        .authority
+        .roles
+        .iter()
+        .find(|role| role.location_unit_id.as_u128() == 12)
+    {
+        scenario.sensor_report_routes.push(SensorReportRoute {
+            origin_role_id: role.id,
+            recipient_unit_id: Uuid::from_u128(5),
+            interval_ticks: 10,
+        });
+    }
     scenario
 }
 

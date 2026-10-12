@@ -38,7 +38,7 @@ export function playerRequests(page: Page, primaryLabel: string) {
     dispose: () => Promise.all(owned.map(client => client.dispose()))
   };
 }
-type StreamFrame = { projection: { messages: { state: string; message: { id: string } }[] } };
+type StreamFrame = { projection: { messages: { state: string; delivered_at_ns?: number | null; message: { id: string } }[] } };
 export async function browserStream(page: Page, input: string) {
   const id = `stream-${Math.random()}`;
   await page.evaluate(async ({ input, id }) => {

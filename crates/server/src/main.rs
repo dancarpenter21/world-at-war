@@ -6,7 +6,9 @@ mod auth;
 mod benchmark;
 mod credential_cookie;
 mod diagnostics;
+mod environment;
 mod execution_acks;
+mod game_clock;
 mod impact_reports;
 mod intents;
 mod leases;
@@ -14,6 +16,7 @@ mod observers;
 mod performance;
 mod planning;
 mod recovery;
+
 #[cfg(test)]
 mod role_tests;
 mod sensor_reports;
@@ -99,6 +102,12 @@ struct AppState {
 struct Game {
     #[serde(skip)]
     audit: audit::Runtime,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rules_version: Option<u32>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    environment_interventions: Vec<environment::Intervention>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    sensing_migration: Option<recovery::SensingMigration>,
     persistence_sequence: u64,
     next_identifier: u64,
     members: BTreeSet<Uuid>,
@@ -108,6 +117,10 @@ struct Game {
     title: String,
     host: Uuid,
     status: GameStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    time_scale: Option<f64>,
+    #[serde(skip)]
+    scheduler: game_clock::Scheduler,
     #[serde(with = "recovery::simulation")]
     simulation: Simulation,
     #[serde(skip)]
@@ -239,9 +252,20 @@ struct ScenarioSummary {
     authored_entity_count: usize,
     role_count: usize,
     requires_space_catalog: bool,
+    terrain_required: bool,
+    terrain_ready: bool,
+    terrain_setup: Option<String>,
 }
 #[derive(Serialize)]
 struct GameSummary {
+    sensing_model_version: Option<u32>,
+    terrain_manifest_digest: Option<String>,
+    time_scale: f64,
+    tick: u64,
+    radio_tick: u64,
+    elapsed_seconds: f64,
+    frame: Option<u64>,
+    simulation_tick_hz: u32,
     id: Uuid,
     title: String,
     status: GameStatus,
@@ -257,6 +281,7 @@ struct GameSummary {
     operational_error: Option<String>,
     mission_complete: bool,
     settling_reports: bool,
+    reporting_pending: bool,
 }
 #[derive(Deserialize)]
 struct AirportListQuery {
@@ -536,16 +561,11 @@ async fn main() -> anyhow::Result<()> {
             .as_deref(),
     )?;
     let performance_writer = performance::start()?;
-    let scenarios = [
-        regional_campaign_scenario(),
-        sim_scenario::iftu_exercise_scenario(),
-        global_crisis_scenario(),
-        jammed_flight_scenario(),
-        command_link_exercise_scenario(),
-        sensor_relay_exercise_scenario(),
-        combat_training_scenario(),
-        contested_combat_scenario(),
-    ];
+    let mut scenarios: Vec<_> = legacy_scenarios()
+        .into_iter()
+        .map(sim_scenario::upgrade_sensing)
+        .collect();
+    scenarios.push(sim_scenario::sensing_exercise_scenario());
     for scenario in &scenarios {
         scenario.validate()?;
     }
@@ -578,6 +598,13 @@ async fn main() -> anyhow::Result<()> {
         communications_catalog: Arc::new(communications_catalog),
         network_event_dir: Arc::new(network_event_dir),
     };
+    if args.first().is_some_and(|arg| arg == "--migrate-sensing") {
+        anyhow::ensure!(
+            args.iter().skip(1).all(|arg| arg == "--dry-run"),
+            "Use --migrate-sensing [--dry-run]"
+        );
+        return recovery::migrate_sensing(&state, args.iter().any(|arg| arg == "--dry-run")).await;
+    }
     recovery::load(&state).await?;
     let simulation_task = tokio::spawn(run_simulation_loop(state.clone()));
     let audit_task = tokio::spawn(audit::maintenance(state.clone(), retention_days));
@@ -655,6 +682,11 @@ fn router(state: AppState) -> Router {
             axum::routing::put(observers::grant).delete(observers::revoke),
         )
         .route("/v1/games/{game_id}/truth", get(observers::truth))
+        .route("/v1/games/{game_id}/environment", get(environment::read))
+        .route(
+            "/v1/games/{game_id}/roles/{role_id}/environment",
+            axum::routing::put(environment::update),
+        )
         .route("/v1/games/{game_id}/truth/stream", get(observers::stream))
         .route(
             "/v1/games/{game_id}/authority",
@@ -690,6 +722,10 @@ fn router(state: AppState) -> Router {
         )
         .route("/v1/games/{game_id}/start", post(start_game))
         .route("/v1/games/{game_id}/pause", post(pause_game))
+        .route(
+            "/v1/games/{game_id}/time-scale",
+            axum::routing::put(game_clock::set_scale),
+        )
         .route(
             "/v1/games/{game_id}/roles/{role_id}/intent",
             post(submit_intent),
@@ -812,6 +848,9 @@ async fn list_scenarios(State(state): State<AppState>) -> Json<Vec<ScenarioSumma
                 authored_entity_count: scenario.units.len(),
                 role_count: scenario.authority.roles.len() + scenario.observer_seats.len(),
                 requires_space_catalog: scenario.requires_space_catalog,
+                terrain_required: scenario.sensing.as_ref().is_some_and(|s| s.terrain_required),
+                terrain_ready: !scenario.sensing.as_ref().is_some_and(|s| s.terrain_required) || sim_core::sensing::regional_terrain_ready(),
+                terrain_setup: scenario.sensing.as_ref().filter(|s| s.terrain_required).map(|_| "Import regional SRTM tiles with python3 scripts/setup-terrain.py --source <download-directory>".into()),
             })
             .collect(),
     )
@@ -925,6 +964,9 @@ async fn create_game(
             })?;
     }
     let mut game = Game {
+        rules_version: scenario.sensing.as_ref().map(|_| 2),
+        environment_interventions: Vec::new(),
+        sensing_migration: None,
         persistence_sequence: 0,
         next_identifier: 0,
         participant_names: BTreeMap::from([(request.host_player_id, "Host".into())]),
@@ -937,6 +979,8 @@ async fn create_game(
             .unwrap_or_else(|| scenario.title.clone()),
         host: request.host_player_id,
         status: GameStatus::Lobby,
+        time_scale: None,
+        scheduler: game_clock::Scheduler::default(),
         simulation,
         roles,
         authority,
@@ -1076,14 +1120,21 @@ async fn set_game_status(
             "only the host can control game state",
         ));
     }
-    if status == GameStatus::Running && game.simulation.mission_complete() {
+    if status == GameStatus::Running
+        && game.simulation.mission_complete()
+        && !reporting_pending(game)
+    {
         return Err(api_error(
             StatusCode::CONFLICT,
             "mission_complete",
             "the training mission has ended; create a new game",
         ));
     }
-    game.status = status;
+    if game.status != status {
+        game.status = status;
+        game.scheduler.reset();
+        game.diagnostics.reset_rate();
+    }
     Ok(Json(game_summary(game)))
 }
 
@@ -2189,12 +2240,14 @@ fn network_message_visible(record: &NetworkMessageRecord, role: &Role) -> bool {
             && ((record.message.profile_id != sensor_reports::TRACK_REPORT_PROFILE
                 && record.message.profile_id != impact_reports::IMPACT_REPORT_PROFILE
                 && !record.message.fields.contains_key("aim_point"))
-                || record.state == MessageState::Delivered))
+                || record.delivered_at_ns.is_some()))
 }
 
 fn network_record_for_role(record: &NetworkMessageRecord, role: &Role) -> NetworkMessageRecord {
     let mut visible = record.clone();
-    if record.message.profile_id == "simulation.joint-operations.v1"
+    if (record.message.profile_id == "simulation.joint-operations.v1"
+        || (record.message.profile_id == sensor_reports::TRACK_REPORT_PROFILE
+            && record.packet_id.is_none()))
         && record.message.header.origin_role_id == role.id
         && record.message.header.recipient_entity_id != role.location_unit_id
         && record.state != MessageState::Acknowledged
@@ -3019,11 +3072,32 @@ async fn stream_socket(
 }
 
 fn advance_game_tick(game: &mut Game) {
+    advance_game_tick_mode(game, None);
+}
+
+fn advance_game_frame(game: &mut Game, scale: f64) {
+    advance_game_tick_mode(game, Some(scale));
+}
+
+fn advance_game_tick_mode(game: &mut Game, frame_scale: Option<f64>) {
     if game.status != GameStatus::Running {
         return;
     }
     if game.simulation.mission_complete() {
-        game.simulation.advance_reporting_clock();
+        let before = game.simulation.radio_tick();
+        if let Some(scale) = frame_scale {
+            game.simulation
+                .advance_reporting_frame(scale)
+                .expect("validated game speed");
+            if game.simulation.radio_tick() == before {
+                return;
+            }
+        } else {
+            game.simulation.advance_reporting_clock();
+        }
+        if game.simulation.sensing_configuration().is_some() {
+            planning::process_deliveries(game);
+        }
         game.network_projection_sequence = game.network_projection_sequence.saturating_add(1);
         process_network_messages(game);
         execution_acks::send_pending(game);
@@ -3047,7 +3121,20 @@ fn advance_game_tick(game: &mut Game) {
     if game.status != GameStatus::Running {
         return;
     }
-    game.simulation.step();
+    let before = game.simulation.tick();
+    if let Some(scale) = frame_scale {
+        game.simulation
+            .step_frame(scale)
+            .expect("validated game speed");
+        if game.simulation.tick() == before {
+            intents::record_execution_results(game);
+            execution_acks::send_pending(game);
+            process_network_messages(game);
+            return;
+        }
+    } else {
+        game.simulation.step();
+    }
     planning::process_deliveries(game);
     planning::report_tick(game);
     if !game.intent_submissions.is_empty() {
@@ -3083,10 +3170,34 @@ fn advance_game_tick(game: &mut Game) {
     process_network_messages(game);
 }
 async fn run_simulation_loop(state: AppState) {
-    let mut interval = tokio::time::interval(Duration::from_secs(1));
+    let mut last_maintenance = std::time::Instant::now();
     let mut last_retention_sample = std::time::Instant::now();
     loop {
-        let scheduled = interval.tick().await;
+        if state
+            .durability
+            .failed
+            .load(std::sync::atomic::Ordering::Acquire)
+            || state
+                .durability
+                .stopping
+                .load(std::sync::atomic::Ordering::Acquire)
+        {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            continue;
+        }
+        let delay = {
+            let games = state.games.read().await;
+            let now = std::time::Instant::now();
+            games
+                .values()
+                .filter(|game| game.status == GameStatus::Running)
+                .map(|game| game.scheduler.delay(now))
+                .min()
+                .unwrap_or(Duration::from_millis(50))
+                .min(Duration::from_millis(50))
+        };
+        let scheduled = tokio::time::Instant::now() + delay;
+        tokio::time::sleep_until(scheduled).await;
         let wait = performance::Span::new(
             "durability_gate",
             || serde_json::json!({"source": "simulation"}),
@@ -3104,8 +3215,21 @@ async fn run_simulation_loop(state: AppState) {
         {
             continue;
         }
-        let expired = state.sessions.expired_players();
         let mut games = state.games.write().await;
+        let now = std::time::Instant::now();
+        let due: BTreeSet<_> = games
+            .values()
+            .filter(|game| game.status == GameStatus::Running && game.scheduler.due(now))
+            .map(|game| game.id)
+            .collect();
+        let maintenance = last_maintenance.elapsed() >= Duration::from_secs(1);
+        if due.is_empty() && !maintenance {
+            continue;
+        }
+        let expired = state.sessions.expired_players();
+        if maintenance {
+            last_maintenance = now;
+        }
         let mut cycle = performance::Span::new("server_cycle", || {
             serde_json::json!({
                 "storage": if state.durability.store.is_some() { "postgres" } else { "volatile" },
@@ -3141,26 +3265,33 @@ async fn run_simulation_loop(state: AppState) {
         let mut inputs: BTreeMap<_, _> = if before.is_some() {
             games
                 .iter()
-                .map(|(id, game)| (*id, recovery::TickInput::capture(game)))
+                .map(|(id, game)| {
+                    let mut input = recovery::TickInput::capture(game);
+                    input.advance = Some(due.contains(id));
+                    input.frame_scale = due.contains(id).then_some(game.time_scale.unwrap_or(1.0));
+                    (*id, input)
+                })
                 .collect()
         } else {
             BTreeMap::new()
         };
-        for game in games
-            .values_mut()
-            .filter(|game| game.status == GameStatus::Running)
-        {
+        for game in games.values_mut().filter(|game| due.contains(&game.id)) {
+            game.scheduler.advanced_frame(now);
             let started = std::time::Instant::now();
             let delay = scheduled.elapsed().as_secs_f64() * 1000.0;
             ai_orders::process_ai_orders(game);
-            advance_game_tick(game);
+            advance_game_frame(game, game.time_scale.unwrap_or(1.0));
             intents::record_execution_results(game);
             let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
-            game.diagnostics.record_tick(elapsed_ms, delay);
+            game.diagnostics.record_frame(
+                elapsed_ms,
+                delay,
+                game.time_scale.unwrap_or(1.0) / f64::from(sim_core::TICKS_PER_SECOND),
+            );
             performance::record(|| {
                 serde_json::json!({"kind": "tick", "game_id": game.id,
-                "scenario": game.scenario_id, "tick": game.simulation.tick(), "duration_ms": elapsed_ms,
-                "schedule_delay_ms": delay})
+                "scenario": game.scenario_id, "tick": game.simulation.tick(), "frame": game.simulation.frame_number(), "elapsed_game_seconds": game.simulation.elapsed_game_seconds(), "duration_ms": elapsed_ms,
+                "schedule_delay_ms": delay, "sensing": game.simulation.sensing_statistics(), "requested_time_scale": game.time_scale.unwrap_or(1.0)})
             });
         }
         if let Some(before) = before {
@@ -3227,8 +3358,41 @@ async fn run_simulation_loop(state: AppState) {
     }
 }
 
+fn reporting_pending(game: &Game) -> bool {
+    game.simulation.sensing_configuration().is_some()
+        && game.simulation.mission_complete()
+        && game.impact_reports.remaining_ticks > 0
+        && !(impact_reports::reports_settled(game) && execution_acks::settled(game))
+}
+fn legacy_scenarios() -> Vec<Scenario> {
+    vec![
+        regional_campaign_scenario(),
+        sim_scenario::iftu_exercise_scenario(),
+        global_crisis_scenario(),
+        jammed_flight_scenario(),
+        command_link_exercise_scenario(),
+        sensor_relay_exercise_scenario(),
+        combat_training_scenario(),
+        contested_combat_scenario(),
+    ]
+}
+
 fn game_summary(game: &Game) -> GameSummary {
     GameSummary {
+        sensing_model_version: game
+            .simulation
+            .sensing_configuration()
+            .map(|config| config.model.version),
+        terrain_manifest_digest: game
+            .simulation
+            .sensing_terrain_pin()
+            .map(|pin| pin.digest()),
+        time_scale: game.time_scale.unwrap_or(1.0),
+        tick: game.simulation.tick(),
+        radio_tick: game.simulation.radio_tick(),
+        elapsed_seconds: game.simulation.elapsed_game_seconds(),
+        frame: game.simulation.frame_number(),
+        simulation_tick_hz: sim_core::TICKS_PER_SECOND,
         id: game.id,
         title: game.title.clone(),
         status: game.status,
@@ -3248,6 +3412,7 @@ fn game_summary(game: &Game) -> GameSummary {
         operational_error: game.operational_error.clone(),
         mission_complete: game.simulation.mission_complete(),
         settling_reports: game.simulation.mission_complete() && game.status == GameStatus::Running,
+        reporting_pending: reporting_pending(game),
     }
 }
 
@@ -3343,6 +3508,9 @@ mod authority_tests {
             })
             .collect();
         Game {
+            rules_version: scenario.sensing.as_ref().map(|_| 2),
+            environment_interventions: Vec::new(),
+            sensing_migration: None,
             persistence_sequence: 0,
             next_identifier: 0,
             participant_names: BTreeMap::new(),
@@ -3352,6 +3520,8 @@ mod authority_tests {
             title: "Test".into(),
             host: Uuid::from_u128(901),
             status: GameStatus::Running,
+            time_scale: None,
+            scheduler: game_clock::Scheduler::default(),
             simulation: scenario
                 .spawn_with_knowledge_namespace(
                     scenario.simulator_options.seed,

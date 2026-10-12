@@ -152,3 +152,12 @@ describe("GlobeEntityReconciler", () => {
     expect(reconciler.focusEntities()).toHaveLength(4);
   });
 });
+
+it("removes uncertainty and bearing overlays when their authorized knowledge expires", () => {
+  const entities = new EntityCollection(); const reconciler = new GlobeEntityReconciler(entities, () => "symbol");
+  const value = projection(); value.tracks[0].uncertainty_m = 100;
+  value.tracks[0].evidence = { modalities: ["radar"], covariance: [[100, 0], [0, 400]], velocity: { north_mps: 0, east_mps: 0 }, observations: ["observation"] };
+  value.sensing = { radar_emitting: true, weather: { visibility_m: 100000, cloud_base_m: 0, cloud_top_m: 0, cloud_opacity: 0, precipitation: 0, thermal_contrast: 1 }, source_modalities: {}, bearings: [{ source: "receiver", maximum_range_m: 20000, id: "bearing", receiver_position: { latitude_deg: 89.9, longitude_deg: 179.9, altitude_m: 1000 }, bearing_deg: 45, uncertainty_deg: 2, observed_tick: 1, received_tick: 2, emitter_class: "fictional" }] };
+  reconciler.reconcile(value); expect(entities.getById("uncertainty:track-1")).toBeDefined(); expect(entities.getById("bearing:bearing")).toBeDefined();
+  reconciler.reconcile(projection({ tracks: [] })); expect(entities.getById("uncertainty:track-1")).toBeUndefined(); expect(entities.getById("bearing:bearing")).toBeUndefined();
+});

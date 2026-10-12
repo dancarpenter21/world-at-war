@@ -36,7 +36,7 @@ struct Envelope<T> {
 pub(super) fn encode(game: &Game) -> anyhow::Result<Vec<u8>> {
     let mut span = performance::Span::new("persistence_encode", || json!({"game_id": game.id}));
     let bytes = serde_json::to_vec(&Envelope {
-        schema_version: SCHEMA,
+        schema_version: game.rules_version.unwrap_or(SCHEMA),
         dependency: DEPENDENCY.trim().into(),
         game,
     })?;
@@ -47,7 +47,8 @@ pub(super) fn encode(game: &Game) -> anyhow::Result<Vec<u8>> {
 pub(super) fn decode(bytes: &[u8]) -> anyhow::Result<Game> {
     let saved: Envelope<Game> = serde_json::from_slice(bytes)?;
     anyhow::ensure!(
-        saved.schema_version == SCHEMA,
+        matches!(saved.schema_version, 1 | 2)
+            && saved.schema_version == saved.game.rules_version.unwrap_or(SCHEMA),
         "incompatible game snapshot schema"
     );
     anyhow::ensure!(
@@ -65,6 +66,10 @@ pub(super) fn digest(bytes: &[u8]) -> String {
 
 #[derive(Serialize, Deserialize)]
 pub(super) struct TickInput {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub advance: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frame_scale: Option<f64>,
     roles: BTreeMap<Uuid, leases::Occupancy>,
     observers: BTreeMap<Uuid, leases::Occupancy>,
     status: GameStatus,
@@ -72,6 +77,8 @@ pub(super) struct TickInput {
 impl TickInput {
     pub fn capture(game: &Game) -> Self {
         Self {
+            advance: None,
+            frame_scale: None,
             roles: game
                 .roles
                 .iter()
@@ -98,9 +105,14 @@ impl TickInput {
             game.observers.get_mut(&id).unwrap().occupancy = occupancy;
         }
         game.status = self.status;
-        if game.status == GameStatus::Running {
+        if game.status == GameStatus::Running && self.advance.unwrap_or(true) {
             ai_orders::process_ai_orders(game);
-            advance_game_tick(game);
+            if let Some(scale) = self.frame_scale {
+                anyhow::ensure!(game_clock::SCALES.contains(&scale), "invalid frame scale");
+                advance_game_frame(game, scale);
+            } else {
+                advance_game_tick(game);
+            }
             intents::record_execution_results(game);
         }
         Ok(())
@@ -311,13 +323,34 @@ async fn transaction_boundary(
     response
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub(super) struct SensingMigration {
+    pub from_scenario_version: u32,
+    pub from_scenario_checksum: String,
+    pub to_scenario_version: u32,
+    pub to_scenario_checksum: String,
+    pub rules_version: u32,
+    pub at_tick: u64,
+}
+
 pub(super) async fn load(state: &AppState) -> anyhow::Result<()> {
+    load_internal(state, None).await
+}
+pub(super) async fn migrate_sensing(state: &AppState, dry_run: bool) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        state.durability.store.is_some(),
+        "DATABASE_URL is required for stopped-server migration"
+    );
+    load_internal(state, Some(dry_run)).await
+}
+async fn load_internal(state: &AppState, migration: Option<bool>) -> anyhow::Result<()> {
     let Some(store) = &state.durability.store else {
         return Ok(());
     };
     let runs = store.runs().await?;
     let active_players = state.sessions.active_players();
     let mut games = BTreeMap::new();
+    let mut changes = Vec::new();
     for run in runs {
         anyhow::ensure!(
             digest(&run.snapshot) == run.snapshot_hash,
@@ -357,18 +390,76 @@ pub(super) async fn load(state: &AppState) -> anyhow::Result<()> {
             game.persistence_sequence == run.sequence && digest(&encode(&game)?) == run.hash,
             "recovered state does not match journal head"
         );
-        let scenario = state
+        let current = state
             .scenarios
             .get(&game.scenario_id)
             .ok_or_else(|| anyhow::anyhow!("snapshot scenario unavailable"))?;
+        let legacy = legacy_scenarios()
+            .into_iter()
+            .find(|scenario| scenario.id == game.scenario_id);
+        let source = if current.version == game.scenario_version
+            && digest(&serde_json::to_vec(current)?) == game.scenario_checksum
+        {
+            current
+        } else {
+            let predecessor = legacy
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("unsupported predecessor scenario"))?;
+            anyhow::ensure!(
+                predecessor.version == game.scenario_version
+                    && digest(&serde_json::to_vec(predecessor)?) == game.scenario_checksum,
+                "snapshot scenario incompatible"
+            );
+            predecessor
+        };
         anyhow::ensure!(
-            scenario.version == game.scenario_version
-                && digest(&serde_json::to_vec(scenario)?) == game.scenario_checksum
-                && state.communications_catalog.checksum() == game.communications_catalog_checksum
+            state.communications_catalog.checksum() == game.communications_catalog_checksum
                 && state.communications_catalog.message_pack_checksum()
                     == game.message_pack_checksum,
-            "snapshot scenario or catalog incompatible"
+            "snapshot communications catalog incompatible"
         );
+        let needs_upgrade =
+            current.sensing.is_some() && game.simulation.sensing_configuration().is_none();
+        if needs_upgrade {
+            anyhow::ensure!(migration.is_some(), "Game {} requires sensing migration. Stop the server, back up PostgreSQL, run --migrate-sensing --dry-run, then --migrate-sensing", game.id);
+            anyhow::ensure!(source.sensing.is_none(), "unsupported sensing predecessor");
+            let config = current
+                .sensing
+                .clone()
+                .ok_or_else(|| anyhow::anyhow!("missing sensing rules"))?;
+            game.simulation
+                .configure_sensing(config.clone(), game.network_seed, game.id)
+                .map_err(anyhow::Error::msg)?;
+            game.impact_reports.window_ticks = current.reporting_window_ticks;
+            game.sensor_reports
+                .upgrade_pacing(config.model.report_interval_ticks);
+            if config.terrain_required {
+                game.simulation
+                    .rebase_ground_units()
+                    .map_err(anyhow::Error::msg)?;
+            }
+            let mut authority_scenario = source.clone();
+            authority_scenario.authority = game.authority.clone();
+            let upgraded_authority = sim_scenario::upgrade_sensing(authority_scenario).authority;
+            game.authority = upgraded_authority;
+            game.sensing_migration = Some(SensingMigration {
+                from_scenario_version: game.scenario_version,
+                from_scenario_checksum: game.scenario_checksum.clone(),
+                to_scenario_version: current.version,
+                to_scenario_checksum: digest(&serde_json::to_vec(current)?),
+                rules_version: 2,
+                at_tick: game.simulation.tick(),
+            });
+            game.scenario_version = current.version;
+            game.scenario_checksum = digest(&serde_json::to_vec(current)?);
+            game.rules_version = Some(2);
+            game.status = GameStatus::Paused;
+            println!(
+                "Verified migration for {} at tick {}",
+                game.id,
+                game.simulation.tick()
+            );
+        }
         game.network_message_events.clear();
         store.load_audit(&mut game).await?;
         if game.status == GameStatus::Running {
@@ -382,10 +473,29 @@ pub(super) async fn load(state: &AppState) -> anyhow::Result<()> {
         game.network_projection_sequence = game.network_projection_sequence.saturating_add(1);
         // Persist the explicit recovery pause and any reservations that expired
         // during downtime before requests or ticks can observe this runtime.
-        let boundary = Boundary::new(&mut game, None, None, "recovery_pause")?;
+        let boundary = Boundary::new(
+            &mut game,
+            None,
+            None,
+            if needs_upgrade {
+                "sensing_rules_migration"
+            } else {
+                "recovery_pause"
+            },
+        )?;
+        changes.push(boundary);
         let id = game.id;
         games.insert(id, game);
-        store.commit(&[boundary], &mut games, None).await?;
+    }
+    if migration == Some(true) {
+        println!(
+            "Dry run complete: {} games verified; no game records written",
+            games.len()
+        );
+        return Ok(());
+    }
+    if !changes.is_empty() {
+        store.commit(&changes, &mut games, None).await?;
     }
     *state.games.write().await = games;
     Ok(())

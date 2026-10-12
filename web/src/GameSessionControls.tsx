@@ -7,16 +7,22 @@ export type Game = {
   operational_error?: string | null;
   mission_complete?: boolean;
   settling_reports?: boolean;
+  reporting_pending?: boolean;
+  time_scale?: number; simulation_tick_hz?: number; frame?: number; tick?: number; radio_tick?: number; elapsed_seconds?: number;
 };
 
-export function GameSessionControls({ game, isHost, pending, onControl }: {
-  game: Game; isHost: boolean; pending: "running" | "paused" | null;
+export function GameSessionControls({ game, isHost, pending, onControl, onTimeScale }: {
+  game: Game; isHost: boolean; pending: "running" | "paused" | "speed" | null;
   onControl: (status: "running" | "paused") => void;
+  onTimeScale: (scale: number) => void;
 }) {
   if (game.status === "lobby") return null;
   return <div className="game-session-controls">
     <span className={"game-state " + game.status}>{game.settling_reports ? "Radio reporting" : game.status === "paused" ? "Paused" : "Running"}</span>
-    {isHost && <button className="secondary" disabled={pending !== null || game.mission_complete} title={game.mission_complete ? "This exercise has ended. Create a new game to retry." : undefined} aria-busy={pending !== null}
+    <span className="simulation-time">Tick {game.tick ?? 0}{game.settling_reports ? ` · radio ${game.radio_tick ?? game.tick ?? 0}` : ""} · {formatElapsed(game.elapsed_seconds ?? 0)}</span>
+    <span className="clock-rate" title="Simulation frame rate; speed scales game time per frame">{game.simulation_tick_hz ?? 60} Hz</span>
+    {isHost ? <label className="time-scale">Speed <select aria-label="Simulation speed" value={game.time_scale ?? 1} disabled={pending !== null} onChange={event => onTimeScale(Number(event.target.value))}>{[0.25, 1, 2, 5, 10, 30, 60].map(scale => <option key={scale} value={scale}>{scale}×</option>)}</select></label> : <span aria-label="Simulation speed">{game.time_scale ?? 1}×</span>}
+    {isHost && <button className="secondary" disabled={pending !== null || (game.mission_complete && !game.reporting_pending)} title={game.mission_complete && !game.reporting_pending ? "This exercise has ended. Create a new game to retry." : undefined} aria-busy={pending !== null}
       onClick={() => onControl(game.status === "running" ? "paused" : "running")}>
       {pending === "paused" ? "Pausing…" : pending === "running" ? "Resuming…" : game.status === "running" ? "Pause scenario" : "Resume scenario"}
     </button>}
@@ -41,4 +47,8 @@ export function GameSessionNotice({ game, status, error, controlError, hasProjec
     </div>
     {interrupted && <button className="secondary" onClick={onRetry}>Retry connection</button>}
   </div>;
+}
+export function formatElapsed(seconds: number): string {
+  const value = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(value / 3600).toString().padStart(2, "0")}:${Math.floor(value / 60 % 60).toString().padStart(2, "0")}:${(value % 60).toString().padStart(2, "0")}`;
 }

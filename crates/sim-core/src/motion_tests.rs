@@ -214,3 +214,63 @@ fn nonfinite_authorized_movement_does_not_corrupt_velocity_or_cancel_a_route() {
     assert_eq!(projection.own_units[0].velocity, Velocity::default());
     assert!(geo_pose_is_finite(projection.own_units[0].position));
 }
+
+#[test]
+fn sixty_frames_advance_one_game_second_with_fractional_motion() {
+    let mut sim = simulation(vec![platform(0.0, 0.0, 100.0)]);
+    let mut legacy = simulation(vec![platform(0.0, 0.0, 100.0)]);
+    for _ in 0..59 {
+        sim.step_frame(1.0).unwrap();
+    }
+    assert_eq!(sim.tick(), 0);
+    assert_eq!(sim.frame_number(), Some(59));
+    assert!((sim.elapsed_game_seconds() - 59.0 / 60.0).abs() < 1e-12);
+    assert!(
+        sim.projection_for(UNIT, Side::Blue).own_units[0]
+            .position
+            .longitude_deg
+            > 0.0
+    );
+    sim.step_frame(1.0).unwrap();
+    legacy.step();
+    assert_eq!(sim.tick(), 1);
+    assert_eq!(sim.elapsed_game_seconds(), 1.0);
+    assert_eq!(
+        serde_json::to_value(sim.projection_for(UNIT, Side::Blue).own_units[0].position).unwrap(),
+        serde_json::to_value(legacy.projection_for(UNIT, Side::Blue).own_units[0].position)
+            .unwrap()
+    );
+}
+
+#[test]
+fn nonlinear_speeds_scale_frame_time_exactly() {
+    for scale in [0.25, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0] {
+        let mut sim = simulation(vec![platform(0.0, 0.0, 100.0)]);
+        for _ in 0..60 {
+            sim.step_frame(scale).unwrap();
+        }
+        assert_eq!(sim.frame_number(), Some(60));
+        assert_eq!(sim.elapsed_game_seconds(), scale);
+        assert_eq!(sim.tick(), scale as u64);
+    }
+}
+
+#[test]
+fn fractional_checkpoint_and_speed_change_preserve_exact_replay() {
+    let mut sim = simulation(vec![platform(179.999, 0.0, 100.0)]);
+    for _ in 0..45 {
+        sim.step_frame(0.25).unwrap();
+    }
+    assert_eq!(sim.network_time().as_nanos(), 187_500_000);
+    let mut restored = Simulation::restore(sim.snapshot()).unwrap();
+    for scale in [60.0, 30.0, 1.0, 0.25, 5.0] {
+        for _ in 0..17 {
+            sim.step_frame(scale).unwrap();
+            restored.step_frame(scale).unwrap();
+            assert_eq!(
+                serde_json::to_value(sim.snapshot()).unwrap(),
+                serde_json::to_value(restored.snapshot()).unwrap()
+            );
+        }
+    }
+}

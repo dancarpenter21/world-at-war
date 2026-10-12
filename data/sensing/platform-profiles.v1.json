@@ -1,0 +1,8 @@
+[
+  {"domain":"Air","signature":{"radar":1.0,"contrast":1.0,"thermal":1.0,"emitter_class":"fictional-air-search"},"modalities":["radar","visual","infrared","sigint"]},
+  {"domain":"Land","signature":{"radar":0.8,"contrast":1.0,"thermal":1.0,"emitter_class":"fictional-surface-search"},"modalities":["radar","visual","infrared","sigint"]},
+  {"domain":"Sea","signature":{"radar":1.0,"contrast":1.0,"thermal":1.0,"emitter_class":"fictional-surface-search"},"modalities":["radar","visual","infrared","sigint"]},
+  {"domain":"Undersea","signature":{"radar":0.0,"contrast":0.0,"thermal":0.0,"emitter_class":"fictional-submerged"},"modalities":["sigint"]},
+  {"domain":"Space","signature":{"radar":1.0,"contrast":1.0,"thermal":1.0,"emitter_class":"fictional-space-relay"},"modalities":["radar","visual","infrared","sigint"]},
+  {"domain":"Cyber","signature":{"radar":0.0,"contrast":0.0,"thermal":0.0,"emitter_class":"fictional-network"},"modalities":["sigint"]}
+]

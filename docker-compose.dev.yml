@@ -58,6 +58,10 @@ services:
           target: /c3mesh/README.md
           initial_sync: true
         - action: sync
+          path: ./data/sensing
+          target: /workspace/data/sensing
+          initial_sync: true
+        - action: sync
           path: ./data/scenarios
           target: /workspace/data/scenarios
           initial_sync: true

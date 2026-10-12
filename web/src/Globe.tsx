@@ -31,7 +31,7 @@ function symbolCanvas(sidc: string, size = 32) {
   return canvas;
 }
 
-export default function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnabled, keyboardEnabled, renderingEnabled, onMapUpdate }: {
+export default function Globe({ projection, filters, gameId, playerId, roleId, spaceCatalogEnabled, keyboardEnabled, renderingEnabled, animateMotion, onMapUpdate }: {
   projection: Projection;
   filters: MapFilters;
   gameId: string;
@@ -40,6 +40,7 @@ export default function Globe({ projection, filters, gameId, playerId, roleId, s
   spaceCatalogEnabled: boolean;
   keyboardEnabled: boolean;
   renderingEnabled: boolean;
+  animateMotion: boolean;
   onMapUpdate?: (milliseconds: number, entities: number) => void;
 }) {
   const operationsLayerRef = useRef<OperationsLayer | null>(null);
@@ -67,16 +68,24 @@ export default function Globe({ projection, filters, gameId, playerId, roleId, s
       baseLayerPicker: false, fullscreenButton: false, geocoder: false, homeButton: false,
       infoBox: true, navigationHelpButton: false, sceneModePicker: false, selectionIndicator: true,
       terrainProvider: new EllipsoidTerrainProvider(), timeline: false,
-      requestRenderMode: true, maximumRenderTimeChange: Infinity, targetFrameRate: 30
+      requestRenderMode: true, maximumRenderTimeChange: Infinity, targetFrameRate: 60
     });
     viewer.scene.globe.baseColor = Color.fromCssColorString("#1f3340");
     viewer.camera.setView({ destination: Cartesian3.fromDegrees(-40, 30, 20_000_000) });
+    const stopCameraObservation = viewer.scene.postRender.addEventListener(() => {
+      // Read-only diagnostics for rendering/recovery checks; no simulation inputs.
+      const position = viewer.camera.positionWC;
+      if (host.current) host.current.dataset.renderedCamera = `${position.x.toFixed(2)},${position.y.toFixed(2)},${position.z.toFixed(2)}`;
+    });
     viewerRef.current = viewer;
     operationsLayerRef.current = new OperationsLayer(viewer.entities);
     const keyboardControls = attachMapKeyboardControls(viewer.camera, viewer.scene.globe.ellipsoid);
     keyboardControls.setEnabled(keyboardEnabled);
     keyboardControlsRef.current = keyboardControls;
     reconcilerRef.current = new GlobeEntityReconciler(viewer.entities, symbolCanvas);
+    const stopMotion = viewer.clock.onTick.addEventListener(() => {
+      if (reconcilerRef.current?.animatePositions()) viewer.scene.requestRender();
+    });
     const airportLayer = new AirportLayer(viewer, (airportId) =>
       request<AirportDetail>(`/v1/airports/${encodeURIComponent(airportId)}`)
     );
@@ -139,6 +148,7 @@ export default function Globe({ projection, filters, gameId, playerId, roleId, s
       airportRequestRef.current?.abort();
       if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
       viewer.camera.moveEnd.removeEventListener(scheduleAirportRefresh);
+      stopCameraObservation();
       keyboardControls.destroy();
       spaceAssetLayerRef.current?.destroy();
       airportLayer.destroy();
@@ -147,6 +157,7 @@ export default function Globe({ projection, filters, gameId, playerId, roleId, s
       showSpaceAssetsRef.current = () => undefined;
       refreshAirportsRef.current = () => undefined;
       keyboardControlsRef.current = null;
+      stopMotion();
       reconcilerRef.current = null;
       operationsLayerRef.current?.clear(); operationsLayerRef.current = null;
       viewer.destroy();
@@ -179,6 +190,7 @@ export default function Globe({ projection, filters, gameId, playerId, roleId, s
     const viewer = viewerRef.current;
     if (!renderingEnabled || !viewer) return;
     const started = performance.now();
+    reconcilerRef.current?.setAnimationEnabled(animateMotion);
     reconcilerRef.current?.reconcile({
       ...projection,
       communication_links: filters.network.visible ? projection.communication_links : []
@@ -192,7 +204,7 @@ export default function Globe({ projection, filters, gameId, playerId, roleId, s
     }
     viewer.scene.requestRender();
     onMapUpdateRef.current?.(performance.now() - started, viewer.entities.values.length);
-  }, [projection, filters.network.visible, renderingEnabled]);
+  }, [projection, animateMotion, filters.network.visible, renderingEnabled]);
 
   useEffect(() => {
     if (spaceCatalogEnabled && (filters.spaceAssets.showAll || filters.spaceAssets.showStarlink)) {

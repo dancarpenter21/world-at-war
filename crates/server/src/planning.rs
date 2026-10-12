@@ -884,12 +884,13 @@ pub(super) fn process_deliveries(game: &mut Game) {
             DeliveryState::Unacknowledged => MessageState::Unacknowledged,
         };
         if event.state == DeliveryState::Delivered {
-            record.delivered_at_ns = Some(game.simulation.tick() * 1_000_000_000);
+            record.delivered_at_ns = Some(game.simulation.radio_tick() * 1_000_000_000);
         }
-        record.terminal_at_ns = Some(game.simulation.tick() * 1_000_000_000);
+        record.terminal_at_ns = Some(game.simulation.radio_tick() * 1_000_000_000);
         if !transport::record_transition(game, record) {
             return;
         }
+        transport::reliable_delivery(game, &event);
         if event.state == DeliveryState::Delivered {
             receive(game, &event.payload);
         }

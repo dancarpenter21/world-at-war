@@ -1,3 +1,4 @@
+import { installFixtureTerrain } from "../support/terrain";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -9,6 +10,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../
 
 export async function startGameBackend() {
   const runDirectory = await mkdtemp(path.join(tmpdir(), "world-at-war-game-e2e-"));
+  const terrain = await installFixtureTerrain(runDirectory);
   let backend: ChildProcess | undefined;
   let provider: Server | undefined;
   let output = "";
@@ -63,6 +65,7 @@ export async function startGameBackend() {
         SPACETRACK_USERNAME: "", SPACETRACK_PASSWORD: "", DATABASE_URL: "",
         SPACETRACK_LOGIN_URL: `http://127.0.0.1:${address.port}/ajaxauth/login`,
         SPACETRACK_GP_URL: `http://127.0.0.1:${address.port}/basicspacedata/query/class/gp/format/json`,
+        TERRAIN_DIR: terrain,
         COMMUNICATIONS_CATALOG_PATH: path.join(repoRoot, "data/communications/catalog.yaml"),
         NETWORK_EVENT_DIR: path.join(runDirectory, "var/network-events"),
         AIRPORT_CACHE_DIR: path.join(runDirectory, "data/cache/airports"),

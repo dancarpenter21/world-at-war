@@ -163,6 +163,13 @@ impl Simulation {
         Ok(())
     }
 
+    pub(super) fn has_pending_message_between(&self, from: Uuid, to: Uuid) -> bool {
+        self.transport
+            .messages
+            .values()
+            .any(|message| message.from == from && message.to == to)
+    }
+
     pub fn drain_deliveries(&mut self) -> Vec<DeliveryEvent> {
         std::mem::take(&mut self.transport.events)
     }
@@ -289,7 +296,7 @@ impl Simulation {
         } else {
             self.usable_routes()
         };
-        let tick = self.tick();
+        let tick = self.radio_tick();
         let ids: Vec<_> = self.transport.messages.keys().copied().collect();
         for id in ids {
             let m = &self.transport.messages[&id];
@@ -505,5 +512,16 @@ impl Simulation {
             (advanced - sent).as_secs_f64() * 1000.0,
             (finished - advanced).as_secs_f64() * 1000.0,
         )
+    }
+}
+
+impl Simulation {
+    pub fn cancel_application_message(&mut self, id: Uuid) {
+        if self.transport.messages.remove(&id).is_some() {
+            self.transport.finished.insert(id);
+            self.transport
+                .packets
+                .retain(|_, fragment| fragment.message != id);
+        }
     }
 }

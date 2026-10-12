@@ -378,10 +378,12 @@ test("clearances, handoffs and cancellation wait for delivery and enforce contro
   await expect(canvas).toBeVisible();
   await expect(canvas).toHaveAttribute("data-retained", "planning");
   await pilot.bringToFront();
-  const beforePan = await canvas.screenshot();
+  const map = pilot.locator(".globe");
+  await expect(map).toHaveAttribute("data-rendered-camera", /.+/);
+  const beforePan = await map.getAttribute("data-rendered-camera");
   await pilot.keyboard.down("KeyD");
   try {
-    await expect.poll(async () => (await canvas.screenshot()).equals(beforePan), { timeout: 20_000 }).toBe(false);
+    await expect.poll(() => map.getAttribute("data-rendered-camera"), { timeout: 20_000 }).not.toBe(beforePan);
   } finally {
     await pilot.keyboard.up("KeyD");
   }

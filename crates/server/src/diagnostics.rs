@@ -33,7 +33,9 @@ pub(super) struct Summary {
 #[derive(Default)]
 pub(super) struct Diagnostics {
     tick_ms: Samples,
+    game_seconds_per_tick: Option<f64>,
     last_tick: Option<Instant>,
+    tick_intervals_ms: Samples,
     schedule_delay_ms: f64,
     roles: BTreeMap<Uuid, RoleSamples>,
 }
@@ -47,9 +49,22 @@ struct RoleSamples {
     visible_queue_bytes: usize,
 }
 impl Diagnostics {
+    pub fn reset_rate(&mut self) {
+        self.last_tick = None;
+        self.tick_intervals_ms = Samples::default();
+    }
+    pub fn record_frame(&mut self, elapsed_ms: f64, schedule_delay_ms: f64, game_seconds: f64) {
+        self.game_seconds_per_tick = Some(game_seconds);
+        self.record_tick(elapsed_ms, schedule_delay_ms);
+    }
     pub fn record_tick(&mut self, elapsed_ms: f64, schedule_delay_ms: f64) {
         self.tick_ms.push(elapsed_ms);
-        self.last_tick = Some(Instant::now());
+        let now = Instant::now();
+        if let Some(last) = self.last_tick {
+            self.tick_intervals_ms
+                .push(now.duration_since(last).as_secs_f64() * 1000.0);
+        }
+        self.last_tick = Some(now);
         self.schedule_delay_ms = schedule_delay_ms;
     }
 }
@@ -88,6 +103,8 @@ pub(super) fn projection_bytes(game: &mut Game, role: &Role) -> Result<Vec<u8>, 
 
 #[derive(Serialize)]
 pub(super) struct View {
+    requested_time_scale: f64,
+    achieved_time_scale: Option<f64>,
     tick: u64,
     status: GameStatus,
     window_capacity: usize,
@@ -111,6 +128,13 @@ fn view(game: &Game, query: &ProjectionQuery) -> Result<View, (StatusCode, Json<
     let role = authorized_role(game, query)?;
     let diagnostics = &game.diagnostics;
     Ok(View {
+        requested_time_scale: game.time_scale.unwrap_or(1.0),
+        achieved_time_scale: (!diagnostics.tick_intervals_ms.0.is_empty()).then(|| {
+            diagnostics.game_seconds_per_tick.unwrap_or(1.0)
+                * 1000.0
+                * diagnostics.tick_intervals_ms.0.len() as f64
+                / diagnostics.tick_intervals_ms.0.iter().sum::<f64>()
+        }),
         tick: game.simulation.tick(),
         status: game.status,
         window_capacity: WINDOW,

@@ -1,0 +1,408 @@
+{
+  "arch": "x86_64",
+  "c3mesh_revision": "2f13199e665806b5d0ac0f0f4db07eb436e0a008",
+  "communications_catalog_sha256": "6ee5ced6ca0c783c4e27210c764ce67474245c108befb7fc550e23e7f07256fb",
+  "cpu": "AMD Ryzen 7 9800X3D 8-Core Processor",
+  "dirty": true,
+  "logical_cpus": 16,
+  "os": "linux",
+  "profile": "release",
+  "results": [
+    {
+      "ecs_ms": {
+        "max": 23.003413000000002,
+        "mean": 9.662128724999997,
+        "p50": 9.058431,
+        "p95": 20.320859,
+        "samples": 120
+      },
+      "elapsed_seconds": 5.11334159,
+      "interference_ms": {
+        "max": 0.155243,
+        "mean": 0.06485780000000001,
+        "p50": 0.0614,
+        "p95": 0.086833,
+        "samples": 120
+      },
+      "links": 78,
+      "measured_ticks": 120,
+      "network_advance_ms": {
+        "max": 47.654160000000005,
+        "mean": 7.138977625,
+        "p50": 2.568647,
+        "p95": 33.233669,
+        "samples": 120
+      },
+      "peak_visible_queue_bytes": 836806,
+      "peak_visible_queue_packets": 1641,
+      "projection_sha256": "52a1ad57a37d2eeefc64bb3cb958756b78453c6e9597425f75c93ef53775ac58",
+      "reassembly_ms": {
+        "max": 19.419847,
+        "mean": 2.950471841666667,
+        "p50": 0.9774090000000001,
+        "p95": 9.151911,
+        "samples": 120
+      },
+      "regional_simulation_budget_met": true,
+      "repeat": 1,
+      "reports_ms": {
+        "max": 125.66434100000001,
+        "mean": 12.541343600000001,
+        "p50": 3.493997,
+        "p95": 70.030882,
+        "samples": 120
+      },
+      "role_projection_ms": {
+        "max": 1.8447310000000001,
+        "mean": 0.6948659974999991,
+        "p50": 0.696447,
+        "p95": 1.149777,
+        "samples": 1200
+      },
+      "role_serialization_ms": {
+        "max": 0.24919200000000002,
+        "mean": 0.06540101166666662,
+        "p50": 0.057024,
+        "p95": 0.13845200000000002,
+        "samples": 1200
+      },
+      "roles_projected_per_tick": 10,
+      "scenario": "regional-campaign.v1",
+      "scenario_version": 3,
+      "seed": 12787750,
+      "sensing": {
+        "candidate_checks": 132,
+        "observation_ms": 9.053688000000001,
+        "terrain_checks": 84
+      },
+      "simulation_tick_ms": {
+        "max": 187.112371,
+        "mean": 32.73560857500001,
+        "p50": 19.542944,
+        "p95": 117.341178,
+        "samples": 120
+      },
+      "snapshot_bytes_uncompressed": {
+        "max": 177932.0,
+        "mean": 69211.81833333333,
+        "p50": 62982.0,
+        "p95": 130500.0,
+        "samples": 1200
+      },
+      "transmission_ms": {
+        "max": 4.242185,
+        "mean": 0.3724816416666667,
+        "p50": 0.049926000000000005,
+        "p95": 3.430354,
+        "samples": 120
+      },
+      "transport_ms": {
+        "max": 52.413122,
+        "mean": 10.46727845,
+        "p50": 5.7499780000000005,
+        "p95": 44.144382,
+        "samples": 120
+      },
+      "units": 12,
+      "warmup_ticks": 30
+    },
+    {
+      "ecs_ms": {
+        "max": 24.849347,
+        "mean": 9.662568433333337,
+        "p50": 9.082502,
+        "p95": 19.048505,
+        "samples": 120
+      },
+      "elapsed_seconds": 4.9955104200000005,
+      "interference_ms": {
+        "max": 0.13258,
+        "mean": 0.06642594166666665,
+        "p50": 0.062254000000000004,
+        "p95": 0.089035,
+        "samples": 120
+      },
+      "links": 78,
+      "measured_ticks": 120,
+      "network_advance_ms": {
+        "max": 37.012401,
+        "mean": 6.613803916666668,
+        "p50": 2.541258,
+        "p95": 29.422231,
+        "samples": 120
+      },
+      "peak_visible_queue_bytes": 836806,
+      "peak_visible_queue_packets": 1641,
+      "projection_sha256": "52a1ad57a37d2eeefc64bb3cb958756b78453c6e9597425f75c93ef53775ac58",
+      "reassembly_ms": {
+        "max": 10.6465,
+        "mean": 2.589967024999999,
+        "p50": 0.89702,
+        "p95": 7.701409,
+        "samples": 120
+      },
+      "regional_simulation_budget_met": true,
+      "repeat": 2,
+      "reports_ms": {
+        "max": 122.817434,
+        "mean": 12.520701633333335,
+        "p50": 3.302535,
+        "p95": 68.48886,
+        "samples": 120
+      },
+      "role_projection_ms": {
+        "max": 2.225857,
+        "mean": 0.6955916624999995,
+        "p50": 0.677285,
+        "p95": 1.2117390000000001,
+        "samples": 1200
+      },
+      "role_serialization_ms": {
+        "max": 0.323495,
+        "mean": 0.06555876583333331,
+        "p50": 0.056721,
+        "p95": 0.136453,
+        "samples": 1200
+      },
+      "roles_projected_per_tick": 10,
+      "scenario": "regional-campaign.v1",
+      "scenario_version": 3,
+      "seed": 12787750,
+      "sensing": {
+        "candidate_checks": 132,
+        "observation_ms": 9.335635,
+        "terrain_checks": 84
+      },
+      "simulation_tick_ms": {
+        "max": 187.59489,
+        "mean": 31.846816274999995,
+        "p50": 19.821027,
+        "p95": 108.93815099999999,
+        "samples": 120
+      },
+      "snapshot_bytes_uncompressed": {
+        "max": 177932.0,
+        "mean": 69211.81833333333,
+        "p50": 62982.0,
+        "p95": 130500.0,
+        "samples": 1200
+      },
+      "transmission_ms": {
+        "max": 5.505165,
+        "mean": 0.387917925,
+        "p50": 0.048738,
+        "p95": 3.307122,
+        "samples": 120
+      },
+      "transport_ms": {
+        "max": 47.749777,
+        "mean": 9.597120266666666,
+        "p50": 6.057835,
+        "p95": 34.586869,
+        "samples": 120
+      },
+      "units": 12,
+      "warmup_ticks": 30
+    },
+    {
+      "ecs_ms": {
+        "max": 0.182067,
+        "mean": 0.05578129166666667,
+        "p50": 0.041813,
+        "p95": 0.142922,
+        "samples": 120
+      },
+      "elapsed_seconds": 4.230110425,
+      "interference_ms": {
+        "max": 3.244316,
+        "mean": 2.051571000000001,
+        "p50": 2.014421,
+        "p95": 2.224288,
+        "samples": 120
+      },
+      "links": 2496,
+      "measured_ticks": 120,
+      "network_advance_ms": {
+        "max": 0.381275,
+        "mean": 0.18381780833333333,
+        "p50": 0.190457,
+        "p95": 0.311888,
+        "samples": 120
+      },
+      "peak_visible_queue_bytes": 0,
+      "peak_visible_queue_packets": 0,
+      "projection_sha256": "bd8f565b5ce2ef6efea9ef89805f4af8fc5072d7d57c8dff95ba5b855e1966e3",
+      "reassembly_ms": {
+        "max": 0.000554,
+        "mean": 0.00014795833333333328,
+        "p50": 0.00012800000000000002,
+        "p95": 0.00035600000000000003,
+        "samples": 120
+      },
+      "regional_simulation_budget_met": null,
+      "repeat": 1,
+      "reports_ms": {
+        "max": 0.000346,
+        "mean": 0.00012318333333333336,
+        "p50": 0.00008900000000000001,
+        "p95": 0.000247,
+        "samples": 120
+      },
+      "role_projection_ms": {
+        "max": 2.1491890000000002,
+        "mean": 1.1566379905555553,
+        "p50": 1.287309,
+        "p95": 1.386721,
+        "samples": 1800
+      },
+      "role_serialization_ms": {
+        "max": 0.787913,
+        "mean": 0.30838406888888853,
+        "p50": 0.33943599999999996,
+        "p95": 0.38727199999999995,
+        "samples": 1800
+      },
+      "roles_projected_per_tick": 15,
+      "scenario": "global-crisis.v2",
+      "scenario_version": 3,
+      "seed": 12787750,
+      "sensing": {
+        "candidate_checks": 269,
+        "observation_ms": 0.091075,
+        "terrain_checks": 0
+      },
+      "simulation_tick_ms": {
+        "max": 3.691977,
+        "mean": 2.292474708333334,
+        "p50": 2.263319,
+        "p95": 2.57449,
+        "samples": 120
+      },
+      "snapshot_bytes_uncompressed": {
+        "max": 684312.0,
+        "mean": 603294.0416666666,
+        "p50": 684211.0,
+        "p95": 684309.0,
+        "samples": 1800
+      },
+      "transmission_ms": {
+        "max": 0.001188,
+        "mean": 0.0005212583333333333,
+        "p50": 0.000495,
+        "p95": 0.0008420000000000001,
+        "samples": 120
+      },
+      "transport_ms": {
+        "max": 0.383612,
+        "mean": 0.18499923333333332,
+        "p50": 0.19159600000000002,
+        "p95": 0.31364099999999995,
+        "samples": 120
+      },
+      "units": 64,
+      "warmup_ticks": 30
+    },
+    {
+      "ecs_ms": {
+        "max": 0.14758300000000002,
+        "mean": 0.04501663333333333,
+        "p50": 0.025262999999999997,
+        "p95": 0.12490099999999998,
+        "samples": 120
+      },
+      "elapsed_seconds": 4.180994349,
+      "interference_ms": {
+        "max": 2.3198939999999997,
+        "mean": 1.9764090583333342,
+        "p50": 1.954464,
+        "p95": 2.0992260000000003,
+        "samples": 120
+      },
+      "links": 2496,
+      "measured_ticks": 120,
+      "network_advance_ms": {
+        "max": 0.29529900000000003,
+        "mean": 0.11919573333333339,
+        "p50": 0.102641,
+        "p95": 0.255826,
+        "samples": 120
+      },
+      "peak_visible_queue_bytes": 0,
+      "peak_visible_queue_packets": 0,
+      "projection_sha256": "bd8f565b5ce2ef6efea9ef89805f4af8fc5072d7d57c8dff95ba5b855e1966e3",
+      "reassembly_ms": {
+        "max": 0.000415,
+        "mean": 0.000069425,
+        "p50": 0.000049999999999999996,
+        "p95": 0.000111,
+        "samples": 120
+      },
+      "regional_simulation_budget_met": null,
+      "repeat": 2,
+      "reports_ms": {
+        "max": 0.00041600000000000003,
+        "mean": 0.00008762499999999996,
+        "p50": 0.00008900000000000001,
+        "p95": 0.000168,
+        "samples": 120
+      },
+      "role_projection_ms": {
+        "max": 1.9973040000000002,
+        "mean": 1.1411503255555562,
+        "p50": 1.272604,
+        "p95": 1.351136,
+        "samples": 1800
+      },
+      "role_serialization_ms": {
+        "max": 0.735344,
+        "mean": 0.30412241333333356,
+        "p50": 0.335817,
+        "p95": 0.378284,
+        "samples": 1800
+      },
+      "roles_projected_per_tick": 15,
+      "scenario": "global-crisis.v2",
+      "scenario_version": 3,
+      "seed": 12787750,
+      "sensing": {
+        "candidate_checks": 269,
+        "observation_ms": 0.10070599999999999,
+        "terrain_checks": 0
+      },
+      "simulation_tick_ms": {
+        "max": 2.583827,
+        "mean": 2.1414217250000007,
+        "p50": 2.118399,
+        "p95": 2.38583,
+        "samples": 120
+      },
+      "snapshot_bytes_uncompressed": {
+        "max": 684312.0,
+        "mean": 603294.0416666666,
+        "p50": 684211.0,
+        "p95": 684309.0,
+        "samples": 1800
+      },
+      "transmission_ms": {
+        "max": 0.000989,
+        "mean": 0.0003294499999999999,
+        "p50": 0.000277,
+        "p95": 0.000624,
+        "samples": 120
+      },
+      "transport_ms": {
+        "max": 0.296892,
+        "mean": 0.11990840833333334,
+        "p50": 0.10331399999999999,
+        "p95": 0.257291,
+        "samples": 120
+      },
+      "units": 64,
+      "warmup_ticks": 30
+    }
+  ],
+  "revision": "9d0a0b58933a4ff98e8afc921a8aeb104275300a",
+  "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "schema_version": 1,
+  "workload": "Seeded scenario ECS, communications and reports; every scenario role projected/serialized each tick. No gateway, wall-clock pacing, server AI/authority/audit, live catalogs or browser rendering."
+}

@@ -25,7 +25,7 @@ pub(super) fn run(args: &[String]) -> anyhow::Result<()> {
     while let Some(flag) = options.next() {
         anyhow::ensure!(seen.insert(flag), "duplicate option {flag}");
         match flag.as_str() {
-            "--check" => (),
+            "--check" | "--sensing" => (),
             "--ticks" | "--warmup" | "--seed" | "--repeats" | "--baseline" => {
                 anyhow::ensure!(options.next().is_some(), "missing value for {flag}");
             }
@@ -49,6 +49,11 @@ pub(super) fn run(args: &[String]) -> anyhow::Result<()> {
     );
     let mut results = vec![];
     for scenario in [regional_campaign_scenario(), global_crisis_scenario()] {
+        let scenario = if args.iter().any(|flag| flag == "--sensing") {
+            sim_scenario::upgrade_sensing(scenario)
+        } else {
+            scenario
+        };
         let mut reference = None;
         for repeat in 0..repeats {
             let mut simulation = scenario.spawn_with_seed(seed)?;
@@ -142,6 +147,7 @@ pub(super) fn run(args: &[String]) -> anyhow::Result<()> {
                 "roles_projected_per_tick": scenario.authority.roles.len(), "links": scenario.communication_links.len(),
                 "elapsed_seconds": started.elapsed().as_secs_f64(), "projection_sha256": hash,
                 "simulation_tick_ms": total,
+                "sensing": simulation.sensing_statistics(),
                 "ecs_ms": summary(timings.iter().map(|s| s.ecs_ms).collect()),
                 "interference_ms": summary(timings.iter().map(|s| s.interference_ms).collect()),
                 "transport_ms": summary(timings.iter().map(|s| s.transport_ms).collect()),

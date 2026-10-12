@@ -1,5 +1,76 @@
 # World At War Implementation Plan
 
+## 60 Hz simulation frames — 2026-10-12
+
+The loop now targets 60 frames per real second with non-linear 0.25×, 1×, 2×,
+5×, 10×, 30× and 60× speed choices. Exact integer time units give each frame
+1/60 game second at 1×, half a second at 30× and one second at 60×. Movement
+and mission guidance update per frame; sensing, radio and reporting retain their
+existing game-second cadences. Legacy tick fields and scenario durations continue
+to count game seconds; a separate frame count and fractional elapsed time are
+exposed. Map motion interpolates received positions at up to 60 FPS and stops on
+pause or connection loss.
+
+Snapshot version 3 preserves fractional time and motion origins. Recovery reads
+older snapshots and replays historical one-second inputs with their prior meaning;
+new frame inputs record the speed. Frame deadlines preserve timer phase and avoid
+catch-up debt. Slow workloads still reduce achieved speed. The measurements below
+predate this change; sustained 60 Hz durable acceptance remains open.
+
+Validation passes 247 fast Rust tests, 17 isolated PostgreSQL tests, 47 frontend
+tests and 16 harness tests. The full browser run passed 61/62 before the frame
+acknowledgement fix; all nine gameplay/control and seven campaign regressions
+then passed. Rust 1.89, strict Clippy, formatting, TypeScript and production builds
+pass. Production Docker smoke checks pass, and all four legacy benchmark samples
+retain their hashes. No long soak or existing-database migration was run.
+
+### Next implementation steps
+
+1. Measure the current 60 Hz loop in short volatile and isolated PostgreSQL runs,
+   recording achieved frame rate, game speed, journal growth and commit/flush
+   latency. The earlier sensing measurements do not validate this frame rate.
+2. Address durable frame costs using those measurements while preserving atomic
+   commits, recovery replay and wall-clock authority leases. Sustained 60 Hz and
+   regional maximum-cycle acceptance remain required evidence.
+3. Install operator-provided real SRTM terrain and add reference line-of-sight
+   measurements before claiming real-terrain acceptance.
+4. Continue the remaining Phase 2 domains and recognition/propagation fidelity.
+   Long endurance runs require an explicit request; they remain pending.
+
+## Shared time controls and sensing kernel — 2026-10-12
+
+The implementation adds a host-controlled shared clock (0.25×, 1×, 2×, 5×,
+10×, 30×, 60×), independent game pacing and explicit maintenance-only
+journal inputs. Requested/achieved rate diagnostics preserve wall-time leases and
+restart-paused behavior. The later 60 Hz checkpoint above supersedes this
+checkpoint's original one-second simulation step.
+
+Upgraded scenarios add seeded visual/IR/radar observations, weather/daylight,
+signature/aspect/clutter/rain and radar-interference abstractions, geometric track
+association, constant-velocity uncertainty, conservative report fusion and dedup,
+passive bearing regions and weighted multi-receiver SIGINT fixes. Emission commands
+use the existing authority/delivery/execution/acknowledgement lifecycle. Weather
+interventions require granted controller leases, revision checks and tick-boundary
+activation; monitors remain read-only. Operational weather knowledge is local or
+report-delivered. A fictional ridge exercise runs entirely offline.
+
+Regional terrain uses a separate SRTM HGT setup and immutable dataset pins. Existing
+games upgrade through an explicit stopped-server migration: verify legacy recovery,
+retain history/pending actions/scoped track IDs, append versioned checkpoints and
+update scenario metadata atomically. See [operation and fidelity limits](docs/SENSING_IMPLEMENTATION.md).
+
+Validation passes 240 fast Rust, 16 PostgreSQL, 46 frontend, 62 browser and 16
+harness tests, plus formatting, strict Clippy, Rust 1.89, dependency-pin and
+production Docker smoke checks. Legacy core hashes remain compatible. No existing
+development database was migrated and no long soak was run. Final synthetic-terrain
+volatile load meets cycle budgets; durable load acceptance remains open after a
+client timeout. See [measurements and limits](docs/performance/2026-10-12-sensing-results.md).
+
+This advances the Phase 2 sensing milestone, not all phase exit criteria. Real
+terrain datasets are operator-installed. Regional durable maximum-cycle acceptance,
+real-terrain reference measurements, long soaks, full target-recognition fidelity,
+radio-terrain propagation and the remaining domains remain open.
+
 ## Communications audit write-path checkpoint — 2026-10-11
 
 Audit preparation now indexes terminal roles, borrows captures and encodes sparse

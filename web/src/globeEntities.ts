@@ -1,3 +1,4 @@
+import { SmoothPositions } from "./smoothPositions";
 import type { IftuProjection } from "./IftuPanel";
 import {
   Cartesian2,
@@ -10,12 +11,12 @@ import {
   type EntityCollection
 } from "cesium";
 
-import { trackTiming } from "./trackTiming";
+import { latestBearings, trackTiming } from "./trackTiming";
 
 export type Side = "Blue" | "Red";
 export type Position = { latitude_deg: number; longitude_deg: number; altitude_m: number };
-export type Unit = { weapon?: { ammunition: number; range_m: number; max_track_age_ticks: number }; hit_points?: number; velocity?: { north_mps: number; east_mps: number; climb_mps: number }; following_flight_path?: boolean; id: string; name: string; domain: string; position: Position; sidc: string; receiver_jammed: boolean; observed_tick?: number; received_tick?: number };
-export type Track = { track_id: string; target_side: Side | null; position: Position; identity_confidence: number; observed_tick: number; received_tick: number; observed_sidc: string; uncertainty_m?: number; assessed_destroyed?: boolean | null };
+export type Unit = { radar_emitting?: boolean | null; weapon?: { ammunition: number; range_m: number; max_track_age_ticks: number }; hit_points?: number; velocity?: { north_mps: number; east_mps: number; climb_mps: number }; following_flight_path?: boolean; id: string; name: string; domain: string; position: Position; sidc: string; receiver_jammed: boolean; observed_tick?: number; received_tick?: number };
+export type Track = { track_id: string; target_side: Side | null; position: Position; identity_confidence: number; observed_tick: number; received_tick: number; observed_sidc: string; uncertainty_m?: number; evidence?: { hypotheses?: { domain: string | null; side: Side | null; probability: number }[]; modalities: string[]; covariance: number[][]; velocity: { north_mps: number; east_mps: number }; observations: string[] }; assessed_destroyed?: boolean | null };
 export type JammingRegion = { id: string; name: string; center: Position; radius_m: number; band: { lower_hz: number; upper_hz: number }; jammed: number };
 export type CommunicationLink = { id: string; from_entity_id: string; to_entity_id: string; available: boolean; jammed: number; effective_bit_rate_bps?: number; queued_packets?: number; queued_bytes?: number };
 export type ImpactReport = { intent_id: string; observed_tick: number; launched_tick: number; resolved_tick: number; hit: boolean };
@@ -23,7 +24,10 @@ export type CombatProjection = {
   mission: { title: string; status: "active" | "succeeded" | "failed"; deadline_tick: number; finished_tick: number | null; reason: string | null } | null;
   local_shots_in_flight: number; local_impacts: ImpactReport[]; received_impacts?: { report: ImpactReport; received_tick: number }[];
 };
-export type Projection = { iftu?: IftuProjection; combat?: CombatProjection; tick: number; own_units: Unit[]; tracks: Track[]; jamming_regions: JammingRegion[]; communication_links: CommunicationLink[] };
+export type Weather = { visibility_m: number; cloud_base_m: number; cloud_top_m: number; cloud_opacity: number; precipitation: number; thermal_contrast: number };
+export type Bearing = { source: string; maximum_range_m: number; id: string; receiver_position: Position; bearing_deg: number; uncertainty_deg: number; observed_tick: number; received_tick: number; emitter_class: string };
+export type SensingView = { weather_reports?: { source: string; position: Position; conditions: Weather; observed_tick: number; received_tick: number }[]; bearings: Bearing[]; radar_emitting: boolean; weather: Weather; source_modalities: Record<string, string[]> };
+export type Projection = { frame?: number; elapsed_seconds?: number; sensing?: SensingView; iftu?: IftuProjection; combat?: CombatProjection; tick: number; own_units: Unit[]; tracks: Track[]; jamming_regions: JammingRegion[]; communication_links: CommunicationLink[] };
 
 type SymbolImage = string | HTMLImageElement | HTMLCanvasElement;
 type EntityKind = "unit" | "track";
@@ -42,7 +46,12 @@ type RegionRecord = { entity: Entity; position: ConstantPositionProperty; radius
 type LinkRecord = { entity: Entity; positions: ConstantProperty; color: ConstantProperty };
 
 export class GlobeEntityReconciler {
+  private readonly smoothing = new SmoothPositions();
+  setAnimationEnabled(enabled: boolean) { this.smoothing.setRunning(enabled); }
+  animatePositions() { return this.smoothing.tick(); }
   private readonly weaponMarkers = new Map<string, { entity: Entity; position: ConstantPositionProperty; label: ConstantProperty }>();
+  private readonly uncertainty = new Map<string, Entity>();
+  private readonly bearingRegions = new Map<string, Entity>();
   private readonly records = new Map<string, EntityRecord>();
   private readonly regions = new Map<string, RegionRecord>();
   private readonly links = new Map<string, LinkRecord>();
@@ -56,6 +65,41 @@ export class GlobeEntityReconciler {
     const visibleIds = new Set<string>();
     this.entities.suspendEvents();
     try {
+      const uncertaintyIds = new Set(projection.tracks.filter(t => t.evidence && (t.uncertainty_m ?? 0) > 0).map(t => t.track_id));
+      for (const [id, entity] of this.uncertainty) if (!uncertaintyIds.has(id)) { this.entities.remove(entity); this.uncertainty.delete(id); }
+      for (const track of projection.tracks) {
+        const radius = track.uncertainty_m;
+        if (!track.evidence || !radius || radius <= 0 || !Number.isFinite(radius)) continue;
+        let ellipse = this.uncertainty.get(track.track_id);
+        if (!ellipse) { ellipse = this.entities.add({ id: `uncertainty:${track.track_id}`, ellipse: { semiMajorAxis: radius, semiMinorAxis: radius, material: Color.CYAN.withAlpha(0.12), outline: true, outlineColor: Color.CYAN.withAlpha(0.4) } }); this.uncertainty.set(track.track_id, ellipse); }
+        ellipse.position = new ConstantPositionProperty(Cartesian3.fromDegrees(track.position.longitude_deg, track.position.latitude_deg, track.position.altitude_m));
+        const covariance = track.evidence?.covariance;
+        const nn = covariance?.[0]?.[0], ee = covariance?.[1]?.[1], ne = covariance?.[0]?.[1];
+        if (nn != null && ee != null && ne != null) {
+          const root = Math.hypot(nn - ee, 2 * ne);
+          ellipse.ellipse!.semiMajorAxis = new ConstantProperty(2.448 * Math.sqrt(Math.max(1, (nn + ee + root) / 2)));
+          ellipse.ellipse!.semiMinorAxis = new ConstantProperty(2.448 * Math.sqrt(Math.max(1, (nn + ee - root) / 2)));
+          ellipse.ellipse!.rotation = new ConstantProperty(-0.5 * Math.atan2(2 * ne, nn - ee));
+        } else { ellipse.ellipse!.semiMajorAxis = new ConstantProperty(radius); ellipse.ellipse!.semiMinorAxis = new ConstantProperty(radius); }
+      }
+      const bearings = latestBearings(projection.sensing?.bearings ?? []);
+      const bearingIds = new Set(bearings.map(b => b.id));
+      for (const [id, entity] of this.bearingRegions) if (!bearingIds.has(id)) { this.entities.remove(entity); this.bearingRegions.delete(id); }
+      for (const bearing of bearings) {
+        if (this.bearingRegions.has(bearing.id)) continue;
+        const origin = bearing.receiver_position;
+        const points = [origin, ...[-1, 1].map(sign => {
+          const angle = (bearing.bearing_deg + sign * bearing.uncertainty_deg * 2) * Math.PI / 180;
+          const latitude = origin.latitude_deg * Math.PI / 180, longitude = origin.longitude_deg * Math.PI / 180;
+          const distance = bearing.maximum_range_m / 6371000;
+          const destination = Math.asin(Math.sin(latitude) * Math.cos(distance) + Math.cos(latitude) * Math.sin(distance) * Math.cos(angle));
+          const east = longitude + Math.atan2(Math.sin(angle) * Math.sin(distance) * Math.cos(latitude), Math.cos(distance) - Math.sin(latitude) * Math.sin(destination));
+          return { latitude_deg: destination * 180 / Math.PI, longitude_deg: ((east * 180 / Math.PI + 540) % 360) - 180, altitude_m: origin.altitude_m };
+        })];
+        const entity = this.entities.add({ id: `bearing:${bearing.id}`, polygon: { hierarchy: Cartesian3.fromDegreesArray(points.flatMap(p => [p.longitude_deg, p.latitude_deg])), material: Color.ORANGE.withAlpha(0.12), outline: true, outlineColor: Color.ORANGE } });
+        this.bearingRegions.set(bearing.id, entity);
+      }
+
       for (const unit of projection.own_units) {
         visibleIds.add(unit.id);
         const position = Cartesian3.fromDegrees(unit.position.longitude_deg, unit.position.latitude_deg, unit.position.altitude_m);
@@ -75,11 +119,11 @@ export class GlobeEntityReconciler {
           record = { entity, kind: "unit", sidc: unit.sidc, name: unit.name, position: positionProperty, image: imageProperty, labelText, color };
           this.records.set(unit.id, record);
         } else {
-          record.position.setValue(position);
           this.updateName(record, unit.name);
           this.updateSymbol(record, unit.sidc, 36);
           record.color?.setValue(unit.receiver_jammed ? Color.ORANGE : Color.WHITE);
         }
+        this.smoothing.update(unit.id, record.position, position);
         const age = projection.tick - (unit.observed_tick ?? projection.tick);
         record.labelText?.setValue(age > 10 ? `${unit.name} · ${age}s old` : unit.name);
         if (age > 10) record.color?.setValue(Color.GRAY);
@@ -138,6 +182,7 @@ export class GlobeEntityReconciler {
         } else { marker.position.setValue(position); marker.label.setValue(text); }
       }
       for (const [id, marker] of this.weaponMarkers) { if (!weaponIds.has(id)) { this.entities.remove(marker.entity); this.weaponMarkers.delete(id); } }
+      this.smoothing.retain(new Set(projection.own_units.map(unit => unit.id)));
       this.reconcileRegions(projection.jamming_regions);
       this.reconcileLinks(projection);
     } finally {

@@ -10,6 +10,15 @@ updates. Current clients receive full snapshots at approximately 1 Hz.
 Use Linux/WSL, Node 22+, the pinned sibling c3mesh checkout, and a release server.
 Run from a clean checkout without competing builds or other benchmarks:
 
+Regional and mixed full-server profiles now require an installed terrain dataset.
+Set `TERRAIN_DIR` to its absolute directory; see
+[terrain setup and model limits](../SENSING_IMPLEMENTATION.md).
+The harness forwards that path to its isolated server and records the manifest and
+checksum in `metadata.json`. Synthetic terrain is suitable for labelled harness
+validation only; it does not establish real-terrain reference acceptance. The
+ordinary core benchmark retains its legacy workload; add `--sensing` for the new
+model and supply terrain.
+
 ```sh
 sh scripts/setup-c3mesh.sh --verify-only
 cargo build --release --locked -p world-at-war-server

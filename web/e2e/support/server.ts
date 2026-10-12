@@ -1,3 +1,4 @@
+import { installFixtureTerrain } from "./terrain";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
@@ -16,6 +17,7 @@ export async function startBackend(environment: Record<string, string> = {}) {
   const occupied = await fetch(healthUrl).then(() => true, () => false);
   if (occupied) throw new Error("E2E backend port 18101 is already occupied");
   const directory = await mkdtemp(path.join(tmpdir(), "world-at-war-e2e-"));
+  const terrain = await installFixtureTerrain(directory);
   const airports = [JSON.parse(await readFile(new URL("../fixtures/airport.json", import.meta.url), "utf8"))];
   const airportCache = path.join(directory, "airports");
   await mkdir(airportCache);
@@ -33,6 +35,7 @@ export async function startBackend(environment: Record<string, string> = {}) {
         SPACE_CARDS_DIR: path.join(directory, "cards"), AIRPORT_CACHE_DIR: airportCache,
         AIRPORT_REFRESH_MAX_AGE_SECONDS: "86400", OURAIRPORTS_AIRPORTS_URL: "http://127.0.0.1:1/airports",
         OURAIRPORTS_RUNWAYS_URL: "http://127.0.0.1:1/runways", FAA_NASR_SUBSCRIPTION_URL: "http://127.0.0.1:1/faa", FAA_NASR_APT_URL: "",
+        TERRAIN_DIR: terrain,
         COMMUNICATIONS_CATALOG_PATH: path.join(repoRoot, "data/communications/catalog.yaml"), NETWORK_EVENT_DIR: path.join(directory, "events"),
         ...environment }, stdio: ["ignore", "pipe", "pipe"]
     });

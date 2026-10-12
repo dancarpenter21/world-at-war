@@ -22,8 +22,12 @@ struct PlatformState {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SimulationSnapshot {
     schema_version: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    sensing: Option<sensing::Runtime>,
     platforms: Vec<PlatformState>,
     clock: SimClock,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    frame_clock: Option<FrameClock>,
     observations: Observations,
     knowledge: KnowledgeBases,
     reports: ReportKnowledge,
@@ -70,9 +74,17 @@ impl Simulation {
             })
             .collect();
         SimulationSnapshot {
-            schema_version: 1,
+            schema_version: if self.world.contains_resource::<FrameClock>() {
+                3
+            } else if self.world.contains_resource::<sensing::Runtime>() {
+                2
+            } else {
+                1
+            },
+            sensing: self.world.get_resource::<sensing::Runtime>().cloned(),
             platforms,
             clock: *self.world.resource::<SimClock>(),
+            frame_clock: self.world.get_resource::<FrameClock>().copied(),
             observations: self.world.resource::<Observations>().clone(),
             knowledge: self.world.resource::<KnowledgeBases>().clone(),
             reports: self.world.resource::<ReportKnowledge>().clone(),
@@ -94,8 +106,21 @@ impl Simulation {
 
     /// Restore a trusted, schema-compatible snapshot without advancing its clocks.
     pub fn restore(snapshot: SimulationSnapshot) -> Result<Self, String> {
-        if snapshot.schema_version != 1 {
+        if !matches!(snapshot.schema_version, 1..=3)
+            || (snapshot.schema_version == 3) != snapshot.frame_clock.is_some()
+            || (snapshot.schema_version != 3
+                && (snapshot.schema_version == 2) != snapshot.sensing.is_some())
+            || snapshot.frame_clock.is_some_and(|clock| {
+                !clock.valid()
+                    || clock.units / 240
+                        != snapshot.clock.tick.saturating_add(snapshot.reporting_ticks)
+            })
+        {
             return Err("incompatible simulation snapshot version".into());
+        }
+        let mut sensing = snapshot.sensing;
+        if let Some(runtime) = &mut sensing {
+            runtime.restore_terrain()?;
         }
         let mut ids = BTreeSet::new();
         if snapshot
@@ -106,7 +131,13 @@ impl Simulation {
             return Err("duplicate platform in snapshot".into());
         }
         let mut world = World::new();
+        if let Some(runtime) = sensing {
+            world.insert_resource(runtime);
+        }
         world.insert_resource(snapshot.clock);
+        if let Some(frame) = snapshot.frame_clock {
+            world.insert_resource(frame);
+        }
         world.insert_resource(snapshot.observations);
         world.insert_resource(snapshot.knowledge);
         world.insert_resource(snapshot.reports);
@@ -144,9 +175,15 @@ impl Simulation {
             apply_orders.after(advance_clock),
             operations::advance_operations.after(apply_orders),
             move_platforms.after(operations::advance_operations),
-            combat::resolve_impacts.after(move_platforms),
-            detect_contacts.after(combat::resolve_impacts),
-            deliver_reports.after(detect_contacts),
+            combat::resolve_impacts
+                .after(move_platforms)
+                .run_if(frame_clock::game_second_advanced),
+            detect_contacts
+                .after(combat::resolve_impacts)
+                .run_if(frame_clock::game_second_advanced),
+            deliver_reports
+                .after(detect_contacts)
+                .run_if(frame_clock::game_second_advanced),
         ));
         Ok(Self {
             audit: audit::Audit::default(),

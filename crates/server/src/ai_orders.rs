@@ -23,7 +23,9 @@ fn order_is_pending(game: &Game, unit_id: Uuid) -> bool {
         DeliveryAction::ActivateRequest { .. }
         | DeliveryAction::ReceiveExecutionAck { .. }
         | DeliveryAction::ReceiveTrackReport { .. }
-        | DeliveryAction::ReceiveImpactReport { .. } => false,
+        | DeliveryAction::ReceiveImpactReport { .. }
+        | DeliveryAction::ReceiveBearingReport { .. }
+        | DeliveryAction::ReceiveWeatherReport { .. } => false,
     }) || game.authority_requests.values().any(|request| {
         request.target_unit_id == unit_id
             && request.action == sim_core::ACTION_MOVE

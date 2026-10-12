@@ -2332,6 +2332,7 @@ dependencies = [
  "serde_json",
  "sim-comms",
  "sim-core",
+ "sim-geo",
  "thiserror",
  "uuid",
 ]

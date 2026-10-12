@@ -1,17 +1,20 @@
+import { SmoothPositions } from "./smoothPositions";
 import { useEffect, useRef, useState } from "react";
 import { Cartesian3, Color, EllipsoidTerrainProvider, ImageryLayer, OpenStreetMapImageryProvider, Viewer } from "cesium";
 import "cesium/Build/Cesium/Widgets/widgets.css";
+import { WeatherEditor, type WeatherRegion } from "./WeatherEditor";
 import { ApiError, apiRequest } from "./apiClient";
 import { usePollingResource, type PollingStatus } from "./usePollingResource";
 import type { ObserverRole, TruthProjection } from "./observerTypes";
 import { updateTruthEntities } from "./truthEntities";
 import { attachMapKeyboardControls } from "./mapKeyboardControls";
 
-export function ObserverWorkspace({ apiBase, gameId, role, onAccessEnded, onStatus }: { apiBase: string; gameId: string; role: ObserverRole; onAccessEnded: () => void; onStatus: (status: PollingStatus, tick: number | null) => void }) {
+export function ObserverWorkspace({ apiBase, gameId, running, role, onAccessEnded, onStatus }: { apiBase: string; gameId: string; running: boolean; role: ObserverRole; onAccessEnded: () => void; onStatus: (status: PollingStatus, tick: number | null) => void }) {
   const truth = usePollingResource<TruthProjection>(`${gameId}:${role.id}:${role.lease_generation}`, signal => apiRequest(apiBase,
     `/v1/games/${gameId}/truth?${new URLSearchParams({ role_id: role.id, lease_generation: String(role.lease_generation) })}`, { signal }));
   const statusCallback = useRef(onStatus); statusCallback.current = onStatus;
   useEffect(() => { statusCallback.current(truth.status, truth.data?.tick ?? null); }, [truth.status, truth.data?.tick]);
+  const [weatherPreview, setWeatherPreview] = useState<WeatherRegion[]>([]);
   const [network, setNetwork] = useState(true);
   const [selected, setSelected] = useState("");
   const ended = useRef(onAccessEnded); ended.current = onAccessEnded;
@@ -35,22 +38,24 @@ export function ObserverWorkspace({ apiBase, gameId, role, onAccessEnded, onStat
       </select>
       {unit && <dl><dt>Name</dt><dd>{unit.name}</dd><dt>Side</dt><dd>{unit.side}</dd><dt>Position</dt><dd>{unit.position.latitude_deg.toFixed(4)}, {unit.position.longitude_deg.toFixed(4)} · {unit.position.altitude_m.toFixed(0)} m</dd><dt>Damage</dt><dd>{unit.destroyed ? "Destroyed" : "Active"}{unit.hit_points == null ? "" : ` · ${unit.hit_points} HP`}</dd><dt>Ammunition</dt><dd>{unit.ammunition}</dd><dt>Fuel (modeled seconds)</dt><dd>{unit.fuel.toFixed(0)}</dd></dl>}
       {weapon && <dl><dt>Model</dt><dd>{weapon.kind}</dd><dt>State</dt><dd>{weapon.phase}</dd><dt>Position</dt><dd>{weapon.position ? `${weapon.position.latitude_deg.toFixed(4)}, ${weapon.position.longitude_deg.toFixed(4)}` : "No flight trajectory modeled"}</dd><dt>Impact tick</dt><dd>{weapon.impact_tick ?? "Not scheduled"}</dd><dt>Provider</dt><dd>{weapon.provider_id ? names.get(weapon.provider_id) ?? weapon.provider_id : "None"}</dd></dl>}
+      <WeatherEditor apiBase={apiBase} gameId={gameId} role={role} onPreview={setWeatherPreview} />
       <h2>Network topology</h2><p>Current links and queues. Message contents are not included.</p>
       <div className="truth-links"><table><thead><tr><th>Link</th><th>State</th><th>Queue</th></tr></thead><tbody>
         {truth.data?.communication_links.map(l => <tr key={l.id}><td>{names.get(l.from_entity_id) ?? l.from_entity_id} → {names.get(l.to_entity_id) ?? l.to_entity_id}</td><td>{l.available ? "Available" : "Unavailable"}{l.jammed > 0 ? " · jammed" : ""}</td><td>{l.queued_packets} packets / {l.queued_bytes} B</td></tr>)}
       </tbody></table></div>
     </aside>
-    {truth.data && <TruthMap truth={truth.data} network={network} onSelect={setSelected} />}
+    {truth.data && <TruthMap animateMotion={running && truth.status === "live"} truth={truth.data} network={network} onSelect={setSelected} weatherPreview={weatherPreview} />}
   </section>;
 }
-function TruthMap({ truth, network, onSelect }: { truth: TruthProjection; network: boolean; onSelect: (id: string) => void }) {
+function TruthMap({ truth, network, onSelect, weatherPreview, animateMotion }: { animateMotion: boolean; truth: TruthProjection; network: boolean; onSelect: (id: string) => void; weatherPreview: WeatherRegion[] }) {
   const host = useRef<HTMLDivElement>(null), viewer = useRef<Viewer | null>(null);
+  const smoothing = useRef(new SmoothPositions());
   const selection = useRef(onSelect); selection.current = onSelect;
   useEffect(() => {
     const map = new Viewer(host.current!, {
       animation: false, baseLayerPicker: false, timeline: false, geocoder: false, homeButton: false,
       navigationHelpButton: false, sceneModePicker: false, fullscreenButton: false, infoBox: false,
-      terrainProvider: new EllipsoidTerrainProvider(), requestRenderMode: true, maximumRenderTimeChange: Infinity, targetFrameRate: 30,
+      terrainProvider: new EllipsoidTerrainProvider(), requestRenderMode: true, maximumRenderTimeChange: Infinity, targetFrameRate: 60,
       baseLayer: new ImageryLayer(new OpenStreetMapImageryProvider({ url: "https://tile.openstreetmap.org/" })),
     });
     map.scene.globe.baseColor = Color.fromCssColorString("#1f3340");
@@ -58,12 +63,20 @@ function TruthMap({ truth, network, onSelect }: { truth: TruthProjection; networ
     map.camera.setView({ destination: Cartesian3.fromDegrees(first?.longitude_deg ?? -40, first?.latitude_deg ?? 30, first ? 220000 : 20000000) });
     const controls = attachMapKeyboardControls(map.camera, map.scene.globe.ellipsoid); controls.setEnabled(true);
     const stop = map.selectedEntityChanged.addEventListener(entity => selection.current(entity?.id ?? ""));
+    const stopMotion = map.clock.onTick.addEventListener(() => { if (smoothing.current.tick()) map.scene.requestRender(); });
     viewer.current = map;
-    return () => { stop(); controls.destroy(); viewer.current = null; map.destroy(); };
+    return () => { stopMotion(); stop(); controls.destroy(); viewer.current = null; map.destroy(); };
   }, []);
   useEffect(() => {
     if (!viewer.current) return;
-    updateTruthEntities(viewer.current.entities, truth, network); viewer.current.scene.requestRender();
-  }, [truth, network]);
+    smoothing.current.setRunning(animateMotion);
+    updateTruthEntities(viewer.current.entities, truth, network, smoothing.current); viewer.current.scene.requestRender();
+  }, [truth, network, animateMotion]);
+  useEffect(() => {
+    const map = viewer.current; if (!map) return;
+    for (const entity of [...map.entities.values]) if (entity.id.startsWith("weather-preview:")) map.entities.remove(entity);
+    for (const region of weatherPreview) if (region.center && Number.isFinite(region.radius_m) && region.radius_m > 0) map.entities.add({ id: `weather-preview:${region.id}`, name: region.id, position: Cartesian3.fromDegrees(region.center.longitude_deg, region.center.latitude_deg), ellipse: { semiMajorAxis: region.radius_m, semiMinorAxis: region.radius_m, material: Color.PURPLE.withAlpha(0.2), outline: true, outlineColor: Color.PURPLE } });
+    map.scene.requestRender();
+  }, [weatherPreview]);
   return <div className="truth-map globe" ref={host} aria-label="Ground truth map" />;
 }

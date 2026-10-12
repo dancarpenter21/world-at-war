@@ -8,6 +8,7 @@ use uom::si::{
 };
 
 pub mod geoid;
+pub mod terrain;
 const R: f64 = 6_371_008.8;
 pub const MAX_VERTICES: usize = 4096;
 

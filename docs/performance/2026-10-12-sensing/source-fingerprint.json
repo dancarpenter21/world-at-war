@@ -1,0 +1,252 @@
+{
+  "revision": "9d0a0b58933a4ff98e8afc921a8aeb104275300a",
+  "dirty": true,
+  "sha256": "99982faec9a5af3892e1828215a2309e134338286b26421174c9fada5fdcc7b2",
+  "files": [
+    {
+      "path": "Cargo.lock",
+      "sha256": "a05b4de020a14aed32e8579b75c874262b55c4f3f45ed52cb2546a575c03f619"
+    },
+    {
+      "path": "crates/server/Dockerfile",
+      "sha256": "e5f69f484fbc06b70ac3b886dabd3d609cc109207df856563607e81064e0f387"
+    },
+    {
+      "path": "crates/server/src/ai_orders.rs",
+      "sha256": "c75a20e81d050556da0bf57cb18a952f45f2b74dbdc00adba4d9d58c9f8bd4ce"
+    },
+    {
+      "path": "crates/server/src/auth.rs",
+      "sha256": "e5f88dfb5e121bb8fb40a4c1d1d149f55f8d41078453419161c6bce1750c5bfe"
+    },
+    {
+      "path": "crates/server/src/benchmark.rs",
+      "sha256": "87ce76a99042f1cf3f037a660304ce4340ce2cf7d34ab84fd783a8b3cdf8d688"
+    },
+    {
+      "path": "crates/server/src/diagnostics.rs",
+      "sha256": "e99c587de6e420526c63318a460f4dbf14e78c0562c33baee075628968c5896a"
+    },
+    {
+      "path": "crates/server/src/environment.rs",
+      "sha256": "57159433b75768311799a5698351b5cbade5f214c99fa430c204c1cf074ecc13"
+    },
+    {
+      "path": "crates/server/src/game_clock.rs",
+      "sha256": "8454a632b995342b3bbd8cbe6c182d126d935176b51e4b6bba568382324327fa"
+    },
+    {
+      "path": "crates/server/src/intents.rs",
+      "sha256": "afd8bf8967138f6f7b1605c16b2fea9d72f92b4c495101dc6caa9a231583d5de"
+    },
+    {
+      "path": "crates/server/src/main.rs",
+      "sha256": "56fa2a8c2c7ea6a805a996a21aec919ab1c1a55ff33b662288e3abd23e8157e7"
+    },
+    {
+      "path": "crates/server/src/planning.rs",
+      "sha256": "239884e19c33d737cfa1b695a0705b97d63c87242a65421b90c0bf64a6fb563c"
+    },
+    {
+      "path": "crates/server/src/recovery.rs",
+      "sha256": "6719134ed7505f636bf9cfb56ecaa83439385ae1e467c363035cfd8e2b2ef640"
+    },
+    {
+      "path": "crates/server/src/sensing_auth_tests.rs",
+      "sha256": "0e4782913cc167d68ac6a65d26fdd5a9ca2fd1045476bcefe9d7e6fe70e5bfbf"
+    },
+    {
+      "path": "crates/server/src/sensor_reports.rs",
+      "sha256": "a2a2f7ca493f093a54cda951e974a990ba255f71230ca35805f2e2a4c2be5223"
+    },
+    {
+      "path": "crates/server/src/storage.rs",
+      "sha256": "aff7c1ddadf47946e42828ea60abc3b198444a70dc351dad752692b94b87d913"
+    },
+    {
+      "path": "crates/server/src/transport.rs",
+      "sha256": "cb1305606370e0febbae526320215a2e6b61f5b8f6f3d0173ea851f8c3de1736"
+    },
+    {
+      "path": "crates/sim-ai/src/lib.rs",
+      "sha256": "5ed8e6bc426bf580f0fa7dc5f6f7b42fa351b7ca91c7a1fb8956cedec3088698"
+    },
+    {
+      "path": "crates/sim-core/src/lib.rs",
+      "sha256": "1c9af940d9844bb891b43caa42dfc6bcee43218cc97ae25783b649cacc0c45dc"
+    },
+    {
+      "path": "crates/sim-core/src/operations.rs",
+      "sha256": "4bdb914f3979f78978267698a18bc4befd3266f00abcd0e6f600729b48e13bd1"
+    },
+    {
+      "path": "crates/sim-core/src/performance.rs",
+      "sha256": "7483a571043592a38369b756c64bbbe28db722cca7662b338d6b1c422e797510"
+    },
+    {
+      "path": "crates/sim-core/src/sensing.rs",
+      "sha256": "3bfa6501a501bf8673fd53e3dca61b49ad22a6b8667c2955172c58bdee1b91a8"
+    },
+    {
+      "path": "crates/sim-core/src/sensing/tests.rs",
+      "sha256": "42fdbafbfa88cd0361049e288c39e6f042e4be4de611705eea9f657477225641"
+    },
+    {
+      "path": "crates/sim-core/src/snapshot.rs",
+      "sha256": "d22c813c2984f34b7676b8f276c8f5e6b842813470044b38c4b8e6a1c842b8ef"
+    },
+    {
+      "path": "crates/sim-core/src/transport.rs",
+      "sha256": "74dd421c75a31a5ad3b12a80ec0c68076d46dbd6edee6fee8b76d64584c3e367"
+    },
+    {
+      "path": "crates/sim-core/src/truth.rs",
+      "sha256": "038e8b37569e910c84bf77e99d370b1e21620dc2b889d99ad8ebf1cc68a220dd"
+    },
+    {
+      "path": "crates/sim-geo/Cargo.toml",
+      "sha256": "42dc58ccf7fd397733ca2d1e1fee463e38cc52511e55ac72c95702f33b7da988"
+    },
+    {
+      "path": "crates/sim-geo/src/lib.rs",
+      "sha256": "6ba24b0a0a58f8ef1c3319d1e8f335c89219bd5ae6b7e977b47ac98ad68013f4"
+    },
+    {
+      "path": "crates/sim-geo/src/terrain.rs",
+      "sha256": "9b3072f182bfe72011da86ea0cb4f871523d53fd8aa42b57a20edf1ce1c05591"
+    },
+    {
+      "path": "crates/sim-scenario/Cargo.toml",
+      "sha256": "16a0366044dac50cb2e939ef33ec5476c7447c5a65566a3386314166e413fa4e"
+    },
+    {
+      "path": "crates/sim-scenario/src/lib.rs",
+      "sha256": "1f871235d8a44caa2fa0b155599e98872a95c3208fa7184e45979f4ad355ec5c"
+    },
+    {
+      "path": "crates/sim-scenario/src/radio_exercise.rs",
+      "sha256": "3463adb93d36d2bdc0d33060b5a6234e59180cce2b40cc3a02aa875a8d797ac6"
+    },
+    {
+      "path": "crates/sim-scenario/tests/sensing.rs",
+      "sha256": "e2d0f270c08783d1264f0b8223339f16b4b65d7b23ea45f02119c50ae1210351"
+    },
+    {
+      "path": "data/scenarios/sensing-kernel-exercise.v1.json",
+      "sha256": "fe3e310b8034fd68e0b3015afe78c1f70982a8fd5fae7902ac6dfa49847c7566"
+    },
+    {
+      "path": "data/sensing/platform-profiles.v1.json",
+      "sha256": "69ddcba79f804b59bd3a2aae94721ca33c9e1e48ab664df57c57a4e8a933a1e4"
+    },
+    {
+      "path": "data/sensing/scenario-upgrades.v1.json",
+      "sha256": "f60760f580d5f34435687aaa15ee085d979696c800d910a63631dde1ea56c106"
+    },
+    {
+      "path": "data/sensing/training-model.v1.json",
+      "sha256": "6f89caa496e6e5c24622d0584110b5f848b47be0b2d558a03310e52926d9fe6c"
+    },
+    {
+      "path": "docker-compose.dev.yml",
+      "sha256": "187634d413062be9ebec370234a2831b885664f579254cdc14e0e0e4cc57830b"
+    },
+    {
+      "path": "docker-compose.yml",
+      "sha256": "95773db96375dfe2f8e17bad3d5140df357bdd2b7f7151e889fae7f953686c45"
+    },
+    {
+      "path": "scripts/setup-terrain.py",
+      "sha256": "065e44325f345d5c2fc7348ff0e94ccf5c20a7c583abad5e30787b1bae9fd688"
+    },
+    {
+      "path": "web/e2e/campaign.e2e.ts",
+      "sha256": "29f8719f170df97280508b440a711633a20855942b9582196b464976d7e4aa63"
+    },
+    {
+      "path": "web/e2e/fixtures/game-backend.ts",
+      "sha256": "1dff8017bec2abaef1a9e2dddc24a1d8af4c9b219662120ca0936a604b886aeb"
+    },
+    {
+      "path": "web/e2e/game-session.e2e.ts",
+      "sha256": "e6c9f8524100db54caa3a622a7fef2aa87336567786175e9f0bdaa8538bfe254"
+    },
+    {
+      "path": "web/e2e/network-gameplay.e2e.ts",
+      "sha256": "0520a7499f42ab9dc61335c04a8573b4e583c1b12d38f47e98637b6cccaf8772"
+    },
+    {
+      "path": "web/e2e/sensing-controls.e2e.ts",
+      "sha256": "1034b6d4110a9dd9cf58996594c3bcb47eaf5e4a6d02c31b26174f5bae475e75"
+    },
+    {
+      "path": "web/e2e/support/server.ts",
+      "sha256": "fcb3cb764245da454277f436db52cac9487de35b1143e096bdf19b0c86a7a56a"
+    },
+    {
+      "path": "web/e2e/support/terrain.ts",
+      "sha256": "f33aaa2bdf5cf0f6246bf78e464e939839d35dee40a332199b68f9e45cf2cb44"
+    },
+    {
+      "path": "web/scripts/performance-server.mjs",
+      "sha256": "72708c378431af6439e33d009c5d3739c631317b839443b433a58aefa16d1aa0"
+    },
+    {
+      "path": "web/scripts/performance.node-test.mjs",
+      "sha256": "fce4e03785b41c9e807d9ca31b06182a653e9bfbff79ca8950caa04d0acef2ed"
+    },
+    {
+      "path": "web/src/GameSessionControls.tsx",
+      "sha256": "7998b6f2bdc231e368b1740ee17e652e0bba153368dc6c442ffcde5301825648"
+    },
+    {
+      "path": "web/src/Globe.tsx",
+      "sha256": "73612aeae638b33bc4dccc39cbfa8ef8f13306b0245c778fa6ab4b56f71f94ab"
+    },
+    {
+      "path": "web/src/ObserverWorkspace.tsx",
+      "sha256": "dd8f7b9dd7dca21a30011d7e473d6c137252a14bface25c3e77f6cbe54d6f5ee"
+    },
+    {
+      "path": "web/src/OperationalInspector.tsx",
+      "sha256": "a85f1fededdb4a89b6c038c982f5d05f50a9f43127d3fcb6728611158f78c487"
+    },
+    {
+      "path": "web/src/RadarControls.tsx",
+      "sha256": "1ab7e853b184c8b1311b0909a4f09a17b6df06a5e773accf7117b2beeac27cc1"
+    },
+    {
+      "path": "web/src/SpaceAssetViewer.tsx",
+      "sha256": "799c405176e1dd457820961e63f8a48b5eedad6c6b5186560413a268546c16e2"
+    },
+    {
+      "path": "web/src/WeatherEditor.tsx",
+      "sha256": "c9b5e711fa7d467679d700f4201c7e26dea3067985c59e275cbedcb8d325e2bb"
+    },
+    {
+      "path": "web/src/globeEntities.test.ts",
+      "sha256": "05213d2354f49b905734e5793c194a0b921064b99cb309da103b8e956ff90ed2"
+    },
+    {
+      "path": "web/src/globeEntities.ts",
+      "sha256": "bc33ee56e6172e955fb1f47c663930a6b6ca806e572fbd0623aededcc0376a5c"
+    },
+    {
+      "path": "web/src/main.tsx",
+      "sha256": "8aadfd11a36216f0d60cf1e393ed8e977735d9b71bd73e27b2745da5a08a75a0"
+    },
+    {
+      "path": "web/src/styles.css",
+      "sha256": "51aa18a05133a84e820bb97a27fb79627c340f535702880273cf151b6d9a4fc5"
+    },
+    {
+      "path": "web/src/trackTiming.ts",
+      "sha256": "700ae73f850b66632d7682f0825a509da6e9cfb31ff09d2b167a42736f6eaf42"
+    },
+    {
+      "path": "web/src/truthEntities.ts",
+      "sha256": "58b187021f94955bbc5042eba98dc5122f865edc86fa1140e1ce3ccd325bc378"
+    }
+  ],
+  "binary_sha256": "911b2629f97560e7df17a59480d9aebb224ce1d2525f340526d3072a69c30f25"
+}

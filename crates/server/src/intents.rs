@@ -349,6 +349,9 @@ pub(super) fn intent_fields(
         ),
     ]);
     match &intent.kind {
+        OrderKind::SetRadarEmission { emitting } => {
+            fields.insert("radar_emitting".into(), serde_json::json!(emitting));
+        }
         OrderKind::Iftu { weapon_id, command } => {
             fields.insert("weapon_id".into(), serde_json::json!(weapon_id));
             fields.insert("command".into(), serde_json::json!(command));

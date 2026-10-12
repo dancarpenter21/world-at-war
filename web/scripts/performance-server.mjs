@@ -59,6 +59,10 @@ const metadata = { schema_version: 2, measurement_version: 3, clock: 'epoch anch
   binary_sha256: createHash('sha256').update(await readFile(binary)).digest('hex'),
   protocol: '1 Hz full snapshots; state/planning HTTP plus network WebSocket, no browser rendering; encoded HTTP body bytes when Content-Length is present, otherwise decoded bytes',
 };
+if (process.env.TERRAIN_DIR) {
+  const terrainManifest = await readFile(path.join(process.env.TERRAIN_DIR, 'manifest.json'));
+  metadata.terrain = { root: path.resolve(process.env.TERRAIN_DIR), manifest_sha256: createHash('sha256').update(terrainManifest).digest('hex'), manifest: JSON.parse(terrainManifest.toString()) };
+}
 const runtime = await mkdtemp(path.join(tmpdir(), 'waw-performance-'));
 const sink = createWriteStream(path.join(output, 'clients.jsonl'), { flags: 'wx' });
 sink.on('error', error => { errors.push(`Client trace: ${error.message}`); stopping = true; });
@@ -204,7 +208,7 @@ try {
   await writeFile(path.join(runtime, 'airports/latest.json'), JSON.stringify({ schema_version: 1, synced_unix: Math.floor(clock.now() / 1000), checksum: 'performance-fixture', sources: [], degraded_sources: [], airports }));
   serverLog = createWriteStream(path.join(output, 'server.log'), { flags: 'wx' });
   backend = spawn(binary, [], { cwd: runtime,
-    env: { PATH: process.env.PATH, COMMUNICATIONS_ARCHIVE_RETENTION_DAYS: String(archiveRetentionDays), DATABASE_URL: database?.url ?? '', BIND_ADDR: `127.0.0.1:${port}`, APP_ALLOWED_ORIGINS: base,
+    env: { PATH: process.env.PATH, TERRAIN_DIR: process.env.TERRAIN_DIR ? path.resolve(process.env.TERRAIN_DIR) : '', COMMUNICATIONS_ARCHIVE_RETENTION_DAYS: String(archiveRetentionDays), DATABASE_URL: database?.url ?? '', BIND_ADDR: `127.0.0.1:${port}`, APP_ALLOWED_ORIGINS: base,
       COOKIE_SECURE: 'false', ADMIN_SETUP_TOKEN: '', PERFORMANCE_TRACE_DIR: output,
       SPACETRACK_USERNAME: '', SPACETRACK_PASSWORD: '', SPACETRACK_LOGIN_URL: `${providerBase}/login`, SPACETRACK_GP_URL: `${providerBase}/gp`,
       AIRPORT_CACHE_DIR: path.join(runtime, 'airports'), AIRPORT_REFRESH_MAX_AGE_SECONDS: '86400',

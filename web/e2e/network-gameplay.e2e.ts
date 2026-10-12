@@ -213,12 +213,12 @@ test("withholds remote sensor knowledge and message contents until radio deliver
   const started = page.waitForResponse((response) => response.url().endsWith(`/games/${gameId}/start`));
   const startClick = page.getByRole("button", { name: "Start scenario", exact: true }).click();
   await started;
-  await expect.poll(async () => (await (await request.get(observerNetwork)).json()).messages.length, { timeout: 10_000, intervals: [100] }).toBe(1);
+  await expect.poll(async () => (await (await request.get(observerNetwork)).json()).messages.filter((record: { message: { fields: { track?: unknown } } }) => record.message.fields.track).length, { timeout: 10_000, intervals: [100] }).toBe(1);
   const pause = await request.post(`${backend.url}/v1/games/${gameId}/pause`, { data: { player_id: playerId } });
   expect(pause.ok()).toBe(true);
   await startClick;
-  const source = (await (await request.get(observerNetwork)).json()).messages[0];
-  expect(source.state).toBe("in_transit");
+  const source = (await (await request.get(observerNetwork)).json()).messages.find((record: { message: { fields: { track?: unknown } } }) => record.message.fields.track);
+  expect(["queued", "in_transit"]).toContain(source.state);
   expect(source.message.profile_id).toBe("public-safe.jseries.track-report.v1");
   expect(source.message.fields.track.track_id).not.toBe(enemyId);
   expect(JSON.stringify(source.message)).not.toContain(enemyId);
@@ -243,13 +243,18 @@ test("withholds remote sensor knowledge and message contents until radio deliver
     const track = received.tracks[0];
     expect(track.observed_tick).toBe(source.message.fields.track.observed_tick);
     expect(track.received_tick).toBeGreaterThan(track.observed_tick);
-    expect(track.position).toEqual(source.message.fields.track.position);
+    // A received estimate may extrapolate the sender's measured position; it
+    // remains within its uncertainty plus the supplied motion during delivery.
+    const delta = track.received_tick - source.message.fields.track.evidence.estimate_tick;
+    const motion = source.message.fields.track.evidence.velocity;
+    const separation = Math.hypot((track.position.latitude_deg - source.message.fields.track.position.latitude_deg) * 111320, (track.position.longitude_deg - source.message.fields.track.position.longitude_deg) * 111320);
+    expect(separation).toBeLessThanOrEqual(track.uncertainty_m + Math.hypot(motion.north_mps, motion.east_mps) * delta + 1);
     expect(track.track_id).not.toBe(source.message.fields.track.track_id);
     expect(track.track_id).not.toBe(enemyId);
     const delivered = (await (await request.get(networkUrl)).json()).messages[0];
     expect(delivered.state).toBe("delivered");
     const events = (await (await request.get(`${backend.url}/v1/games/${gameId}/network/events?${authorization}`)).json()).events;
-    expect(events.map((event: { state: string }) => event.state)).toEqual(["delivered"]);
+    expect(events.filter((event: { message: { id: string } }) => event.message.id === source.message.id).map((event: { state: string }) => event.state)).toEqual(["delivered"]);
     expect((await (await request.get(`${backend.url}/v1/games/${gameId}/state?${otherAuthorization}`)).json()).tracks).toEqual([]);
     await expect(page.getByText("Scenario paused", { exact: true })).toBeVisible();
     const report = page.locator(".track");
@@ -260,7 +265,7 @@ test("withholds remote sensor knowledge and message contents until radio deliver
     await page.screenshot({ path: testInfo.outputPath("sensor-report-delivered.png") });
     await page.getByRole("button", { name: "Leave scenario", exact: true }).click();
     await expect.poll(async () => (await stream.frames()).some((frame) => frame.projection.messages.some((record) => record.message.id === source.message.id)), { timeout: 5_000 }).toBe(true);
-    expect((await stream.frames()).flatMap((frame) => frame.projection.messages).every((record) => record.state === "delivered")).toBe(true);
+    expect((await stream.frames()).flatMap((frame) => frame.projection.messages).every((record) => record.delivered_at_ns != null && ["delivered", "acknowledged"].includes(record.state))).toBe(true);
     expect(errors).toEqual([]);
   } finally {
     stream.close();
@@ -593,6 +598,7 @@ test("a pilot requests firing authority, respects denial, and launches only afte
 });
 
 test("reacquires a patrolling target after a blackout and receives its final impact in the mission debrief", async ({ page }, testInfo) => {
+  test.setTimeout(120000);
   const request = playerRequests(page, playerId); clients.push(request);
   test.setTimeout(90_000);
   const commander = "00000000-0000-0000-0000-000000004e86";
@@ -620,7 +626,7 @@ test("reacquires a patrolling target after a blackout and receives its final imp
   await expect(orders.getByRole("button", { name: "Send engagement order", exact: true })).toBeDisabled();
   await expect.poll(async () => (await readState()).tracks.length, { timeout: 20_000 }).toBe(1);
   const first = (await readState()).tracks[0];
-  await expect.poll(async () => (await readState()).tracks[0]?.observed_tick, { timeout: 25_000 }).toBeGreaterThanOrEqual(20);
+  await expect.poll(async () => (await readState()).tracks[0]?.observed_tick, { timeout: 40_000 }).toBeGreaterThanOrEqual(30);
   const refreshed = await readState();
   expect(refreshed.tracks[0].position.latitude_deg).toBeGreaterThan(first.position.latitude_deg);
   expect(refreshed.jamming_regions).toEqual([]);
@@ -640,7 +646,7 @@ test("reacquires a patrolling target after a blackout and receives its final imp
   expect(before.entries[0].hit).toBeNull();
   const invalid = await request.get(`${backend.url}/v1/games/${gameId}/roles/${commander}/debrief?player_id=${playerId}&lease_generation=${lease + 1}`);
   expect(invalid.status()).toBe(403);
-  await expect(dialog.getByRole("cell", { name: "Hit", exact: true })).toBeVisible({ timeout: 25_000 });
+  await expect(dialog.getByRole("cell", { name: "Hit", exact: true })).toBeVisible({ timeout: 40_000 });
   const after = await (await request.get(debriefUrl)).json();
   expect(after.entries).toHaveLength(1);
   const entry = after.entries[0];

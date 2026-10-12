@@ -592,6 +592,8 @@ struct Execution {
 }
 #[derive(Clone, Serialize, Deserialize)]
 struct Weapon {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    aim_point: Option<GeoPose>,
     target: Uuid,
     impact_tick: u64,
     hit: bool,
@@ -696,6 +698,7 @@ impl Operations {
             });
         } else {
             self.weapons.push(Weapon {
+                aim_point: track.evidence.as_ref().map(|_| track.position),
                 target,
                 impact_tick: tick
                     + (distance / combat.profile.weapon_speed_mps).ceil().max(1.0) as u64,
@@ -939,6 +942,9 @@ impl Simulation {
 
 pub(super) fn advance_operations(world: &mut World) {
     let tick = world.resource::<SimClock>().tick;
+    let delta_seconds = world
+        .get_resource::<FrameClock>()
+        .map_or(1.0, |clock| f64::from(clock.delta_units) / 240.0);
     let mut ops = world.remove_resource::<Operations>().unwrap();
     let mut query = world.query::<(&SimEntityId, &GeoPose, &Ownership, &CombatState)>();
     let states: BTreeMap<_, _> = query
@@ -949,7 +955,16 @@ pub(super) fn advance_operations(world: &mut World) {
     ops.weapons.retain(|w| {
         if tick >= w.impact_tick {
             if w.hit {
-                hits.insert(w.target);
+                if let Some(aim) = w.aim_point {
+                    // Fictional 250 m impact region around the reported aimpoint.
+                    for (id, (position, _, _)) in &states {
+                        if geodesy::slant_distance_m(aim, *position) <= 250.0 {
+                            hits.insert(*id);
+                        }
+                    }
+                } else {
+                    hits.insert(w.target);
+                }
             }
             false
         } else {
@@ -1083,7 +1098,7 @@ pub(super) fn advance_operations(world: &mut World) {
                             <= task.engagement.max_track_age_ticks
                 })
                 .filter_map(|t| {
-                    if ops.iftu_units.contains(&task.unit_id) {
+                    if ops.iftu_units.contains(&task.unit_id) || t.evidence.is_some() {
                         return Some((Uuid::nil(), t));
                     }
                     targets
@@ -1120,6 +1135,7 @@ pub(super) fn advance_operations(world: &mut World) {
                         });
                     } else {
                         ops.weapons.push(Weapon {
+                            aim_point: track.evidence.as_ref().map(|_| track.position),
                             target,
                             impact_tick: tick
                                 + (distance / combat.profile.weapon_speed_mps).ceil().max(1.0)
@@ -1190,7 +1206,7 @@ pub(super) fn advance_operations(world: &mut World) {
             if let Some(p) = path.as_deref_mut() {
                 p.active = false;
             }
-            combat.profile.fuel_seconds = (combat.profile.fuel_seconds - 1.0).max(0.0);
+            combat.profile.fuel_seconds = (combat.profile.fuel_seconds - delta_seconds).max(0.0);
         }
         if shots.contains(&id.0) {
             combat.profile.ammunition = combat.profile.ammunition.saturating_sub(1);

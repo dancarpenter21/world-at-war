@@ -39,3 +39,30 @@ impl super::Simulation {
         counts
     }
 }
+
+#[derive(Debug, Clone, Copy, Default, Serialize)]
+pub struct SensingStatistics {
+    pub candidate_checks: u64,
+    pub terrain_checks: u64,
+    pub observation_ms: f64,
+}
+impl super::Simulation {
+    /// Private performance trace only; candidate counts must not enter role APIs.
+    pub fn sensing_statistics(&self) -> SensingStatistics {
+        if self
+            .world
+            .get_resource::<super::FrameClock>()
+            .is_some_and(|clock| !clock.crossed_second())
+        {
+            return SensingStatistics::default();
+        }
+        self.world
+            .get_resource::<super::sensing::Runtime>()
+            .map(|runtime| SensingStatistics {
+                candidate_checks: runtime.candidate_count,
+                terrain_checks: runtime.terrain_checks,
+                observation_ms: runtime.observation_ms,
+            })
+            .unwrap_or_default()
+    }
+}

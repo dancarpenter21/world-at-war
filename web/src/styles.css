@@ -348,3 +348,13 @@ select, textarea { width: 100%; padding: 9px; color: #eef7fa; background: #0e171
 .account-dialog form { padding: 1.5rem; }
 .account-dialog label { display: grid; gap: .4rem; margin: 1rem 0; }
 .account-actions { display: flex; justify-content: flex-end; gap: .75rem; margin-top: 1rem; }
+
+.time-scale { display: flex; align-items: center; gap: 6px; }
+.time-scale select { width: auto; padding: 4px 8px; }
+.simulation-time { font-variant-numeric: tabular-nums; white-space: nowrap; font-size: .85rem; }
+.game-session-controls { flex-wrap: wrap; }
+
+.weather-editor fieldset { padding: 0; border: 0; }
+.weather-editor input, .weather-editor textarea { max-width: 100%; box-sizing: border-box; }
+.weather-editor textarea { width: 100%; }
+.weather-editor button { margin: 4px; }

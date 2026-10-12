@@ -11,6 +11,14 @@ pub(super) enum DeliveryAction {
         recipient_unit_id: Uuid,
         report: sim_core::combat::ImpactReport,
     },
+    ReceiveWeatherReport {
+        recipient_unit_id: Uuid,
+        report: sim_core::sensing::WeatherObservation,
+    },
+    ReceiveBearingReport {
+        recipient_unit_id: Uuid,
+        bearing: sim_core::sensing::Bearing,
+    },
     ReceiveTrackReport {
         recipient_unit_id: Uuid,
         source_track: sim_core::Track,
@@ -104,7 +112,21 @@ pub(super) fn transmit_c2_message_from_entity(
     };
     let encoded_bytes = message.encoded();
     let local = origin_entity_id == recipient_entity_id;
-    let queued = if local {
+    let reliable_report = !local
+        && profile_id == sensor_reports::TRACK_REPORT_PROFILE
+        && game.simulation.sensing_configuration().is_some();
+    let queued = if reliable_report {
+        game.simulation
+            .send_message(
+                message.id,
+                origin_entity_id,
+                recipient_entity_id,
+                encoded_bytes.clone(),
+                message.header.expires_tick,
+            )
+            .map(|()| None)
+            .map_err(|error| error.to_string())
+    } else if local {
         Ok(None)
     } else {
         game.simulation
@@ -123,10 +145,19 @@ pub(super) fn transmit_c2_message_from_entity(
                 },
             )
             .map(Some)
+            .map_err(|error| error.to_string())
     };
     let (state, packet_id, drop_reason) = match queued {
         Ok(Some(id)) => (MessageState::Queued, Some(id.get()), None),
-        Ok(None) => (MessageState::Delivered, None, None),
+        Ok(None) => (
+            if reliable_report {
+                MessageState::Queued
+            } else {
+                MessageState::Delivered
+            },
+            None,
+            None,
+        ),
         Err(error) => (MessageState::Dropped, None, Some(error.to_string())),
     };
     let message_id = message.id;
@@ -163,6 +194,23 @@ pub(super) fn transmit_c2_message_from_entity(
         game.packet_messages.insert(packet_id, message_id);
     }
     Some(message_id)
+}
+
+pub(super) fn reliable_delivery(game: &mut Game, event: &sim_core::DeliveryEvent) {
+    if let Some(action) = game.pending_deliveries.remove(&event.id) {
+        if event.state == sim_core::DeliveryState::Delivered {
+            apply_delivery(game, event.id, action);
+        } else if matches!(
+            event.state,
+            sim_core::DeliveryState::Expired
+                | sim_core::DeliveryState::Dropped
+                | sim_core::DeliveryState::Unacknowledged
+        ) {
+            fail_delivery(game, event.id, action);
+        } else {
+            game.pending_deliveries.insert(event.id, action);
+        }
+    }
 }
 
 fn message_delivered(game: &Game, message_id: Uuid) -> bool {
@@ -247,6 +295,20 @@ fn apply_delivery(game: &mut Game, message_id: Uuid, action: DeliveryAction) {
             game.simulation
                 .receive_impact_report(recipient_unit_id, report, received_tick);
         }
+        DeliveryAction::ReceiveWeatherReport {
+            recipient_unit_id,
+            report,
+        } => {
+            game.simulation
+                .receive_weather_report(recipient_unit_id, report);
+        }
+        DeliveryAction::ReceiveBearingReport {
+            recipient_unit_id,
+            bearing,
+        } => {
+            game.simulation
+                .receive_bearing_report(recipient_unit_id, bearing);
+        }
         DeliveryAction::ReceiveTrackReport {
             recipient_unit_id,
             source_track,
@@ -261,6 +323,8 @@ fn apply_delivery(game: &mut Game, message_id: Uuid, action: DeliveryAction) {
                 DeliveryAction::ExecuteIntent(_)
                 | DeliveryAction::ReceiveExecutionAck { .. }
                 | DeliveryAction::ReceiveImpactReport { .. }
+                | DeliveryAction::ReceiveWeatherReport { .. }
+                | DeliveryAction::ReceiveBearingReport { .. }
                 | DeliveryAction::ReceiveTrackReport { .. } => {
                     unreachable!()
                 }
@@ -284,6 +348,8 @@ fn fail_delivery(game: &mut Game, message_id: Uuid, action: DeliveryAction) {
         DeliveryAction::ExecuteIntent(_)
         | DeliveryAction::ReceiveExecutionAck { .. }
         | DeliveryAction::ReceiveImpactReport { .. }
+        | DeliveryAction::ReceiveWeatherReport { .. }
+        | DeliveryAction::ReceiveBearingReport { .. }
         | DeliveryAction::ReceiveTrackReport { .. } => None,
     };
     if let Some(request) = request_id.and_then(|id| game.authority_requests.get_mut(&id)) {
@@ -374,6 +440,7 @@ pub(super) fn finish_reporting(game: &mut Game) {
         .collect();
     for mut record in pending {
         let id = record.message.id;
+        game.simulation.cancel_application_message(id);
         if let Some(packet) = record.packet_id {
             game.packet_messages.remove(&packet);
         }

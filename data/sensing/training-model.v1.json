@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "rationale": "Fictional deterministic training estimates; not sourced platform performance.",
+  "epoch_unix": 1791806400,
+  "track_expiry_ticks": 120,
+  "process_acceleration_mps2": 10,
+  "association_gate": 9.21,
+  "visual_error_m": 20,
+  "radar_error_m": 30,
+  "bearing_error_deg": 2.0,
+  "sensor_height_m": 10.0,
+  "radar_reference_signature": 1.0,
+  "radar_clutter_factor": 0.6,
+  "radar_rain_factor": 0.15,
+  "jammer_power": 4.0,
+  "emitter_range_m": 180000.0,
+  "report_interval_ticks": 10
+}

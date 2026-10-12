@@ -1,9 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Metric, profiles, analyze } from './performance-lib.mjs';
+
+async function installTerrain(directory) {
+  const { createHash } = await import('node:crypto');
+  const root = path.join(directory, 'terrain'); await mkdir(root);
+  const data = Buffer.alloc(1201 * 1201 * 2);
+  const sha256 = createHash('sha256').update(data).digest('hex');
+  const tiles = [];
+  for (const latitude of [37, 38]) for (const longitude of [-78, -77, -76]) {
+    const file = `N${latitude}W${Math.abs(longitude).toString().padStart(3, '0')}.hgt`;
+    await writeFile(path.join(root, file), data);
+    tiles.push({ file, latitude, longitude, samples: 1201, sha256 });
+  }
+  await writeFile(path.join(root, 'manifest.json'), JSON.stringify({ version: 1,
+    source: 'Synthetic flat terrain for isolated harness tests; not real SRTM acceptance evidence',
+    vertical_datum: 'EGM96', tiles }));
+  return root;
+}
 
 test('histograms aggregate nearest-rank percentiles, empty input, and overflow', () => {
   const metric = new Metric(); assert.equal(metric.summary().p95, null);
@@ -66,9 +83,10 @@ test('interrupted runs stop their isolated server and retain invalid evidence', 
   if (process.platform !== 'linux') { t.skip('Load harness process telemetry requires Linux'); return; }
   const directory = await mkdtemp(path.join(tmpdir(), 'waw-perf-cleanup-'));
   const output = path.join(directory, 'run');
+  const terrain = await installTerrain(directory);
   const child = spawn(process.execPath, [path.join(root, 'web/scripts/performance-server.mjs'),
     '--profile', 'regional', '--clients', '1', '--warmup', '0', '--duration', '60', '--output', output],
-  { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
+  { cwd: root, env: { ...process.env, TERRAIN_DIR: terrain }, stdio: ['ignore', 'pipe', 'pipe'] });
   const exited = once(child, 'exit');
   let text = '', started = false;
   child.stdout.on('data', chunk => { text += chunk; if (!started && text.includes('Performance regional:')) { started = true; child.kill('SIGTERM'); } });
@@ -161,9 +179,10 @@ test('interrupted PostgreSQL runs remove their container and volume and preserve
   const { docker } = await import('./performance-postgres.mjs');
   const directory = await mkdtemp(path.join(tmpdir(), 'waw-pg-cleanup-'));
   const output = path.join(directory, 'run');
+  const terrain = await installTerrain(directory);
   const script = new URL('./performance-server.mjs', import.meta.url);
   const child = spawn(process.execPath, [script.pathname, '--storage', 'postgres', '--profile', 'regional',
-    '--clients', '1', '--warmup', '0', '--duration', '60', '--output', output], { stdio: ['ignore', 'pipe', 'pipe'] });
+    '--clients', '1', '--warmup', '0', '--duration', '60', '--output', output], { env: { ...process.env, TERRAIN_DIR: terrain }, stdio: ['ignore', 'pipe', 'pipe'] });
   const exited = once(child, 'exit');
   let text = '', started = false;
   child.stdout.on('data', chunk => { text += chunk; if (!started && text.includes('Performance regional:')) { started = true; child.kill('SIGTERM'); } });

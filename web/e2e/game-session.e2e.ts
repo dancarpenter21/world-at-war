@@ -466,7 +466,7 @@ test("keeps an unanswered order unconfirmed and accepts a later execution reply 
 
 test("opens the lobby before downloading the map and keeps host controls usable during loading", async ({ page }, testInfo) => {
   const pendingMaps: Route[] = [];
-  await page.route("**/src/Globe.tsx", (route) => { pendingMaps.push(route); });
+  await page.route(/\/src\/Globe\.tsx(?:\?.*)?$/, (route) => { pendingMaps.push(route); });
   const state = await openSession(page, false, sessionProjection(), sessionRole(), {
     waitForMap: false,
     onLobby: async () => {
@@ -487,11 +487,11 @@ test("opens the lobby before downloading the map and keeps host controls usable 
 });
 
 test("recovers a failed map download by reloading the held game and role", async ({ page }) => {
-  await page.route("**/src/Globe.tsx", (route) => route.abort("failed"));
+  await page.route(/\/src\/Globe\.tsx(?:\?.*)?$/, (route) => route.abort("failed"));
   const state = await openSession(page, false, sessionProjection(), sessionRole(), { waitForMap: false });
   await expect(page.getByText("The operational map could not load.", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Pause scenario", exact: true })).toBeEnabled();
-  await page.unroute("**/src/Globe.tsx");
+  await page.unroute(/\/src\/Globe\.tsx(?:\?.*)?$/);
   await page.getByRole("button", { name: "Reload page", exact: true }).click();
   await expect(page.locator(".globe canvas")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Blue One Pilot", exact: true })).toBeVisible();

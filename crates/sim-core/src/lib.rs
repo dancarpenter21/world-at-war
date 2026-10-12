@@ -1,13 +1,17 @@
 //! Deterministic, server-authoritative primitives for World At War.
 
+mod frame_clock;
 pub mod operations;
 pub mod performance;
+use frame_clock::FrameClock;
+pub use frame_clock::TICKS_PER_SECOND;
 mod transport;
 pub mod truth;
 pub use transport::{DeliveryEvent, DeliveryState};
 pub mod combat;
 pub mod geodesy;
 pub mod iftu;
+pub mod sensing;
 
 #[cfg(test)]
 mod sensor_tests;
@@ -136,6 +140,8 @@ pub struct CyclicFlightPath {
 struct GeodesicMotionState {
     origin: GeoPose,
     started_at_tick: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    started_at_units: Option<u64>,
     velocity: Velocity,
 }
 
@@ -474,6 +480,8 @@ pub struct Observations(pub Vec<Contact>);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Track {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<sensing::Evidence>,
     pub track_id: Uuid,
     pub target_side: Option<Side>,
     pub position: GeoPose,
@@ -500,6 +508,10 @@ struct ReportKnowledge {
 
 #[derive(Serialize, Deserialize)]
 struct KnowledgeReport {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    weather: Option<sensing::WeatherObservation>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    bearings: Vec<sensing::Bearing>,
     #[serde(default)]
     origins: BTreeMap<Uuid, (Uuid, Uuid)>,
     friendly: Vec<VisibleUnit>,
@@ -523,6 +535,9 @@ pub enum OrderKind {
     Engage {
         track_id: Uuid,
     },
+    SetRadarEmission {
+        emitting: bool,
+    },
     Iftu {
         weapon_id: Uuid,
         command: iftu::Command,
@@ -533,6 +548,7 @@ impl OrderKind {
     pub fn action_key(&self) -> &'static str {
         match self {
             Self::Move { .. } => ACTION_MOVE,
+            Self::SetRadarEmission { .. } => "set_radar_emission",
             Self::Engage { .. } | Self::Iftu { .. } => ACTION_ENGAGE,
         }
     }
@@ -937,9 +953,15 @@ impl Simulation {
             apply_orders.after(advance_clock),
             operations::advance_operations.after(apply_orders),
             move_platforms.after(operations::advance_operations),
-            combat::resolve_impacts.after(move_platforms),
-            detect_contacts.after(combat::resolve_impacts),
-            deliver_reports.after(detect_contacts),
+            combat::resolve_impacts
+                .after(move_platforms)
+                .run_if(frame_clock::game_second_advanced),
+            detect_contacts
+                .after(combat::resolve_impacts)
+                .run_if(frame_clock::game_second_advanced),
+            deliver_reports
+                .after(detect_contacts)
+                .run_if(frame_clock::game_second_advanced),
         ));
         let snapshot_query = world.query::<(Entity, &SimEntityId)>();
         let mut simulation = Self {
@@ -987,6 +1009,7 @@ impl Simulation {
             GeodesicMotionState {
                 origin: platform.pose,
                 started_at_tick: 0,
+                started_at_units: None,
                 velocity: platform.velocity,
             },
             AuthorityNode {
@@ -1044,6 +1067,7 @@ impl Simulation {
         if sides.get(&terminal) != Some(&side) {
             return Err("target report must come from a friendly command terminal".into());
         }
+        self.refresh_sensing_knowledge();
         let track = self
             .world
             .resource::<KnowledgeBases>()
@@ -1098,11 +1122,31 @@ impl Simulation {
     }
 
     pub fn step(&mut self) {
+        if let Some(mut clock) = self.world.get_resource_mut::<FrameClock>() {
+            clock.delta_units = 240;
+        }
+        self.step_current_clock();
+    }
+    fn step_current_clock(&mut self) {
+        let whole_second = self.world.get_resource::<FrameClock>().is_none_or(|clock| {
+            clock.units.saturating_add(u64::from(clock.delta_units)) / 240 > clock.units / 240
+        });
         // Wall-clock observations stay outside ECS resources and never affect simulation decisions.
         let started = std::time::Instant::now();
-        self.capture_iftu_positions();
+        if whole_second {
+            self.refresh_sensing_knowledge();
+            self.capture_iftu_positions();
+        }
         self.schedule.run(&mut self.world);
         let ecs = started.elapsed();
+        if !whole_second {
+            self.last_step_timings = performance::StepTimings {
+                ecs_ms: ecs.as_secs_f64() * 1000.0,
+                total_ms: ecs.as_secs_f64() * 1000.0,
+                ..Default::default()
+            };
+            return;
+        }
         self.sync_network_interference()
             .expect("validated network must accept tick interference");
         let interference = started.elapsed();
@@ -1126,6 +1170,14 @@ impl Simulation {
 
     /// Advance radio traffic after an objective ends without moving or sensing platforms.
     pub fn advance_reporting_clock(&mut self) {
+        if let Some(mut clock) = self.world.get_resource_mut::<FrameClock>() {
+            clock.delta_units = 240;
+            clock.units = clock.units.saturating_add(240);
+            clock.frame = clock.frame.saturating_add(1);
+        }
+        self.advance_reporting_second();
+    }
+    fn advance_reporting_second(&mut self) {
         assert!(
             self.mission_complete(),
             "reporting clock requires a completed mission"
@@ -1133,6 +1185,9 @@ impl Simulation {
         self.reporting_ticks = self.reporting_ticks.saturating_add(1);
         self.sync_network_interference()
             .expect("validated interference");
+        if self.world.contains_resource::<sensing::Runtime>() {
+            self.advance_messages();
+        }
     }
 
     pub fn radio_tick(&self) -> u64 {
@@ -1201,7 +1256,17 @@ impl Simulation {
                     units.insert(unit.id, unit);
                 }
             }
+            if let Some(weather) = report.weather {
+                self.receive_weather_report(event.recipient, weather);
+            }
+            for bearing in report.bearings {
+                self.receive_bearing_report(event.recipient, bearing);
+            }
             for (target, mut track) in report.contacts {
+                if self.world.contains_resource::<sensing::Runtime>() {
+                    self.receive_track_report(event.recipient, track);
+                    continue;
+                }
                 let origin = report.origins.get(&track.track_id).copied();
                 let mut reports = self.world.resource_mut::<ReportKnowledge>();
                 let next = Uuid::from_u128(
@@ -1235,7 +1300,13 @@ impl Simulation {
                 }
             }
         }
-        if tick != 1 && !tick.is_multiple_of(5) {
+        let report_interval = self
+            .world
+            .get_resource::<sensing::Runtime>()
+            .map_or(5, |runtime| {
+                runtime.configuration.model.report_interval_ticks
+            });
+        if tick != 1 && !tick.is_multiple_of(report_interval) {
             return;
         }
         let mut query = self.world.query::<(
@@ -1256,6 +1327,10 @@ impl Simulation {
                     (
                         side.0,
                         VisibleUnit {
+                            radar_emitting: self
+                                .world
+                                .get_resource::<sensing::Runtime>()
+                                .and_then(|runtime| runtime.emissions.get(&id.0).copied()),
                             id: id.0,
                             name: name.0.clone(),
                             domain: domain.0,
@@ -1285,6 +1360,15 @@ impl Simulation {
             if side != other_side {
                 continue;
             }
+            // Advanced reports are larger and use acknowledged fragments. Wait
+            // for the preceding batch (including C2 on this route) to settle;
+            // the next report samples current knowledge instead of accumulating
+            // full copies of overlapping estimates in the durable snapshot.
+            if self.world.contains_resource::<sensing::Runtime>()
+                && self.has_pending_message_between(link.from_entity_id, link.to_entity_id)
+            {
+                continue;
+            }
             let payload = payloads
                 .entry(link.from_entity_id)
                 .or_insert_with(|| {
@@ -1302,27 +1386,37 @@ impl Simulation {
                         })
                         .unwrap_or_default();
                     friendly.push(unit.clone());
-                    let contacts: Vec<(Uuid, Track)> = self
-                        .world
-                        .resource::<KnowledgeBases>()
-                        .0
-                        .get(&link.from_entity_id)
-                        .map(|tracks| {
-                            tracks
-                                .iter()
-                                .filter(|t| tick.saturating_sub(t.observed_tick) < 120)
-                                .filter_map(|track| {
-                                    report_knowledge
-                                        .targets
-                                        .iter()
-                                        .find(|((owner, _), id)| {
-                                            *owner == link.from_entity_id && **id == track.track_id
-                                        })
-                                        .map(|((_, target), _)| (*target, track.clone()))
-                                })
+                    let contacts: Vec<(Uuid, Track)> =
+                        if self.world.contains_resource::<sensing::Runtime>() {
+                            self.world
+                                .resource::<sensing::Runtime>()
+                                .tracks_for(link.from_entity_id, tick)
+                                .into_iter()
+                                .map(|track| (track.track_id, track))
                                 .collect()
-                        })
-                        .unwrap_or_default();
+                        } else {
+                            self.world
+                                .resource::<KnowledgeBases>()
+                                .0
+                                .get(&link.from_entity_id)
+                                .map(|tracks| {
+                                    tracks
+                                        .iter()
+                                        .filter(|t| tick.saturating_sub(t.observed_tick) < 120)
+                                        .filter_map(|track| {
+                                            report_knowledge
+                                                .targets
+                                                .iter()
+                                                .find(|((owner, _), id)| {
+                                                    *owner == link.from_entity_id
+                                                        && **id == track.track_id
+                                                })
+                                                .map(|((_, target), _)| (*target, track.clone()))
+                                        })
+                                        .collect()
+                                })
+                                .unwrap_or_default()
+                        };
                     let origins = contacts
                         .iter()
                         .map(|(_, t)| {
@@ -1338,9 +1432,26 @@ impl Simulation {
                         })
                         .collect();
                     serde_json::to_vec(&KnowledgeReport {
+                        weather: self
+                            .world
+                            .get_resource::<sensing::Runtime>()
+                            .map(|runtime| sensing::WeatherObservation {
+                                source: unit.id,
+                                position: unit.position,
+                                conditions: runtime
+                                    .local_view(unit.id, unit.position, tick)
+                                    .weather,
+                                observed_tick: tick,
+                                received_tick: tick,
+                            }),
                         origins,
                         friendly,
                         contacts,
+                        bearings: self
+                            .world
+                            .get_resource::<sensing::Runtime>()
+                            .map(|runtime| runtime.current_bearings(link.from_entity_id, tick))
+                            .unwrap_or_default(),
                     })
                     .expect("finite observations")
                 })
@@ -1361,6 +1472,9 @@ impl Simulation {
 
     /// Only tracks refreshed by this terminal's own sensors during the current tick.
     pub fn current_sensor_tracks(&self, observer: Uuid) -> Vec<Track> {
+        if let Some(runtime) = self.world.get_resource::<sensing::Runtime>() {
+            return runtime.current_tracks(observer, self.tick());
+        }
         let namespace = self.world.resource::<KnowledgeNamespace>().0;
         let knowledge = self.world.resource::<KnowledgeBases>();
         let Some(tracks) = knowledge.0.get(&observer) else {
@@ -1381,6 +1495,17 @@ impl Simulation {
     /// Apply a received report without reading the target's authoritative position.
     /// Older reports from the same source track cannot overwrite a newer report.
     pub fn receive_track_report(&mut self, recipient: Uuid, mut track: Track) -> bool {
+        if self.world.contains_resource::<sensing::Runtime>() {
+            let tick = self.tick();
+            let accepted = self
+                .world
+                .resource_mut::<sensing::Runtime>()
+                .receive(recipient, track, tick, false);
+            if accepted {
+                self.sync_sensing_knowledge(recipient);
+            }
+            return accepted;
+        }
         if track.observed_tick > self.tick()
             || !geo_pose_is_finite(track.position)
             || !track.identity_confidence.is_finite()
@@ -1573,6 +1698,9 @@ impl Simulation {
             track.identity_confidence *= (1.0 - age as f32 / 120.0).max(0.0);
         }
         tracks.retain(|track| self.tick().saturating_sub(track.observed_tick) <= 120);
+        if let Some(runtime) = self.world.get_resource::<sensing::Runtime>() {
+            tracks = runtime.tracks_for(knowledge_owner, self.tick());
+        }
         let network_time = self.network_time();
         let mut own_units: Vec<_> = self
             .world
@@ -1599,6 +1727,13 @@ impl Simulation {
         {
             if ownership.0 == side && (id.0 == knowledge_owner || !self.campaign_mode) {
                 own_units.push(VisibleUnit {
+                    radar_emitting: if id.0 == knowledge_owner {
+                        self.world
+                            .get_resource::<sensing::Runtime>()
+                            .and_then(|runtime| runtime.emissions.get(&id.0).copied())
+                    } else {
+                        None
+                    },
                     id: id.0,
                     name: name.0.clone(),
                     domain: domain.0,
@@ -1630,6 +1765,26 @@ impl Simulation {
         let visible_ids: BTreeSet<_> = own_units.iter().map(|unit| unit.id).collect();
         let link_statuses = self.communication_link_statuses(knowledge_owner, &visible_ids);
         RoleProjection {
+            frame: self.frame_number(),
+            elapsed_seconds: self.frame_number().map(|_| self.elapsed_game_seconds()),
+            sensing: self
+                .world
+                .get_resource::<sensing::Runtime>()
+                .map(|runtime| {
+                    runtime.local_view(
+                        knowledge_owner,
+                        own_units
+                            .iter()
+                            .find(|u| u.id == knowledge_owner)
+                            .map(|u| u.position)
+                            .unwrap_or(GeoPose {
+                                latitude_deg: 0.0,
+                                longitude_deg: 0.0,
+                                altitude_m: 0.0,
+                            }),
+                        self.tick(),
+                    )
+                }),
             iftu: self.iftu_projection(knowledge_owner),
             tick: self.tick(),
             own_units,
@@ -1653,10 +1808,13 @@ impl Simulation {
     }
 
     fn network_time(&self) -> NetworkTime {
-        let tick_ns = self
-            .radio_tick()
-            .saturating_mul(TICK_SECONDS)
-            .saturating_mul(1_000_000_000);
+        let tick_ns = if let Some(clock) = self.world.get_resource::<FrameClock>() {
+            ((u128::from(clock.units) * 1_000_000_000 / 240).min(u128::from(u64::MAX))) as u64
+        } else {
+            self.radio_tick()
+                .saturating_mul(TICK_SECONDS)
+                .saturating_mul(1_000_000_000)
+        };
         NetworkTime::from_nanos(tick_ns.max(self.communications.simulator.now().as_nanos()))
     }
 
@@ -1791,6 +1949,8 @@ impl Simulation {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VisibleUnit {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub radar_emitting: Option<bool>,
     pub id: Uuid,
     pub name: String,
     pub domain: Domain,
@@ -1812,9 +1972,15 @@ pub struct VisibleUnit {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoleProjection {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sensing: Option<sensing::LocalView>,
     #[serde(default)]
     pub iftu: iftu::Projection,
     pub tick: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frame: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub elapsed_seconds: Option<f64>,
     pub own_units: Vec<VisibleUnit>,
     pub tracks: Vec<Track>,
     pub jamming_regions: Vec<JammingRegion>,
@@ -1823,13 +1989,20 @@ pub struct RoleProjection {
     pub combat: Option<combat::CombatProjection>,
 }
 
-fn advance_clock(mut clock: ResMut<SimClock>) {
-    clock.tick += 1;
+fn advance_clock(mut clock: ResMut<SimClock>, frame: Option<ResMut<FrameClock>>) {
+    if let Some(mut frame) = frame {
+        frame.units = frame.units.saturating_add(u64::from(frame.delta_units));
+        frame.frame = frame.frame.saturating_add(1);
+        clock.tick = frame.units / 240;
+    } else {
+        clock.tick += 1;
+    }
 }
 
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn apply_orders(
     clock: Res<SimClock>,
+    frame: Option<Res<FrameClock>>,
     mut pending: ResMut<PendingIntents>,
     mut results: ResMut<OrderResults>,
     mut operations: ResMut<operations::Operations>,
@@ -1838,6 +2011,7 @@ fn apply_orders(
     reports: Res<ReportKnowledge>,
     mut applied: ResMut<AppliedIntents>,
     mut training_combat: ResMut<CombatState>,
+    mut sensing: Option<ResMut<sensing::Runtime>>,
     mut units: Query<(
         &SimEntityId,
         &AuthorityNode,
@@ -1888,6 +2062,23 @@ fn apply_orders(
             continue;
         }
         match intent.kind {
+            OrderKind::SetRadarEmission { emitting } => {
+                let status = sensing
+                    .as_mut()
+                    .ok_or("sensing is not configured")
+                    .and_then(|runtime| {
+                        runtime
+                            .set_emission(intent.target, emitting)
+                            .map_err(|_| "platform has no controllable radar")
+                    })
+                    .map(|()| OrderStatus::Accepted)
+                    .unwrap_or_else(|error| OrderStatus::Rejected(error.into()));
+                applied.0.insert(intent.intent_id, status.clone());
+                results.0.push(OrderResult {
+                    intent_id: intent.intent_id,
+                    status,
+                });
+            }
             OrderKind::Iftu { weapon_id, command } => {
                 let status = weapon_system
                     .validate_command(intent.target, weapon_id, &command)
@@ -1923,6 +2114,7 @@ fn apply_orders(
                 operations.tactical_move(intent.target);
                 motion.origin = *pose;
                 motion.started_at_tick = clock.tick.saturating_sub(1);
+                motion.started_at_units = frame.as_ref().map(|frame| frame.previous_units());
                 velocity.north_mps = north_mps;
                 velocity.east_mps = east_mps;
                 if let Some(path) = flight_path.as_deref_mut() {
@@ -1993,6 +2185,7 @@ fn apply_orders(
 
 fn move_platforms(
     clock: Res<SimClock>,
+    frame: Option<Res<FrameClock>>,
     mut units: Query<(
         &mut GeoPose,
         &Velocity,
@@ -2002,16 +2195,29 @@ fn move_platforms(
 ) {
     for (mut pose, velocity, mut motion, flight_path) in &mut units {
         if let Some(path) = flight_path.filter(|path| path.active) {
-            *pose = position_on_flight_path(&path.path, clock.tick);
+            *pose = if let Some(frame) = &frame {
+                position_on_flight_path_at(&path.path, frame.seconds())
+            } else {
+                position_on_flight_path(&path.path, clock.tick)
+            };
             continue;
         }
         if motion.velocity != *velocity {
             motion.origin = *pose;
             motion.started_at_tick = clock.tick.saturating_sub(1);
+            motion.started_at_units = frame.as_ref().map(|frame| frame.previous_units());
             motion.velocity = *velocity;
         }
-        let elapsed_seconds =
-            clock.tick.saturating_sub(motion.started_at_tick) as f64 * TICK_SECONDS as f64;
+        let elapsed_seconds = if let Some(frame) = &frame {
+            frame.units.saturating_sub(
+                motion
+                    .started_at_units
+                    .unwrap_or(motion.started_at_tick.saturating_mul(240)),
+            ) as f64
+                / 240.0
+        } else {
+            clock.tick.saturating_sub(motion.started_at_tick) as f64 * TICK_SECONDS as f64
+        };
         if let Some(mut moved) = geodesy::advance_position(
             motion.origin,
             velocity.north_mps * elapsed_seconds,
@@ -2080,6 +2286,31 @@ fn position_on_flight_path(path: &CyclicFlightPath, tick: u64) -> GeoPose {
         .expect("validated flight path has finite positions and interpolation fraction")
 }
 
+fn position_on_flight_path_at(path: &CyclicFlightPath, tick: f64) -> GeoPose {
+    let cycle_tick = tick % path.period_ticks as f64;
+    let upper_index = path
+        .waypoints
+        .partition_point(|waypoint| waypoint.at_tick as f64 <= cycle_tick);
+    let (lower, upper, upper_tick) = if upper_index < path.waypoints.len() {
+        (
+            &path.waypoints[upper_index - 1],
+            &path.waypoints[upper_index],
+            path.waypoints[upper_index].at_tick,
+        )
+    } else {
+        (
+            path.waypoints.last().expect("validated path has waypoints"),
+            path.waypoints
+                .first()
+                .expect("validated path has waypoints"),
+            path.period_ticks,
+        )
+    };
+    let fraction = (cycle_tick - lower.at_tick as f64) / (upper_tick - lower.at_tick) as f64;
+    geodesy::interpolate_position(lower.position, upper.position, fraction)
+        .expect("validated flight path has finite positions and interpolation fraction")
+}
+
 fn geo_pose_is_finite(position: GeoPose) -> bool {
     position.latitude_deg.is_finite()
         && position.longitude_deg.is_finite()
@@ -2092,6 +2323,15 @@ fn geo_pose_is_finite(position: GeoPose) -> bool {
 fn detect_contacts(
     clock: Res<SimClock>,
     mut observations: ResMut<Observations>,
+    mut sensing: Option<ResMut<sensing::Runtime>>,
+    all_platforms: Query<(
+        &SimEntityId,
+        &Ownership,
+        &DomainKind,
+        &GeoPose,
+        &Velocity,
+        &operations::CombatState,
+    )>,
     sensors: Query<(
         &SimEntityId,
         &Ownership,
@@ -2109,6 +2349,25 @@ fn detect_contacts(
     )>,
 ) {
     observations.0.clear();
+    if let Some(runtime) = sensing.as_mut() {
+        let mut platforms: Vec<_> = all_platforms
+            .iter()
+            .map(
+                |(id, side, domain, pose, velocity, combat)| sensing::Platform {
+                    id: id.0,
+                    side: side.0,
+                    domain: domain.0,
+                    pose: *pose,
+                    velocity: *velocity,
+                    destroyed: combat.destroyed,
+                },
+            )
+            .collect();
+        platforms.sort_by_key(|p| p.id);
+        let jammers = runtime.configuration.jammers.clone();
+        runtime.observe(clock.tick, &platforms, &jammers);
+        return;
+    }
     for (observer_id, observer_side, observer_pose, sensor, velocity, observer_combat) in &sensors {
         if observer_combat.destroyed {
             continue;
@@ -2157,9 +2416,18 @@ fn deliver_reports(
     clock: Res<SimClock>,
     observations: Res<Observations>,
     namespace: Res<KnowledgeNamespace>,
+    sensing: Option<Res<sensing::Runtime>>,
     mut knowledge: ResMut<KnowledgeBases>,
     mut reports: ResMut<ReportKnowledge>,
 ) {
+    if let Some(runtime) = sensing {
+        for owner in runtime.configuration.sensors.keys() {
+            knowledge
+                .0
+                .insert(*owner, runtime.tracks_for(*owner, clock.tick));
+        }
+        return;
+    }
     for contact in &observations.0 {
         let track_id = scoped_track_id(namespace.0, contact.observer, contact.target);
         reports
@@ -2176,6 +2444,7 @@ fn deliver_reports(
             track.observed_domain = contact.observed_domain;
         } else {
             tracks.push(Track {
+                evidence: None,
                 track_id,
                 target_side: (contact.identity_confidence >= 0.8).then_some(contact.side),
                 position: contact.position,

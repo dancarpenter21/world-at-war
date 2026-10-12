@@ -56,6 +56,10 @@ impl Simulation {
                     TruthUnit {
                         side: side.0,
                         state: VisibleUnit {
+                            radar_emitting: self
+                                .world
+                                .get_resource::<sensing::Runtime>()
+                                .and_then(|runtime| runtime.emissions.get(&id.0).copied()),
                             id: id.0,
                             name: name.0.clone(),
                             domain: domain.0,

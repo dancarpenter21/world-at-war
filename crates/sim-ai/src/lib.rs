@@ -45,9 +45,13 @@ mod tests {
 
     fn projection() -> RoleProjection {
         RoleProjection {
+            frame: None,
+            elapsed_seconds: None,
+            sensing: None,
             iftu: Default::default(),
             tick: 10,
             own_units: vec![VisibleUnit {
+                radar_emitting: None,
                 observed_tick: 0,
                 received_tick: 0,
                 id: Uuid::from_u128(1),
@@ -82,6 +86,7 @@ mod tests {
 
     fn add_contact(projection: &mut RoleProjection) {
         projection.tracks.push(Track {
+            evidence: None,
             uncertainty_m: 100.0,
             assessed_destroyed: None,
             observed_domain: None,

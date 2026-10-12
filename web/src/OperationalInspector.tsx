@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { Role } from "./AuthorityWorkspace";
 import type { Projection } from "./globeEntities";
 import { formatBitRate } from "./networkModel";
-import { trackTiming } from "./trackTiming";
+import { latestBearings, trackTiming } from "./trackTiming";
 
 const MAX_LINK_PREVIEW = 8;
 
@@ -30,6 +30,7 @@ export function OperationalInspector({ projection, role, onInspectNetwork }: {
     <h2>Operational picture</h2>
     <div className="metric"><span>Own units</span><strong>{projection.own_units.length}</strong></div>
     <div className="metric"><span>Tracks</span><strong>{projection.tracks.length}</strong></div>
+    {projection.sensing && <><h2>Local conditions</h2><p>{Math.round(projection.sensing.weather.visibility_m / 1000)} km visibility · {Math.round(projection.sensing.weather.precipitation * 100)}% precipitation</p>{projection.sensing.weather_reports?.map(report => <p key={report.source}>Received weather: {Math.round(report.conditions.visibility_m / 1000)} km visibility · observed tick {report.observed_tick}, received tick {report.received_tick}</p>)}<h2>Passive bearings</h2>{latestBearings(projection.sensing.bearings).map(b => <div className="track" key={b.id}><span>{b.emitter_class}</span><small>{b.bearing_deg.toFixed(1)}° ± {b.uncertainty_deg.toFixed(1)}° · observed tick {b.observed_tick}</small><small>Bearing region; no position fix</small></div>)}</>}
     <h2>Tracks</h2>
     {projection.tracks.length ? projection.tracks.map((track) => {
       const timing = trackTiming(track, projection.tick);
@@ -38,6 +39,8 @@ export function OperationalInspector({ projection, role, onInspectNetwork }: {
         <small>{Math.round(track.identity_confidence * 100)}% identity · {timing.isCurrentObservation ? "Current observation" : "Last known position"}</small>
         <small className="track-timing">{timing.observationLabel} · {timing.receiptLabel}</small>
         <small className="track-timing">{timing.deliveryLabel}</small>
+        {track.uncertainty_m != null && <small>95% horizontal uncertainty: ±{Math.round(track.uncertainty_m)} m · {track.evidence?.modalities.join(", ") ?? "reported contact"}</small>}
+        {track.evidence?.hypotheses?.map((hypothesis, index) => <small key={index}>{hypothesis.domain ?? "Unknown class"} · {hypothesis.side ?? "Unidentified side"}: {Math.round(hypothesis.probability * 100)}%</small>)}
       </div>;
     }) : <p className="muted">No reports received.</p>}
     <h2>Communications</h2>

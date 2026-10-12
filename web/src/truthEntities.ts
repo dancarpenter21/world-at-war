@@ -1,9 +1,10 @@
+import type { SmoothPositions } from "./smoothPositions";
 import { Cartesian2, Cartesian3, Color, ConstantPositionProperty, EllipseGraphics, EntityCollection, LabelGraphics, PointGraphics, PolylineGraphics } from "cesium";
 import type { TruthProjection } from "./observerTypes";
 import type { Position } from "./globeEntities";
 const point = (p: Position) => Cartesian3.fromDegrees(p.longitude_deg, p.latitude_deg, p.altitude_m);
 /** Dedicated truth layer: never constructs operational tracks or friendly knowledge. */
-export function updateTruthEntities(entities: EntityCollection, truth: TruthProjection, network: boolean) {
+export function updateTruthEntities(entities: EntityCollection, truth: TruthProjection, network: boolean, smoothing?: SmoothPositions) {
   const retained = new Set<string>();
   const positions = new Map<string, Position>();
   entities.suspendEvents();
@@ -12,7 +13,9 @@ export function updateTruthEntities(entities: EntityCollection, truth: TruthProj
       retained.add(id);
       const entity = entities.getOrCreateEntity(id);
       entity.name = name;
-      entity.position = new ConstantPositionProperty(point(pose));
+      const position = entity.position instanceof ConstantPositionProperty ? entity.position : new ConstantPositionProperty(point(pose));
+      entity.position = position;
+      if (smoothing) smoothing.update(id, position, point(pose)); else position.setValue(point(pose));
       entity.point = new PointGraphics({ pixelSize: 10, color, outlineColor: Color.BLACK, outlineWidth: 1 });
       entity.label = new LabelGraphics({ text: name, font: "13px sans-serif", fillColor: color, showBackground: true, pixelOffset: new Cartesian2(0, -20) });
     };
@@ -42,6 +45,7 @@ export function updateTruthEntities(entities: EntityCollection, truth: TruthProj
       entity.name = link.id;
       entity.polyline = new PolylineGraphics({ positions: [point(from), point(to)], width: 2, material: link.available ? Color.LIME.withAlpha(0.6) : Color.RED.withAlpha(0.7) });
     }
-    for (const entity of [...entities.values]) if (!retained.has(entity.id)) entities.remove(entity);
+    smoothing?.retain(retained);
+    for (const entity of [...entities.values]) if (!retained.has(entity.id) && !entity.id.startsWith("weather-preview:")) entities.remove(entity);
   } finally { entities.resumeEvents(); }
 }

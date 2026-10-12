@@ -753,9 +753,10 @@ async fn performance_cycles_include_database_delay_and_reject_failed_commits() {
     let commits: Vec<_> = rows.iter().filter(|row| row["kind"] == "persistence_commit" && row["game_ids"].as_array().is_some_and(|ids| ids.contains(&json!(id)))).collect();
     assert!(commits.iter().any(|row| row["success"] == true && row["duration_ms"].as_f64().unwrap() >= 50.0));
     assert_eq!(commits.last().unwrap()["success"], false);
-    assert!(commits.iter().filter(|row| row["success"] == true)
-        .all(|row| row["snapshot_submitted_bytes"] == 0),
-        "ordinary tick commits must not submit unused snapshots");
+    let ordinary: Vec<_> = commits.iter().filter(|row| row["success"] == true && row["checkpoints"] == 0).collect();
+    assert!(!ordinary.is_empty());
+    assert!(ordinary.iter().all(|row| row["snapshot_submitted_bytes"] == 0),
+        "ordinary frame commits must not submit unused snapshots");
     assert_eq!(state.games.read().await[&id].status, GameStatus::Paused);
     database.close().await;
 }

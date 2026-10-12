@@ -1,0 +1,5 @@
+{
+  "sensor-relay-exercise.v1": {"bit_rate_bps":9600,"mtu_bytes":4096,"queue_packets":16,"queue_bytes":65536},
+  "training-engagement.v1": {"bit_rate_bps":9600,"mtu_bytes":4096,"queue_packets":16,"queue_bytes":65536},
+  "training-contested.v1": {"bit_rate_bps":9600,"mtu_bytes":4096,"queue_packets":16,"queue_bytes":65536}
+}
