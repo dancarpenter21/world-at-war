@@ -246,3 +246,163 @@ test('PostgreSQL samples include checkpoint, WAL and I/O counters without enabli
   assert.ok(query.includes('pg_stat_checkpointer') && query.includes('pg_stat_wal') && query.includes('pg_stat_io') && query.includes('pg_stat_activity'));
   assert.ok(!/ALTER|SET /i.test(query));
 });
+
+
+test('frame rates include stalled buckets, fractional speeds and partial measurement seconds', async () => {
+  const { FrameProgress, parseTimeScale } = await import('./performance-lib.mjs');
+  const clock = new FrameProgress(1000, 3500);
+  const sample = (frames = 1, scale = 0.25, id = 'a') => [{ game_id: id, frames, game_seconds: frames * scale / 60, whole_seconds: 0, requested_time_scale: scale }];
+  clock.add(900, sample()); // warmup cannot contribute an interval or count
+  clock.add(1000, sample()); clock.add(1020, sample());
+  clock.add(2200, sample(0)); // maintenance cannot count as a committed frame
+  clock.add(3100, sample()); clock.add(3200, sample(1, 60, 'b'));
+  clock.add(3500, sample()); // exclusive end
+  const result = clock.summary().a;
+  assert.equal(result.committed_frames, 3);
+  assert.equal(result.frame_hz, 3 / 2.5);
+  assert.equal(result.achieved_time_scale, (3 * 0.25 / 60) / 2.5);
+  assert.equal(result.interval_ms.samples, 2);
+  assert.equal(result.interval_ms.max, 2080);
+  assert.equal(result.series[1].frame_hz, 0);
+  assert.equal(result.series[2].frame_hz, 2);
+  assert.equal(clock.summary().b.achieved_time_scale, 1 / 2.5);
+  for (const scale of [0.25, 1, 2, 5, 10, 30, 60]) assert.equal(parseTimeScale(String(scale)), scale);
+  for (const invalid of ['0', '3', 'NaN', 'Infinity']) assert.throws(() => parseTimeScale(invalid));
+  assert.throws(() => clock.add(3400, sample(-1)));
+  assert.throws(() => clock.add(3400, [{ ...sample()[0], game_seconds: 9 }]));
+});
+
+test('version four analysis counts successful advancing cycles and correlates flush costs', async () => {
+  const { validateRun } = await import('./performance-lib.mjs');
+  const directory = await mkdtemp(path.join(tmpdir(), 'waw-frame-test-'));
+  try {
+    const progress = [{ game_id: 'a', frames: 1, game_seconds: 1 / 60, whole_seconds: 0, requested_time_scale: 1 }];
+    const server = [
+      { kind: 'trace_start', unix_ms: 1000, elapsed_ms: 0 },
+      { kind: 'tick', game_id: 'a', frame: 1, duration_ms: 2, elapsed_ms: 10 },
+      { kind: 'server_cycle', cycle_id: 1, success: true, running_games: ['a'], frame_progress: [], duration_ms: 900, elapsed_ms: 20 },
+      { kind: 'persistence_flush', commit_id: 2, success: true, duration_ms: 50, elapsed_ms: 90 },
+      { kind: 'persistence_commit', commit_id: 2, cycle_id: 2, success: true, duration_ms: 60, journal_bytes: 100, checkpoints: 1, elapsed_ms: 95 },
+      { kind: 'server_cycle', cycle_id: 2, success: true, running_games: ['a'], frame_progress: progress, duration_ms: 70, elapsed_ms: 100 },
+      { kind: 'server_cycle', cycle_id: 3, success: false, running_games: ['a'], frame_progress: progress, duration_ms: 80, elapsed_ms: 200 },
+      { kind: 'trace_end', written: 7, dropped: 0 }
+    ];
+    await writeFile(path.join(directory, 'server.jsonl'), server.map(JSON.stringify).join('\n'));
+    await writeFile(path.join(directory, 'clients.jsonl'), '');
+    let result = await analyze(directory, 1000, 2000);
+    assert.equal(result.frames.a.committed_frames, 1);
+    assert.equal(result.committed_games.a, 1);
+    assert.equal(result.metrics.server.cycle_duration_ms.max, 70);
+    assert.equal(result.slowest_cycles[0].commit.stages.persistence_flush, 50);
+    assert.equal(result.persistence.journal_bytes, 100);
+    assert.equal(result.persistence.per_wall_second.journal_bytes, 100);
+    assert.equal(result.valid, false);
+    // Old successful-cycle telemetry alone cannot validate a new frame baseline.
+    result = { valid: true, errors: [], committed_games: { a: 1 }, metrics: { server: { cycle_duration_ms: { samples: 1 } } }, frames: {} };
+    validateRun(result, { measurement_version: 4, requested_time_scale: 1, games: [{ id: 'a' }], measurement_completed: true });
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.includes('Missing committed frame telemetry: a'));
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+
+test('stream watchdog waits for expected game-second delivery while clock progress remains independent', async () => {
+  const { streamStalled } = await import('./performance-lib.mjs');
+  const player = { role: {}, lastFrame: 100, streamConnectedAt: 0, streamTick: 6 };
+  // A slow durable clock can commit fractional frames for over fifteen wall seconds.
+  assert.equal(streamStalled(player, 6, 20_000), false);
+  // A resumed network connection may legitimately wait for a sequence newer
+  // than after_sequence; retain the last delivered tick across reconnect.
+  assert.equal(streamStalled({ role: {}, streamTick: 6, streamConnectedAt: 0 }, 6, 20_000), false);
+  assert.equal(streamStalled(player, 7, 21_000), false);
+  assert.equal(streamStalled(player, 8, 36_001), true);
+  // Receiving the current game second clears the outstanding delivery deadline.
+  player.streamTick = 8;
+  assert.equal(streamStalled(player, 8, 36_002), false);
+  assert.equal(player.streamBehindSince, undefined);
+  // At high speeds a healthy stream can remain behind the latest HTTP tick;
+  // satisfying each outstanding expectation must restart its delivery deadline.
+  assert.equal(streamStalled(player, 100, 37_000), false);
+  player.streamTick = 100;
+  assert.equal(streamStalled(player, 200, 52_001), false);
+  assert.equal(player.streamExpectedTick, 200);
+  assert.equal(streamStalled({ role: { observer_kind: 'monitor' }, lastFrame: 100 }, 6, 20_000), true);
+  assert.equal(streamStalled({ role: {}, streamConnectedAt: 0 }, 0, 15_001), true);
+});
+
+
+test('reconnect freshness uses fractional frames without requiring whole-second advancement', async () => {
+  const { freshReconnectSnapshot } = await import('./performance-lib.mjs');
+  assert.equal(freshReconnectSnapshot({ tick: 12, frame: 740 }, { tick: 12, frame: 745 }), true);
+  assert.equal(freshReconnectSnapshot({ tick: 12, frame: 740 }, { tick: 12, frame: 740 }), false);
+  assert.equal(freshReconnectSnapshot({ tick: 12, frame: 740 }, { tick: 11, frame: 745 }), false);
+  assert.equal(freshReconnectSnapshot({ tick: 12 }, { tick: 12 }), true);
+  assert.equal(freshReconnectSnapshot({ tick: 12 }, { tick: 11 }), false);
+});
+
+test('termination during player setup aborts requests and cleans up its server', { timeout: 30_000 }, async t => {
+  const { spawn } = await import('node:child_process');
+  const { once } = await import('node:events');
+  const { access, readFile } = await import('node:fs/promises');
+  const { fileURLToPath } = await import('node:url');
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+  try { await access(path.join(root, 'target/release/world-at-war-server')); }
+  catch { t.skip('Build the release server to exercise setup cleanup'); return; }
+  if (process.platform !== 'linux') { t.skip('Reference harness requires Linux'); return; }
+  const directory = await mkdtemp(path.join(tmpdir(), 'waw-setup-cleanup-'));
+  const output = path.join(directory, 'run');
+  const child = spawn(process.execPath, [path.join(root, 'web/scripts/performance-server.mjs'),
+    '--profile', 'global', '--clients', '200', '--warmup', '0', '--duration', '60', '--output', output],
+  { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
+  const exited = once(child, 'exit');
+  let text = ''; child.stdout.on('data', b => { text += b; }); child.stderr.on('data', b => { text += b; });
+  const timeout = setTimeout(() => child.kill('SIGKILL'), 20_000);
+  try {
+    const deadline = performance.now() + 10_000;
+    let setupStarted = false;
+    while (performance.now() < deadline) {
+      const log = await readFile(path.join(output, 'server.log'), 'utf8').catch(() => '');
+      if (log.includes('guest_created')) { setupStarted = true; break; }
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    assert.equal(setupStarted, true, text);
+    child.kill('SIGTERM');
+    const [code] = await exited;
+    assert.equal(code, 1, text);
+    const metadata = JSON.parse(await readFile(path.join(output, 'metadata.json')));
+    assert.equal(metadata.measurement_start_unix_ms, undefined, 'interruption must precede measurement');
+    const summary = JSON.parse(await readFile(path.join(output, 'summary.json')));
+    assert.equal(summary.valid, false);
+    assert.ok(summary.errors.includes('Run terminated'));
+    const trace = (await readFile(path.join(output, 'server.jsonl'), 'utf8')).trim().split('\n').map(JSON.parse);
+    assert.equal(trace.at(-1).kind, 'trace_end');
+    assert.throws(() => process.kill(trace[0].pid, 0), { code: 'ESRCH' });
+  } finally { clearTimeout(timeout); child.kill('SIGTERM'); await rm(directory, { recursive: true, force: true }); }
+});
+
+
+test('clock watchdog excludes planned host outages and resumes its deadline after recovery', async () => {
+  const { clockStalled } = await import('./performance-lib.mjs');
+  const host = { disconnected: true, lastClockProgress: 0 };
+  assert.equal(clockStalled(host, 20_000), false);
+  host.disconnected = false; host.lastClockProgress = 20_000;
+  assert.equal(clockStalled(host, 20_000), false);
+  assert.equal(clockStalled(host, 35_001), true);
+});
+
+
+test('a delayed reconnect handshake stays offline until its fresh clock deadline is ready', async () => {
+  const { resumeConnection, clockStalled } = await import('./performance-lib.mjs');
+  let open;
+  const player = { disconnected: true, lastClockProgress: 0, connect: () => new Promise(resolve => { open = resolve; }) };
+  const recovering = resumeConnection(player, () => 25_000);
+  assert.equal(player.disconnected, true);
+  assert.equal(clockStalled(player, 24_999), false);
+  open(); await recovering;
+  assert.equal(player.disconnected, false);
+  assert.equal(player.lastClockProgress, 25_000);
+  assert.equal(clockStalled(player, 25_000), false);
+  const failed = { disconnected: true, lastClockProgress: 0, connect: async () => { throw new Error('handshake failed'); } };
+  await assert.rejects(resumeConnection(failed, () => 25_000));
+  assert.equal(failed.disconnected, true);
+});

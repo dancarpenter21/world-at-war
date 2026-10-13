@@ -1,0 +1,256 @@
+{
+  "image": "postgres@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
+  "runs": [
+    {
+      "name": "forward-regional-volatile",
+      "profile": "regional",
+      "storage": "volatile",
+      "scale": 1,
+      "warmup": 60,
+      "duration": 300,
+      "complete": true
+    },
+    {
+      "name": "forward-global-volatile",
+      "profile": "global",
+      "storage": "volatile",
+      "scale": 1,
+      "warmup": 60,
+      "duration": 300,
+      "complete": true
+    },
+    {
+      "name": "forward-mixed-volatile",
+      "profile": "mixed",
+      "storage": "volatile",
+      "scale": 1,
+      "warmup": 60,
+      "duration": 300,
+      "complete": true
+    },
+    {
+      "name": "forward-regional-postgres-retry-1",
+      "profile": "regional",
+      "storage": "postgres",
+      "scale": 1,
+      "warmup": 60,
+      "duration": 300
+    },
+    {
+      "name": "forward-global-postgres",
+      "profile": "global",
+      "storage": "postgres",
+      "scale": 1,
+      "warmup": 60,
+      "duration": 300,
+      "complete": true
+    },
+    {
+      "name": "forward-mixed-postgres-retry-3",
+      "profile": "mixed",
+      "storage": "postgres",
+      "scale": 1,
+      "warmup": 60,
+      "duration": 300
+    },
+    {
+      "name": "reverse-regional-postgres",
+      "profile": "regional",
+      "storage": "postgres",
+      "scale": 1,
+      "warmup": 60,
+      "duration": 300
+    },
+    {
+      "name": "reverse-global-postgres",
+      "profile": "global",
+      "storage": "postgres",
+      "scale": 1,
+      "warmup": 60,
+      "duration": 300
+    },
+    {
+      "name": "reverse-mixed-postgres",
+      "profile": "mixed",
+      "storage": "postgres",
+      "scale": 1,
+      "warmup": 60,
+      "duration": 300
+    },
+    {
+      "name": "reverse-regional-volatile",
+      "profile": "regional",
+      "storage": "volatile",
+      "scale": 1,
+      "warmup": 60,
+      "duration": 300
+    },
+    {
+      "name": "reverse-global-volatile",
+      "profile": "global",
+      "storage": "volatile",
+      "scale": 1,
+      "warmup": 60,
+      "duration": 300
+    },
+    {
+      "name": "reverse-mixed-volatile",
+      "profile": "mixed",
+      "storage": "volatile",
+      "scale": 1,
+      "warmup": 60,
+      "duration": 300
+    },
+    {
+      "name": "speed-0_25-volatile",
+      "profile": "global",
+      "storage": "volatile",
+      "scale": 0.25,
+      "warmup": 15,
+      "duration": 45
+    },
+    {
+      "name": "speed-2-volatile",
+      "profile": "global",
+      "storage": "volatile",
+      "scale": 2,
+      "warmup": 15,
+      "duration": 45
+    },
+    {
+      "name": "speed-5-volatile",
+      "profile": "global",
+      "storage": "volatile",
+      "scale": 5,
+      "warmup": 15,
+      "duration": 45
+    },
+    {
+      "name": "speed-10-volatile",
+      "profile": "global",
+      "storage": "volatile",
+      "scale": 10,
+      "warmup": 15,
+      "duration": 45
+    },
+    {
+      "name": "speed-30-volatile",
+      "profile": "global",
+      "storage": "volatile",
+      "scale": 30,
+      "warmup": 15,
+      "duration": 45
+    },
+    {
+      "name": "speed-60-volatile",
+      "profile": "global",
+      "storage": "volatile",
+      "scale": 60,
+      "warmup": 15,
+      "duration": 45
+    },
+    {
+      "name": "speed-0_25-postgres",
+      "profile": "global",
+      "storage": "postgres",
+      "scale": 0.25,
+      "warmup": 15,
+      "duration": 45
+    },
+    {
+      "name": "speed-2-postgres",
+      "profile": "global",
+      "storage": "postgres",
+      "scale": 2,
+      "warmup": 15,
+      "duration": 45
+    },
+    {
+      "name": "speed-5-postgres",
+      "profile": "global",
+      "storage": "postgres",
+      "scale": 5,
+      "warmup": 15,
+      "duration": 45
+    },
+    {
+      "name": "speed-10-postgres",
+      "profile": "global",
+      "storage": "postgres",
+      "scale": 10,
+      "warmup": 15,
+      "duration": 45
+    },
+    {
+      "name": "speed-30-postgres",
+      "profile": "global",
+      "storage": "postgres",
+      "scale": 30,
+      "warmup": 15,
+      "duration": 45
+    },
+    {
+      "name": "speed-60-postgres",
+      "profile": "global",
+      "storage": "postgres",
+      "scale": 60,
+      "warmup": 15,
+      "duration": 45
+    }
+  ],
+  "excluded_attempts": [
+    {
+      "name": "forward-regional-postgres",
+      "profile": "regional",
+      "storage": "postgres",
+      "scale": 1,
+      "warmup": 60,
+      "duration": 300,
+      "valid": false,
+      "errors": [
+        "Reconnect did not receive a fresh snapshot",
+        "Measurement window did not complete"
+      ]
+    },
+    {
+      "name": "forward-mixed-postgres",
+      "profile": "mixed",
+      "storage": "postgres",
+      "scale": 1,
+      "warmup": 60,
+      "duration": 300,
+      "valid": false,
+      "errors": [
+        "Missing or interrupted artifacts"
+      ]
+    },
+    {
+      "name": "forward-mixed-postgres-retry-1",
+      "profile": "mixed",
+      "storage": "postgres",
+      "scale": 1,
+      "warmup": 60,
+      "duration": 300,
+      "valid": false,
+      "errors": [
+        "Committed clock stalled for game 13264a7d-a15d-4cd8-83d8-4969958ea6de",
+        "This operation was aborted",
+        "Measurement window did not complete"
+      ]
+    },
+    {
+      "name": "forward-mixed-postgres-retry-2",
+      "profile": "mixed",
+      "storage": "postgres",
+      "scale": 1,
+      "warmup": 60,
+      "duration": 300,
+      "valid": false,
+      "errors": [
+        "Committed clock stalled for game 4b914c66-e83f-46ba-89a1-9a185f84ac2e",
+        "This operation was aborted",
+        "Measurement window did not complete"
+      ]
+    }
+  ]
+}

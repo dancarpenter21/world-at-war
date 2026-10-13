@@ -1,5 +1,12 @@
 # Performance measurements
 
+The [October 12 committed-frame baseline](2026-10-12-frame-results.md) records
+24 valid short runs with actual frame throughput, achieved speed, durability and
+growth measurements. Volatile global reaches 60 Hz; regional/mixed and all durable
+profiles remain below target. Encoding, checkpoint/mutation work and shared-gate
+waits are the measured follow-up priorities. Role diagnostics expose committed
+rates, and preserved incomplete attempts remain excluded. No long soak was run.
+
 The [October 11 audit write-path checkpoint](2026-10-11-audit-write-results.md)
 records schema-compatible preparation, sparse JSON and cross-game batch writes,
 with 19 complete short-run traces and finer PostgreSQL diagnostics. Regional

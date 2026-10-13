@@ -33,9 +33,11 @@ pub(super) struct Summary {
 #[derive(Default)]
 pub(super) struct Diagnostics {
     tick_ms: Samples,
-    game_seconds_per_tick: Option<f64>,
     last_tick: Option<Instant>,
-    tick_intervals_ms: Samples,
+    committed_intervals_ms: Samples,
+    committed_seconds: Samples,
+    committed_frames: Samples,
+    last_commit: Option<Instant>,
     schedule_delay_ms: f64,
     roles: BTreeMap<Uuid, RoleSamples>,
 }
@@ -51,21 +53,40 @@ struct RoleSamples {
 impl Diagnostics {
     pub fn reset_rate(&mut self) {
         self.last_tick = None;
-        self.tick_intervals_ms = Samples::default();
-    }
-    pub fn record_frame(&mut self, elapsed_ms: f64, schedule_delay_ms: f64, game_seconds: f64) {
-        self.game_seconds_per_tick = Some(game_seconds);
-        self.record_tick(elapsed_ms, schedule_delay_ms);
+        self.last_commit = None;
+        self.committed_intervals_ms = Samples::default();
+        self.committed_seconds = Samples::default();
+        self.committed_frames = Samples::default();
     }
     pub fn record_tick(&mut self, elapsed_ms: f64, schedule_delay_ms: f64) {
         self.tick_ms.push(elapsed_ms);
-        let now = Instant::now();
-        if let Some(last) = self.last_tick {
-            self.tick_intervals_ms
-                .push(now.duration_since(last).as_secs_f64() * 1000.0);
-        }
-        self.last_tick = Some(now);
+        self.last_tick = Some(Instant::now());
         self.schedule_delay_ms = schedule_delay_ms;
+    }
+    pub fn record_commit(&mut self, now: Instant, frames: u64, game_seconds: f64) {
+        if frames == 0 {
+            return;
+        }
+        if let Some(last) = self.last_commit {
+            self.committed_intervals_ms
+                .push(now.duration_since(last).as_secs_f64() * 1000.0);
+            self.committed_seconds.push(game_seconds);
+            self.committed_frames.push(frames as f64);
+        }
+        self.last_commit = Some(now);
+    }
+    #[cfg(test)]
+    pub fn last_committed_sample_absent(&self) -> bool {
+        self.last_commit.is_none()
+    }
+    fn committed_rate(&self, samples: &Samples, now: Instant) -> Option<f64> {
+        let last = self.last_commit?;
+        if samples.0.is_empty() || now.duration_since(last) > Duration::from_secs(3) {
+            return None;
+        }
+        let elapsed_ms = self.committed_intervals_ms.0.iter().sum::<f64>()
+            + now.duration_since(last).as_secs_f64() * 1000.0;
+        (elapsed_ms > 0.0).then(|| samples.0.iter().sum::<f64>() * 1000.0 / elapsed_ms)
     }
 }
 
@@ -105,6 +126,11 @@ pub(super) fn projection_bytes(game: &mut Game, role: &Role) -> Result<Vec<u8>, 
 pub(super) struct View {
     requested_time_scale: f64,
     achieved_time_scale: Option<f64>,
+    target_frame_hz: u32,
+    committed_frame_hz: Option<f64>,
+    committed_frame_interval_ms: Summary,
+    committed_frame_overruns: usize,
+    last_committed_frame_age_ms: Option<f64>,
     tick: u64,
     status: GameStatus,
     window_capacity: usize,
@@ -129,12 +155,23 @@ fn view(game: &Game, query: &ProjectionQuery) -> Result<View, (StatusCode, Json<
     let diagnostics = &game.diagnostics;
     Ok(View {
         requested_time_scale: game.time_scale.unwrap_or(1.0),
-        achieved_time_scale: (!diagnostics.tick_intervals_ms.0.is_empty()).then(|| {
-            diagnostics.game_seconds_per_tick.unwrap_or(1.0)
-                * 1000.0
-                * diagnostics.tick_intervals_ms.0.len() as f64
-                / diagnostics.tick_intervals_ms.0.iter().sum::<f64>()
-        }),
+        achieved_time_scale: (game.status == GameStatus::Running)
+            .then(|| diagnostics.committed_rate(&diagnostics.committed_seconds, Instant::now()))
+            .flatten(),
+        target_frame_hz: sim_core::TICKS_PER_SECOND,
+        committed_frame_hz: (game.status == GameStatus::Running)
+            .then(|| diagnostics.committed_rate(&diagnostics.committed_frames, Instant::now()))
+            .flatten(),
+        committed_frame_interval_ms: diagnostics.committed_intervals_ms.summary(),
+        committed_frame_overruns: diagnostics
+            .committed_intervals_ms
+            .0
+            .iter()
+            .filter(|ms| **ms > 1000.0 / f64::from(sim_core::TICKS_PER_SECOND))
+            .count(),
+        last_committed_frame_age_ms: diagnostics
+            .last_commit
+            .map(|at| at.elapsed().as_secs_f64() * 1000.0),
         tick: game.simulation.tick(),
         status: game.status,
         window_capacity: WINDOW,
@@ -189,6 +226,57 @@ mod tests {
         assert_eq!(result.samples, WINDOW);
         assert_eq!(result.last, Some(200.0));
         assert_eq!(result.p95, Some(194.0));
+    }
+    #[test]
+    fn committed_rates_use_actual_progress_and_reset_without_counting_processing() {
+        let mut diagnostics = Diagnostics::default();
+        let start = Instant::now();
+        diagnostics.record_tick(10.0, 2.0);
+        assert_eq!(
+            diagnostics.committed_rate(&diagnostics.committed_frames, start),
+            None
+        );
+        diagnostics.record_commit(start, 1, 0.25 / 60.0);
+        assert_eq!(diagnostics.committed_intervals_ms.summary().samples, 0);
+        // Maintenance and rolled-back frames never call record_commit with advancing progress.
+        diagnostics.record_commit(start + Duration::from_millis(10), 0, 0.0);
+        diagnostics.record_commit(start + Duration::from_millis(20), 1, 0.25 / 60.0);
+        assert_eq!(
+            diagnostics.committed_rate(
+                &diagnostics.committed_frames,
+                start + Duration::from_millis(20)
+            ),
+            Some(50.0)
+        );
+        assert_eq!(
+            diagnostics.committed_rate(
+                &diagnostics.committed_seconds,
+                start + Duration::from_millis(20)
+            ),
+            Some(0.25 / 60.0 * 50.0)
+        );
+        assert_eq!(
+            diagnostics.committed_rate(
+                &diagnostics.committed_frames,
+                start + Duration::from_millis(40)
+            ),
+            Some(25.0)
+        );
+        assert_eq!(
+            diagnostics.committed_rate(
+                &diagnostics.committed_frames,
+                start + Duration::from_secs(4)
+            ),
+            None
+        );
+        for index in 2..=200 {
+            diagnostics.record_commit(start + Duration::from_millis(index * 20), 1, 1.0);
+        }
+        assert_eq!(diagnostics.committed_intervals_ms.summary().samples, WINDOW);
+        assert_eq!(diagnostics.committed_seconds.0.len(), WINDOW);
+        diagnostics.reset_rate();
+        assert_eq!(diagnostics.committed_intervals_ms.summary().samples, 0);
+        assert!(diagnostics.last_commit.is_none());
     }
     #[test]
     fn diagnostics_are_role_scoped_and_do_not_change_projection_bytes() {

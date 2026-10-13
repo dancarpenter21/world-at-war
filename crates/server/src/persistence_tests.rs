@@ -750,6 +750,10 @@ async fn performance_cycles_include_database_delay_and_reject_failed_commits() {
     let cycles: Vec<_> = rows.iter().filter(|row| row["kind"] == "server_cycle" && row["running_games"].as_array().is_some_and(|ids| ids.contains(&json!(id)))).collect();
     assert!(cycles.iter().any(|row| row["success"] == true && row["duration_ms"].as_f64().unwrap() >= 50.0));
     assert_eq!(cycles.last().unwrap()["success"], false);
+    assert!(cycles.last().unwrap()["frame_progress"].is_null(), "rolled-back frames must never publish committed progress");
+    let successful: Vec<_> = cycles.iter().filter(|row| row["success"] == true).collect();
+    assert!(successful.iter().all(|row| row["frame_progress"].as_array().unwrap().iter().any(|p| p["game_id"] == json!(id) && p["frames"] == 1)));
+    assert!(state.games.read().await[&id].diagnostics.last_committed_sample_absent());
     let commits: Vec<_> = rows.iter().filter(|row| row["kind"] == "persistence_commit" && row["game_ids"].as_array().is_some_and(|ids| ids.contains(&json!(id)))).collect();
     assert!(commits.iter().any(|row| row["success"] == true && row["duration_ms"].as_f64().unwrap() >= 50.0));
     assert_eq!(commits.last().unwrap()["success"], false);

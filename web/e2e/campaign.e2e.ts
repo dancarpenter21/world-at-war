@@ -58,6 +58,7 @@ async function join(page: Page, title: string, role: string) {
   await expect.poll(async () => ((await session(page))?.role_id ?? "")).toMatch(/^[0-9a-f-]{36}$/);
 }
 async function openPlanning(page: Page) {
+  await page.bringToFront();
   await page.getByRole("button", { name: "Joint planning", exact: true }).click();
   await expect(page.getByRole("region", { name: "Joint campaign planning" })).toBeVisible();
 }
@@ -273,12 +274,19 @@ test("diagnostics measure the held role, distinguish pause and recover after sta
   const s = await session(page);
   const path = `/v1/games/${s.game_id}/diagnostics?player_id=${s.player_id}&role_id=${s.role_id}`;
   await expect.poll(async () => (await api(page, path)).body.server_tick_ms.samples).toBeGreaterThan(0);
+  const measured = (await api(page, path)).body;
+  expect(measured.target_frame_hz).toBe(60);
+  await expect.poll(async () => (await api(page, path)).body.committed_frame_interval_ms.samples).toBeGreaterThan(0);
+  await expect(panel).toContainText("Committed frame rate / target");
+  await expect(panel).toContainText("Game speed, requested / achieved");
   expect((await api(page, `/v1/games/${s.game_id}/diagnostics?player_id=${s.player_id}&role_id=${pilotRole}`)).status).toBe(403);
   await control(page, "pause");
   await expect(panel).toContainText("Simulation is paused; a stationary tick is expected.");
   const stateText = await page.evaluate(async ({ base, game, role }) => { const saved = JSON.parse(localStorage.getItem("world-at-war-session")!); return (await fetch(`${base}/v1/games/${game}/state?role_id=${role}&lease_generation=${saved.lease_generation}`, { credentials: "include" })).text(); }, { base: backendUrl, game: s.game_id, role: s.role_id });
   const state = JSON.parse(stateText);
   const diagnostics = (await api(page, path)).body;
+  expect(diagnostics.committed_frame_hz).toBeNull();
+  expect(diagnostics.achieved_time_scale).toBeNull();
   expect(diagnostics.projection.tick).toBe(state.tick);
   expect(diagnostics.projection.visible_queue_packets).toBe(state.communication_links.reduce((sum: number, link: { queued_packets: number }) => sum + link.queued_packets, 0));
   expect(diagnostics.projection.snapshot_bytes).toBe(Buffer.byteLength(stateText));

@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID, createHash } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import WebSocket from 'ws';
-import { analyze, profiles, validateRun } from './performance-lib.mjs';
+import { analyze, profiles, validateRun, parseTimeScale, streamStalled, freshReconnectSnapshot, clockStalled, resumeConnection } from './performance-lib.mjs';
 import { PerformancePostgres } from './performance-postgres.mjs';
 import { createClock } from './performance-clock.mjs';
 const clock = createClock();
@@ -22,6 +22,7 @@ const { values } = parseArgs({ options: {
   profile: { type: 'string', default: 'mixed' }, clients: { type: 'string' },
   warmup: { type: 'string', default: '60' }, duration: { type: 'string', default: '300' },
   'archive-retention-days': { type: 'string', default: '0' },
+  'time-scale': { type: 'string', default: '1' },
   seed: { type: 'string', default: '12787750' }, output: { type: 'string' },
   'reconnect-every': { type: 'string', default: '300' },
   'check-budgets': { type: 'boolean', default: false },
@@ -33,29 +34,36 @@ const numeric = (key, min, max) => {
 const warmup = numeric('warmup', 0, 3600), duration = numeric('duration', 1, 86400);
 const seed = numeric('seed', 0, Number.MAX_SAFE_INTEGER), reconnectEvery = numeric('reconnect-every', 15, 86400);
 const archiveRetentionDays = numeric('archive-retention-days', 0, 4294967295);
+const timeScale = parseTimeScale(values['time-scale']);
 const layout = profiles(values.profile, values.clients === undefined ? undefined : Number(values.clients));
 const binary = path.resolve(values.binary ?? path.join(root, 'target/release/world-at-war-server'));
 const output = path.resolve(values.output ?? path.join(root, 'tmp/performance', `${new Date().toISOString().replaceAll(':', '-')}-${values.profile}`));
 await mkdir(path.dirname(output), { recursive: true });
 await mkdir(output, { recursive: false });
 const errors = []; const players = [], games = [], tasks = []; let stopping = false, backend, provider, base, serverLog;
-let measurementStart, measurementEnd, workloadStart; let phase = 'setup'; let recording = true; let database, databaseSampling;
+let measurementStart, measurementEnd, workloadStart; let phase = 'setup'; let recording = true; let database, databaseSampling; let sink;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 function emit(row) {
-  if (!recording) return;
+  if (!recording || !sink) return;
   if (sink.writableLength > 8 * 1024 * 1024) { stopping = true; throw new Error('Client trace writer backlog exceeded 8 MiB'); }
   sink.write(JSON.stringify({ time: clock.now(), phase, ...row }) + '\n');
 }
-function fail(error) { const message = String(error?.message ?? error); errors.push(message); emit({ kind: 'error', message }); stopping = true; }
+function fail(error) {
+  const message = String(error?.message ?? error); errors.push(message);
+  stopping = true;
+  for (const player of players) for (const controller of player.controllers) controller.abort();
+  emit({ kind: 'error', message });
+}
 process.on('SIGINT', () => { fail(new Error('Run interrupted')); });
 process.on('SIGTERM', () => { fail(new Error('Run terminated')); });
-const metadata = { schema_version: 2, measurement_version: 3, clock: 'epoch anchored to monotonic process time', storage: values.storage, archive_retention_days: archiveRetentionDays, retention_sample_seconds: 5, profile: values.profile, layout, seed, warmup_seconds: warmup, measured_seconds: duration,
+const metadata = { schema_version: 2, measurement_version: 4, clock: 'epoch anchored to monotonic process time', storage: values.storage, archive_retention_days: archiveRetentionDays, retention_sample_seconds: 5, profile: values.profile, layout, seed, requested_time_scale: timeScale, target_frame_hz: 60, warmup_seconds: warmup, measured_seconds: duration,
   reconnect_every_seconds: reconnectEvery, started_at: new Date().toISOString(),
   revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
   dirty: execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim().length > 0,
   c3mesh_revision: (await readFile(path.join(root, 'c3mesh-revision.txt'), 'utf8')).trim(),
   rustc: execFileSync('rustc', ['--version'], { encoding: 'utf8' }).trim(), node: process.version,
   os: process.platform, os_release: release(), cpu: cpus()[0]?.model, logical_cpus: cpus().length, memory_bytes: totalmem(),
+  harness_sha256: Object.fromEntries(await Promise.all(['performance-server.mjs', 'performance-lib.mjs', 'performance-clock.mjs', 'performance-postgres.mjs'].map(async name => [name, createHash('sha256').update(await readFile(path.join(root, 'web/scripts', name))).digest('hex')]))),
   binary_sha256: createHash('sha256').update(await readFile(binary)).digest('hex'),
   protocol: '1 Hz full snapshots; state/planning HTTP plus network WebSocket, no browser rendering; encoded HTTP body bytes when Content-Length is present, otherwise decoded bytes',
 };
@@ -64,15 +72,19 @@ if (process.env.TERRAIN_DIR) {
   metadata.terrain = { root: path.resolve(process.env.TERRAIN_DIR), manifest_sha256: createHash('sha256').update(terrainManifest).digest('hex'), manifest: JSON.parse(terrainManifest.toString()) };
 }
 const runtime = await mkdtemp(path.join(tmpdir(), 'waw-performance-'));
-const sink = createWriteStream(path.join(output, 'clients.jsonl'), { flags: 'wx' });
+sink = createWriteStream(path.join(output, 'clients.jsonl'), { flags: 'wx' });
+for (const outputStream of [process.stdout, process.stderr]) outputStream.on('error', () => {
+  if (!stopping) fail(new Error('Harness output stream closed'));
+});
 sink.on('error', error => { errors.push(`Client trace: ${error.message}`); stopping = true; });
 await writeFile(path.join(output, 'metadata.json'), JSON.stringify(metadata, null, 2));
 
 class Player {
-  constructor(index) { this.index = index; this.cookie = ''; this.cookies = new Map(); this.csrf = ''; this.disconnected = false; this.controllers = new Set(); this.pending = []; this.lastProgress = clock.now(); }
+  constructor(index) { this.index = index; this.cookie = ''; this.cookies = new Map(); this.csrf = ''; this.disconnected = false; this.controllers = new Set(); this.pending = []; this.lastProgress = clock.now(); this.lastClockProgress = clock.now(); }
   get prefix() { return `/v1/games/${this.game.id}`; }
   get query() { return new URLSearchParams({ role_id: this.role.id, lease_generation: String(this.role.lease_generation) }); }
   async request(resource, method = 'GET', body, expected = 200, operation = resource.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, ':id').split('?')[0]) {
+    if (stopping && phase !== 'cleanup') throw new Error('Run stopped during setup or workload');
     const controller = new AbortController(); this.controllers.add(controller);
     const timeout = setTimeout(() => controller.abort(), 10_000); const started = performance.now();
     try {
@@ -92,29 +104,39 @@ class Player {
   progress(tick, source = 'http') {
     this.progressBySource ??= new Map();
     if (!Number.isFinite(tick)) throw new Error(`Client ${this.index} received invalid tick`);
-    if (this.progressBySource.has(source) && tick < this.progressBySource.get(source)) throw new Error(`Client ${this.index} tick regressed`);
+    const previous = this.progressBySource.get(source);
+    if (previous !== undefined && tick < previous) throw new Error(`Client ${this.index} ${source} progress regressed`);
     this.progressBySource.set(source, tick);
-    if (this.lastTick === undefined || tick > this.lastTick) { this.lastTick = tick; this.lastProgress = clock.now(); }
+    if (previous === undefined || tick > previous) {
+      this.lastProgress = clock.now();
+      if (source === 'clock') this.lastClockProgress = clock.now();
+    }
+    if (source === 'http' || source === 'websocket') this.lastTick = Math.max(this.lastTick ?? 0, tick);
   }
   async snapshot() {
     const data = await this.request(`${this.prefix}/${this.role.observer_kind ? 'truth' : 'state'}?${this.query}`);
-    this.progress(data.tick); return data;
+    this.progress(data.tick);
+    if (data.frame !== undefined && data.frame !== null) this.progress(data.frame, 'http_frame');
+    this.lastSnapshotFrame = data.frame;
+    return data;
   }
   async connect() {
     const endpoint = this.role.observer_kind ? 'truth/stream' : 'network/stream';
     const query = this.query; if (this.sequence !== undefined && !this.role.observer_kind) query.set('after_sequence', this.sequence);
     const socket = new WebSocket(`${base.replace('http:', 'ws:')}${this.prefix}/${endpoint}?${query}`, { headers: { cookie: this.cookie, origin: base }, handshakeTimeout: 10_000 });
-    this.socket = socket; this.lastFrame = undefined; this.streamConnectedAt = clock.now();
+    this.socket = socket; this.lastFrame = undefined; this.streamTick = this.sequence === undefined ? undefined : this.streamTick; this.streamBehindSince = undefined; this.streamExpectedTick = undefined; this.streamConnectedAt = clock.now();
     socket.on('message', bytes => {
       try {
         const now = clock.now(); const frame = JSON.parse(String(bytes));
-        this.progress(this.role.observer_kind ? frame.tick : frame.projection.tick, 'websocket');
+        const tick = this.role.observer_kind ? frame.tick : frame.projection.tick;
+        this.progress(tick, 'websocket');
+        this.streamTick = tick;
         if (!this.role.observer_kind) {
           if (!frame.resync && this.sequence !== undefined && frame.sequence <= this.sequence) throw new Error('Non-monotonic stream sequence');
           this.sequence = frame.sequence;
         }
         emit({ kind: 'websocket', client: this.index, game_id: this.game.id, bytes: bytes.length,
-          gap_ms: this.lastFrame === undefined ? undefined : now - this.lastFrame }); this.lastFrame = now;
+          tick, gap_ms: this.lastFrame === undefined ? undefined : now - this.lastFrame }); this.lastFrame = now;
       } catch (error) { fail(error); }
     });
     socket.on('error', error => { if (!stopping && !this.disconnected) fail(new Error(`Client ${this.index} WebSocket: ${error.message}`)); });
@@ -144,6 +166,14 @@ class Player {
         await this.request(`${this.prefix}/authority/requests?${this.query}`);
       });
     }
+    if (this.commander) this.loop(1000, async () => {
+      const summary = (await this.request('/v1/games')).find(game => game.id === this.game.id);
+      assert.ok(summary, 'Measured game disappeared');
+      this.progress(summary.frame ?? summary.elapsed_seconds, 'clock');
+      this.clockTick = summary.tick;
+      if (summary.status !== 'running') throw new Error(`Game stopped during workload: ${summary.status}`);
+      assert.equal(summary.time_scale, timeScale, 'Game speed changed during workload');
+    });
     if (this.commander) this.loop(30_000, async () => {
       const intent = { intent_id: randomUUID(), issuer_role: this.role.id, target: this.role.command_units[0],
         kind: { Move: { north_mps: 0, east_mps: 0 } }, requested_tick: this.lastTick ?? 0 };
@@ -161,10 +191,10 @@ class Player {
   async reconnect() {
     this.disconnected = true; this.socket?.terminate(); for (const c of this.controllers) c.abort();
     await sleep(10_000); if (stopping) return;
-    const started = performance.now(); const before = this.lastTick;
+    const started = performance.now(); const before = { tick: this.lastTick, frame: this.lastSnapshotFrame };
     this.role = await this.request(`${this.prefix}/roles/${this.role.id}/resume`, 'POST', {});
-    const snapshot = await this.snapshot(); assert.ok(snapshot.tick > before, 'Reconnect did not receive a fresh snapshot');
-    this.disconnected = false; await this.connect(); this.lastProgress = clock.now();
+    const snapshot = await this.snapshot(); assert.ok(freshReconnectSnapshot(before, snapshot), 'Reconnect did not receive a fresh snapshot');
+    await resumeConnection(this, () => clock.now());
     emit({ kind: 'reconnect', client: this.index, game_id: this.game.id, duration_ms: performance.now() - started });
   }
 }
@@ -183,6 +213,7 @@ async function resources() {
     audit_bytes: auditBytes, generator_rss_bytes: process.memoryUsage().rss, generator_cpu: process.cpuUsage() });
 }
 try {
+  assert.ok(!stopping, 'Run stopped before setup');
   if (values.storage === 'postgres') {
     database = new PerformancePostgres(values['postgres-image']);
     metadata.postgres = { container_name: database.name, volume_name: database.volume };
@@ -243,6 +274,8 @@ try {
       if (i > 0) await player.request(`${player.prefix}/state?role_id=${host.role.id}&lease_generation=${host.role.lease_generation}`, 'GET', undefined, 403);
       await player.request(`${player.prefix}/${role.observer_kind ? 'truth' : 'state'}?role_id=${role.id}&lease_generation=${player.role.lease_generation + 1}`, 'GET', undefined, 403);
     }
+    const paced = await host.request(host.prefix + '/time-scale', 'PUT', { time_scale: timeScale });
+    assert.equal(paced.time_scale, timeScale, 'Host speed selection was not applied');
     await host.request(host.prefix + '/start', 'POST', {});
   }
   metadata.games = games.map(({ host, ...game }) => game); metadata.clients = players.map(p => ({ index: p.index, game_id: p.game.id, role_id: p.role.id, observer_kind: p.role.observer_kind }));
@@ -265,7 +298,13 @@ try {
     phase = clock.now() < measurementStart ? 'warmup' : 'measurement';
     const expected = clock.now() + 1000; await sleep(1000);
     emit({ kind: 'generator_lag', duration_ms: Math.max(0, clock.now() - expected) });
-    for (const p of players) if (!p.disconnected && (clock.now() - p.lastProgress > 15_000 || clock.now() - (p.lastFrame ?? p.streamConnectedAt) > 15_000)) fail(new Error(`Game stalled for client ${p.index}`));
+    for (const p of players) {
+      if (p.disconnected) continue;
+      const host = games.find(g => g.id === p.game.id).host;
+      const now = clock.now();
+      if (clockStalled(host, now)) fail(new Error(`Committed clock stalled for game ${p.game.id}`));
+      if (streamStalled(p, host.clockTick, now)) fail(new Error(`Expected stream progress stalled for client ${p.index}`));
+    }
     if (clock.now() >= nextResource) { await resources(); nextResource = clock.now() + 5000; }
     if (clock.now() >= nextReconnect && clock.now() + 15_000 < measurementEnd) {
       const count = Math.max(1, Math.ceil(players.length / 10));
@@ -301,7 +340,7 @@ finally {
     console.log(JSON.stringify({ valid: result.valid, errors: result.errors, budgets: result.budgets, output }, null, 2));
     if (!result.valid || (values['check-budgets'] && [...result.budgets.regional, ...result.budgets.reconnect].some(b => !b.met))) process.exitCode = 1;
   } catch (error) {
-    const result = { valid: false, storage: values.storage, measurement_version: 3, errors: [...errors, `Analysis failed: ${error.message}`] };
+    const result = { valid: false, storage: values.storage, measurement_version: 4, errors: [...errors, `Analysis failed: ${error.message}`] };
     await writeFile(path.join(output, 'summary.json'), JSON.stringify(result, null, 2));
     console.error(JSON.stringify(result)); process.exitCode = 1;
   }

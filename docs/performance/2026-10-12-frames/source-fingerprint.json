@@ -1,0 +1,19 @@
+{
+  "revision": "59c610489ba89be10ea040c193d9b47dcf19941e",
+  "captured_at": "2026-10-12T21:55:06.537945+00:00",
+  "binary_sha256": "5db6014287e7c56b4f70632a52dd96d3d5b2f58a271e373126ed53b7d3058990",
+  "files": {
+    "README.md": "c2c903320ce58c670441df8c1999a7b87b59f5b58b4ebe10eb9b3f3cb3c176c7",
+    "crates/server/src/diagnostics.rs": "a2ff552b3e57d809d532e71a3553790ed95f674d2dfeb729bff6fa0ba1062281",
+    "crates/server/src/main.rs": "450ad8711b46d0e936ad70b45f9ce46fe05d27a5dfe2f9fc3f6a159a0b943258",
+    "crates/server/src/performance.rs": "89376ed6c202b3ffa23e5a6fe97ef9be05b2cc94fdd70d3e854c78006edb3d16",
+    "crates/server/src/persistence_tests.rs": "9181e201d97f86c3cd6a2137407bfb206d74530568edc4408c67502d61517a5c",
+    "crates/server/src/storage.rs": "65ec59ddf6de6a43f94731fafffccdc91de86c4cfc603db7c8f1ede8c7c4bb82",
+    "docs/performance/LOAD_TESTING.md": "d04100d38a53922722e7dd4f0281809d89afb2c7e00520b466e965353b12dd6c",
+    "web/e2e/campaign.e2e.ts": "135cf799501cf35d969c45a2c5a4164bdc1090dd29d4a6eb02444d1886af002b",
+    "web/scripts/performance-lib.mjs": "6f3bf6a15a166e052abe8fb3d4b0c3607a169824ca4c26ff4bd61d2a53239b11",
+    "web/scripts/performance-server.mjs": "a046668d8f7e08fd6c041bdfee6565d35f1143283d9e59921763de4d63270fb9",
+    "web/scripts/performance.node-test.mjs": "f215112d3a7763ac97c740015a4806f49e63f61e48ff8e4c5abd5f247c1063c4",
+    "web/src/DiagnosticsPanel.tsx": "4bd5b48394b5494c395641fa54cf4572a9b4e6496d2664a6297ab9f75e6e02cc"
+  }
+}

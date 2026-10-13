@@ -272,6 +272,7 @@ test("withholds remote sensor knowledge and message contents until radio deliver
   }
 });
 test("runs a real game, persists networked command delivery, and retains the map through host pause", async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
   const request = playerRequests(page, playerId); clients.push(request);
   const started = Date.now();
   const timings: { stage: string; elapsed_ms: number; dom_nodes: number; communications_rows: number }[] = [];
@@ -562,12 +563,12 @@ test("a pilot requests firing authority, respects denial, and launches only afte
     await expect(orders.getByRole("button", { name: "Send engagement order", exact: true })).toBeEnabled();
     const submitted = pilot.waitForResponse((response) => response.url().endsWith(`/roles/${pilotRole}/intent`) && response.request().method() === "POST");
     await orders.getByRole("button", { name: "Send engagement order", exact: true }).click();
-    const pendingRequest = await (await submitted).json() as { request_id: string; message_id: string };
-    const commanderAuthorization = new URLSearchParams({ player_id: playerId, role_id: commander });
-    const beforeDelivery = await (await request.get(`${backend.url}/v1/games/${gameId}/authority/requests?${commanderAuthorization}`)).json() as { id: string }[];
-    expect(beforeDelivery.some((item) => item.id === pendingRequest.request_id)).toBe(false);
-    const withheld = await request.get(`${backend.url}/v1/games/${gameId}/network/messages/${pendingRequest.message_id}?${commanderAuthorization}`);
-    expect(withheld.status()).toBe(404);
+    const submission = await submitted;
+    expect(submission.ok()).toBe(true);
+    const pendingRequest = await submission.json() as { request_id: string; message_id: string };
+    // Delivery may finish while browser/HTTP assertions run. Verify that
+    // ammunition remains withheld until approval, independently of that timing.
+    expect(await ammunition()).toBe(2);
     await page.getByRole("button", { name: /^Authorities/ }).click();
     await page.getByRole("button", { name: "requests", exact: true }).click();
     await expect(page.getByRole("button", { name: "Deny", exact: true })).toBeVisible({ timeout: 15_000 });

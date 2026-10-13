@@ -19,6 +19,11 @@ validation only; it does not establish real-terrain reference acceptance. The
 ordinary core benchmark retains its legacy workload; add `--sensing` for the new
 model and supply terrain.
 
+CI creates a fresh, explicitly synthetic flat dataset with
+`python3 scripts/setup-ci-terrain.py --output <fresh-directory>` for the short
+performance and production-container smoke checks. It never downloads terrain
+or replaces an existing dataset; these runs validate the harness and runtime.
+
 ```sh
 sh scripts/setup-c3mesh.sh --verify-only
 cargo build --release --locked -p world-at-war-server
@@ -58,6 +63,15 @@ warmup, 300 measured seconds, and reconnects every 300 seconds. CI uses a
 120-second run with reconnects every 30 seconds. `npm run perf:server -- ...`
 from `web/` is an equivalent entry point; relative output paths follow the caller.
 
+`--time-scale` selects 0.25, 1, 2, 5, 10, 30 or 60 (default 1) through each
+host's authenticated control endpoint before starting. Metadata records the
+requested speed and 60 Hz target. One host per game additionally polls the game
+summary once per second to check fractional/frame progress, selected speed and
+running status. These requests are included in client load and latency telemetry.
+Compare runs using the same measurement version and request workload.
+The `games` metadata entries retain creation-time summaries; use top-level
+`requested_time_scale` and committed-frame progress for the measured speed.
+
 ## Workload
 
 | Profile | Games | Distinct guest players |
@@ -81,10 +95,19 @@ The workload measures the existing authority and audit paths without disabling A
 Every five minutes a rotating 10% of players stops requests and closes sockets
 for ten seconds. Recovery time starts when connectivity returns, includes lease
 resume, a fresh HTTP snapshot and WebSocket reopening, and excludes the intended
-outage. The five-minute reference profiles normally contain no reconnect cycle;
+outage. Operational HTTP snapshots verify fractional frame advancement when
+available. Truth/historical snapshots may retain the same whole-second tick;
+they must not regress, and the independent host-clock watchdog verifies progress.
+Planned host outages suspend that game’s clock probe deadline, which resets after
+the WebSocket handshake completes; committed-frame throughput still includes
+the entire outage window. Clients stay offline throughout recovery, so a partially
+opened connection cannot expose the old clock deadline. The five-minute reference profiles normally contain no reconnect cycle;
 the short CI run and one-hour soak exercise it. A run fails on unexpected HTTP or
-WebSocket errors, forbidden reads succeeding, stalled tick/stream progress for
-15 seconds, interrupted execution, or incomplete telemetry.
+WebSocket errors, forbidden reads succeeding, stalled committed-clock progress for
+15 seconds, an expected operational whole-second stream update remaining
+undelivered for 15 seconds, an observer stream silent for 15 seconds, interrupted
+execution, or incomplete telemetry. A newer expected tick does not extend an
+outstanding delivery deadline; receiving its required tick clears that deadline.
 
 ## Artifacts and interpretation
 
@@ -127,6 +150,51 @@ and reconnect <=3 seconds. Budget misses are findings by default. Add
 correctness, not timing on shared runners. A short run without reconnect samples
 does not certify reconnect latency. Optimization, the full roadmap scale and the
 24-hour release soak remain separate increments.
+
+## Committed frames (measurement version 4)
+
+A successful `server_cycle` now carries a process-local `cycle_id` and per-game
+`frame_progress`: actual frame/game-time deltas, whole-second boundaries, final
+clock values and requested speed. Progress publishes only after the entire cycle
+commits, including PostgreSQL persistence or volatile audit flush. Failed cycles
+have no committed progress; maintenance-only cycles do not count as frames.
+`persistence_commit.cycle_id` links shared transaction stages to the cycle via
+`commit_id`. Private `tick` records remain pre-persistence processing measurements;
+`whole_seconds` separates fractional motion work from game-second boundary work.
+
+`summary.json.frames` reports each game's committed frames divided by the entire
+measured wall-time window, achieved game-time rate, requested-speed percentage,
+interval percentiles and intervals exceeding 1/60 second. Per-second series include
+zero-progress buckets; a partial final bucket uses its actual duration. The window
+is start-inclusive/end-exclusive. Intervals count only when both commits fall in
+the window. Rates count frame deltas at completion, so a frame straddling a window
+edge belongs to the window containing its completion. The 60 Hz value is a target,
+not a new pass tolerance. A valid slow run is still useful baseline evidence.
+
+`persistence` adds successful commit/boundary/checkpoint counts and journal/submitted
+snapshot byte totals per measured wall second and aggregate committed game second.
+These are encoded/submitted bytes, not on-disk growth. `database_growth` measures
+the difference between first and last in-window database/WAL samples and records
+that shorter sampling interval; it is not exact growth over the full window.
+`slowest_cycles` retains the twenty largest advancing cycles and their correlated
+commit/flush stages. Shared transaction costs remain server-wide. Failed operations,
+missing committed progress, incomplete windows and dropped traces invalidate runs.
+Historical traces remain analyzable; older records cannot certify frame throughput.
+
+The role-scoped diagnostics API adds `target_frame_hz`, `committed_frame_hz`,
+`committed_frame_interval_ms`, `committed_frame_overruns` and
+`last_committed_frame_age_ms`. `achieved_time_scale` now uses committed progress.
+Rates use up to 120 committed intervals plus time since the latest commit, becoming
+unavailable after three seconds without progress. Pause/resume and speed changes
+reset rate samples. These observational fields never enter snapshots or gameplay
+projections. The browser panel labels persistence-inclusive rates separately from
+frame processing time and marks paused/stale/waiting states.
+
+For short reference measurements, run each profile in each storage mode separately
+at 1× with 60-second warmup, 300-second measurement and 60-second reconnects, then
+repeat in reverse storage order. Brief speed checks use one global game in each
+mode with 15-second warmup and 45-second measurement. Synthetic terrain results
+must remain explicitly labelled. Neither procedure authorizes a long soak.
 
 ## Retention measurements
 

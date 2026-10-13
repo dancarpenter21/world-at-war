@@ -52,7 +52,11 @@ jobs:
           mkdir -p tmp/performance
           target/release/world-at-war-server --benchmark --ticks 120 --warmup 30 --repeats 2 --seed 12787750 > tmp/performance/core.json
       - name: Fifty authenticated clients, renewals and reconnects
-        run: node web/scripts/performance-server.mjs --storage ${{ matrix.storage }} --warmup 5 --duration 120 --reconnect-every 30 --output tmp/performance/ci
+        env:
+          TERRAIN_DIR: ${{ runner.temp }}/performance-terrain
+        run: |
+          python3 scripts/setup-ci-terrain.py --output "$TERRAIN_DIR"
+          node web/scripts/performance-server.mjs --storage ${{ matrix.storage }} --warmup 5 --duration 120 --reconnect-every 30 --output tmp/performance/ci
       - name: Upload performance evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

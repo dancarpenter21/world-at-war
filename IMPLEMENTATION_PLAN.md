@@ -1,5 +1,45 @@
 # World At War Implementation Plan
 
+## Committed-frame performance baseline — 2026-10-12
+
+Measurement version 4 records actual per-game frame/time deltas only after a
+successful cycle, separates maintenance and whole-second work, and reports
+whole-window throughput including zero-progress buckets. Role-authorized browser
+diagnostics now show committed frame rate, interval timing and requested/achieved
+game speed. Harness speed selection uses the host API; fractional reconnect checks,
+planned host outages, delayed socket opening and interrupted setup have regressions.
+
+All 24 selected short runs are valid: two six-profile volatile/PostgreSQL matrices
+at 1×, plus twelve brief checks of the other speed choices. On labelled synthetic
+flat terrain, volatile regional reaches 57.1–57.3 Hz, global 60.0 Hz, and mixed
+50.9–51.0 Hz per game. PostgreSQL reaches 10.2–16.2 Hz, 18.9–19.3 Hz, and
+2.9–3.3 Hz respectively. Regional cycle budgets pass, but regional/mixed reconnects
+reach 5.1–10.4 seconds. Sustained 60 Hz durable acceptance remains open.
+
+Repeated full-state encoding/hashing, HTTP checkpoint/mutation work under the
+shared durability gate, and SQL volume are the measured optimization priorities.
+Large gate waits explain multi-second frame gaps beyond the cycle span; current
+flush measurements do not establish a universal storage/checkpoint cause. See
+[results, fingerprints, preserved attempts and limits](docs/performance/2026-10-12-frame-results.md).
+
+Validation passes 248 fast Rust tests, 17 isolated PostgreSQL tests, 47 frontend
+tests, 23 fast harness tests and the updated real-server browser diagnostics
+regression. Formatting, strict Clippy, dependency-pin verification, TypeScript and
+production frontend/release-server builds pass. Snapshot schemas, replay semantics,
+atomic commits, fencing and wall-time leases remain compatible. No long soak,
+existing-database migration or real-terrain acceptance was run.
+
+### Next implementation steps
+
+1. Reduce repeated snapshot encoding/hashing and review checkpoint/mutation cost
+   using the current committed-frame baseline. Preserve fail-closed rollback,
+   canonical hashes, recovery replay and wall-clock authority leases.
+2. Repeat short durable measurements after optimization, including shared-gate
+   delays and reconnects; sustained 60 Hz acceptance remains required evidence.
+3. Install operator-provided real SRTM terrain and add reference LOS measurements.
+4. Continue remaining Phase 2 domains and recognition/propagation fidelity.
+   Long endurance runs still require an explicit request.
+
 ## 60 Hz simulation frames — 2026-10-12
 
 The loop now targets 60 frames per real second with non-linear 0.25×, 1×, 2×,

@@ -12,6 +12,14 @@ use std::{
 };
 
 const CAPACITY: usize = 8192;
+static CYCLE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+pub(super) fn next_cycle_id() -> u64 {
+    if enabled() {
+        CYCLE_SEQUENCE.fetch_add(1, Ordering::Relaxed) + 1
+    } else {
+        0
+    }
+}
 static COMMIT_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 pub(super) fn next_commit_id() -> u64 {
     if enabled() {

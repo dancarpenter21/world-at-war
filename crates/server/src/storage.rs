@@ -517,13 +517,22 @@ impl Store {
         games: &mut BTreeMap<Uuid, Game>,
         identity: Option<&auth::SessionUpdate>,
     ) -> anyhow::Result<()> {
+        self.commit_cycle(changes, games, identity, None).await
+    }
+    pub async fn commit_cycle(
+        &self,
+        changes: &[recovery::Boundary],
+        games: &mut BTreeMap<Uuid, Game>,
+        identity: Option<&auth::SessionUpdate>,
+        cycle_id: Option<u64>,
+    ) -> anyhow::Result<()> {
         for change in changes {
             audit::collect(games.get_mut(&change.id).unwrap());
         }
         let commit_id = performance::next_commit_id();
         let mut commit = performance::Span::new("persistence_commit", || {
             json!({
-                "commit_id": commit_id,
+                "commit_id": commit_id, "cycle_id": cycle_id,
                 "boundaries": changes.len(),
                 "game_ids": changes.iter().map(|c| c.id).collect::<Vec<_>>(),
                 "checkpoints": changes.iter().filter(|c| c.checkpoint).count(),

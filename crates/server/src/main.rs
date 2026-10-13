@@ -3230,8 +3230,10 @@ async fn run_simulation_loop(state: AppState) {
         if maintenance {
             last_maintenance = now;
         }
+        let cycle_id = performance::next_cycle_id();
         let mut cycle = performance::Span::new("server_cycle", || {
             serde_json::json!({
+                "cycle_id": cycle_id, "maintenance": maintenance,
                 "storage": if state.durability.store.is_some() { "postgres" } else { "volatile" },
                 "schedule_delay_ms": scheduled.elapsed().as_secs_f64() * 1000.0,
                 "running_games": games.values().filter(|g| g.status == GameStatus::Running).map(|g| g.id).collect::<Vec<_>>()
@@ -3275,7 +3277,11 @@ async fn run_simulation_loop(state: AppState) {
         } else {
             BTreeMap::new()
         };
+        let mut progress = Vec::new();
         for game in games.values_mut().filter(|game| due.contains(&game.id)) {
+            let previous_frame = game.simulation.frame_number().unwrap_or(0);
+            let previous_seconds = game.simulation.elapsed_game_seconds();
+            let previous_tick = game.simulation.radio_tick();
             game.scheduler.advanced_frame(now);
             let started = std::time::Instant::now();
             let delay = scheduled.elapsed().as_secs_f64() * 1000.0;
@@ -3283,15 +3289,23 @@ async fn run_simulation_loop(state: AppState) {
             advance_game_frame(game, game.time_scale.unwrap_or(1.0));
             intents::record_execution_results(game);
             let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
-            game.diagnostics.record_frame(
-                elapsed_ms,
-                delay,
-                game.time_scale.unwrap_or(1.0) / f64::from(sim_core::TICKS_PER_SECOND),
-            );
+            game.diagnostics.record_tick(elapsed_ms, delay);
+            let frames = game
+                .simulation
+                .frame_number()
+                .unwrap_or(0)
+                .saturating_sub(previous_frame);
+            let seconds = game.simulation.elapsed_game_seconds() - previous_seconds;
+            progress.push((
+                game.id,
+                frames,
+                seconds,
+                game.simulation.radio_tick().saturating_sub(previous_tick),
+            ));
             performance::record(|| {
                 serde_json::json!({"kind": "tick", "game_id": game.id,
                 "scenario": game.scenario_id, "tick": game.simulation.tick(), "frame": game.simulation.frame_number(), "elapsed_game_seconds": game.simulation.elapsed_game_seconds(), "duration_ms": elapsed_ms,
-                "schedule_delay_ms": delay, "sensing": game.simulation.sensing_statistics(), "requested_time_scale": game.time_scale.unwrap_or(1.0)})
+                "schedule_delay_ms": delay, "whole_seconds": game.simulation.radio_tick().saturating_sub(previous_tick), "sensing": game.simulation.sensing_statistics(), "requested_time_scale": game.time_scale.unwrap_or(1.0)})
             });
         }
         if let Some(before) = before {
@@ -3331,7 +3345,7 @@ async fn run_simulation_loop(state: AppState) {
                         .store
                         .as_ref()
                         .unwrap()
-                        .commit(&changes, &mut games, None)
+                        .commit_cycle(&changes, &mut games, None, Some(cycle_id))
                         .await
                         .is_err())
             {
@@ -3343,6 +3357,29 @@ async fn run_simulation_loop(state: AppState) {
             for game in games.values_mut() {
                 audit::flush_volatile(game);
             }
+        }
+        let committed_at = std::time::Instant::now();
+        for (id, frames, seconds, _) in &progress {
+            games
+                .get_mut(id)
+                .unwrap()
+                .diagnostics
+                .record_commit(committed_at, *frames, *seconds);
+        }
+        if performance::enabled() {
+            cycle.set(
+                "frame_progress",
+                serde_json::json!(progress
+                    .iter()
+                    .map(|(id, frames, seconds, whole_seconds)| {
+                        let game = &games[id];
+                        serde_json::json!({"game_id": id, "frames": frames, "game_seconds": seconds,
+                    "whole_seconds": whole_seconds, "frame": game.simulation.frame_number(),
+                    "elapsed_game_seconds": game.simulation.elapsed_game_seconds(),
+                    "requested_time_scale": game.time_scale.unwrap_or(1.0)})
+                    })
+                    .collect::<Vec<_>>()),
+            );
         }
         cycle.set(
             "scheduled_to_committed_ms",
