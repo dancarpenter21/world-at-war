@@ -23,6 +23,7 @@ mod sensor_reports;
 mod space_assets;
 mod space_catalog;
 mod storage;
+mod teams;
 mod transport;
 
 use std::{
@@ -113,6 +114,8 @@ struct Game {
     members: BTreeSet<Uuid>,
     participant_names: BTreeMap<Uuid, String>,
     observers: BTreeMap<Uuid, observers::ObserverSeat>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    teams: Option<teams::Teams>,
     id: Uuid,
     title: String,
     host: Uuid,
@@ -255,9 +258,14 @@ struct ScenarioSummary {
     terrain_required: bool,
     terrain_ready: bool,
     terrain_setup: Option<String>,
+    human_red_supported: bool,
 }
 #[derive(Serialize)]
 struct GameSummary {
+    control_revision: u64,
+    blue_roles_available: usize,
+    red_roles_available: usize,
+    red_control: Option<teams::RedControl>,
     sensing_model_version: Option<u32>,
     terrain_manifest_digest: Option<String>,
     time_scale: f64,
@@ -354,6 +362,8 @@ struct CreateGameRequest {
     host_player_id: Uuid,
     seed: Option<u64>,
     network_policy_id: Option<String>,
+    creator_team: Option<teams::Team>,
+    red_control: Option<teams::RedControl>,
 }
 #[derive(Serialize)]
 struct CreateGameResponse {
@@ -377,6 +387,7 @@ struct RolesQuery {
 #[derive(Deserialize)]
 struct GameControlRequest {
     player_id: Uuid,
+    expected_control_revision: Option<u64>,
 }
 #[derive(Deserialize)]
 struct SubmitIntentRequest {
@@ -672,6 +683,26 @@ fn router(state: AppState) -> Router {
         )
         .route("/v1/games", get(list_games).post(create_game))
         .route("/v1/games/{game_id}/join", post(join_game))
+        .route("/v1/games/{game_id}/teams", get(teams::read))
+        .route("/v1/games/{game_id}/teams/requests", post(teams::request))
+        .route(
+            "/v1/games/{game_id}/teams/requests/{request_id}/decision",
+            post(teams::decide),
+        )
+        .route(
+            "/v1/games/{game_id}/teams/requests/{request_id}/cancel",
+            post(teams::cancel),
+        )
+        .route(
+            "/v1/games/{game_id}/teams/members/{player_id}",
+            axum::routing::delete(teams::remove),
+        )
+        .route("/v1/games/{game_id}/white-cell", get(teams::overview))
+        .route(
+            "/v1/games/{game_id}/white-cell/inspect",
+            get(teams::inspect),
+        )
+        .route("/v1/games/{game_id}/white-cell/notes", post(teams::note))
         .route("/v1/games/{game_id}/roles", get(list_roles))
         .route(
             "/v1/games/{game_id}/participants",
@@ -841,6 +872,7 @@ async fn list_scenarios(State(state): State<AppState>) -> Json<Vec<ScenarioSumma
             .scenarios
             .values()
             .map(|scenario| ScenarioSummary {
+                human_red_supported: teams::human_red_supported(scenario),
                 id: scenario.id.clone(),
                 title: scenario.title.clone(),
                 description: scenario.description.clone(),
@@ -926,7 +958,22 @@ async fn create_game(
                 error.to_string(),
             )
         })?;
-    let authority = scenario.authority.clone();
+    if request.red_control == Some(teams::RedControl::Human)
+        && !teams::human_red_supported(scenario)
+    {
+        return Err(api_error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "human_red_unavailable",
+            "This scenario does not support human Red",
+        ));
+    }
+    let mut authority = scenario.authority.clone();
+    if let Some(mode) = request.red_control {
+        for role in authority.roles.iter_mut().filter(|r| r.side == Side::Red) {
+            role.ai_controlled = mode == teams::RedControl::Ai;
+            role.claimable = mode == teams::RedControl::Human;
+        }
+    }
     let roles = authority
         .roles
         .iter()
@@ -971,6 +1018,7 @@ async fn create_game(
         next_identifier: 0,
         participant_names: BTreeMap::from([(request.host_player_id, "Host".into())]),
         observers: observers::from_scenario(scenario),
+        teams: request.red_control.map(teams::Teams::with_red_control),
         members: BTreeSet::from([request.host_player_id]),
         id: game_id,
         title: request
@@ -1030,6 +1078,9 @@ async fn create_game(
         network_seed,
         operational_error: None,
     };
+    if let Some(team) = request.creator_team {
+        teams::assign(&mut game, request.host_player_id, team)?;
+    }
     game.simulation.enable_audit();
     let summary = game_summary(&game);
     state.games.write().await.insert(game_id, game);
@@ -1081,6 +1132,15 @@ async fn list_roles(
     Ok(Json(
         game.roles
             .values()
+            .filter(|role| {
+                query.player_id.is_none_or(|player| {
+                    game.host == player
+                        || teams::team(game, player).is_none_or(|team| {
+                            team == teams::Team::WhiteCell
+                                || team == teams::Team::for_side(role.side)
+                        })
+                })
+            })
             .map(|role| observers::SeatSummary::Operational(role_summary(role, query.player_id)))
             .chain(game.observers.values().map(|seat| {
                 observers::SeatSummary::Observer(observers::summary(seat, query.player_id))
@@ -1094,32 +1154,41 @@ async fn start_game(
     State(state): State<AppState>,
     AuthJson(request): AuthJson<GameControlRequest>,
 ) -> ApiResult<GameSummary> {
-    set_game_status(state, game_id, request.player_id, GameStatus::Running).await
+    set_game_status(
+        state,
+        game_id,
+        request.player_id,
+        GameStatus::Running,
+        request.expected_control_revision,
+    )
+    .await
 }
 async fn pause_game(
     Path(game_id): Path<Uuid>,
     State(state): State<AppState>,
     AuthJson(request): AuthJson<GameControlRequest>,
 ) -> ApiResult<GameSummary> {
-    set_game_status(state, game_id, request.player_id, GameStatus::Paused).await
+    set_game_status(
+        state,
+        game_id,
+        request.player_id,
+        GameStatus::Paused,
+        request.expected_control_revision,
+    )
+    .await
 }
 async fn set_game_status(
     state: AppState,
     game_id: Uuid,
     player: Uuid,
     status: GameStatus,
+    expected_revision: Option<u64>,
 ) -> ApiResult<GameSummary> {
     let mut games = state.games.write().await;
     let game = games
         .get_mut(&game_id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "game not found"))?;
-    if game.host != player {
-        return Err(api_error(
-            StatusCode::FORBIDDEN,
-            "host_required",
-            "only the host can control game state",
-        ));
-    }
+    teams::control(game, player, expected_revision)?;
     if status == GameStatus::Running
         && game.simulation.mission_complete()
         && !reporting_pending(game)
@@ -1132,6 +1201,7 @@ async fn set_game_status(
     }
     if game.status != status {
         game.status = status;
+        teams::record_control(game, player, format!("status {status:?}"));
         game.scheduler.reset();
         game.diagnostics.reset_rate();
     }
@@ -1229,6 +1299,17 @@ async fn update_authority(
                 "occupied_role_side_changed",
                 format!("occupied role {} cannot change side", old.name),
             ));
+        }
+    }
+    if let Some(mode) = game.teams.as_ref().and_then(|t| t.red_control) {
+        for role in request
+            .definition
+            .roles
+            .iter_mut()
+            .filter(|r| r.side == Side::Red)
+        {
+            role.ai_controlled = mode == teams::RedControl::Ai;
+            role.claimable = mode == teams::RedControl::Human;
         }
     }
     request.definition.version = game.authority.version + 1;
@@ -1809,6 +1890,7 @@ fn validate_role_lease(
         .roles
         .get(&role_id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "role_not_found", "role not found"))?;
+    teams::validate_side(game, player_id, role.side)?;
     if role.owner != Some(player_id)
         || role.lease_generation != lease_generation
         || !leases::active(role)
@@ -3416,6 +3498,30 @@ fn legacy_scenarios() -> Vec<Scenario> {
 
 fn game_summary(game: &Game) -> GameSummary {
     GameSummary {
+        control_revision: game.teams.as_ref().map_or(0, |t| t.control_revision),
+        blue_roles_available: game
+            .roles
+            .values()
+            .filter(|r| {
+                r.side == Side::Blue
+                    && r.claimable
+                    && !r.ai_controlled
+                    && !leases::active(&r.occupancy)
+                    && r.owner.is_none()
+            })
+            .count(),
+        red_roles_available: game
+            .roles
+            .values()
+            .filter(|r| {
+                r.side == Side::Red
+                    && r.claimable
+                    && !r.ai_controlled
+                    && !leases::active(&r.occupancy)
+                    && r.owner.is_none()
+            })
+            .count(),
+        red_control: game.teams.as_ref().and_then(|t| t.red_control),
         sensing_model_version: game
             .simulation
             .sensing_configuration()
@@ -3552,6 +3658,7 @@ mod authority_tests {
             next_identifier: 0,
             participant_names: BTreeMap::new(),
             observers: observers::from_scenario(&scenario),
+            teams: None,
             members: BTreeSet::new(),
             id: Uuid::from_u128(900),
             title: "Test".into(),

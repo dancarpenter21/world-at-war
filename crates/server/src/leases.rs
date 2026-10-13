@@ -251,15 +251,34 @@ async fn acquire_role(
     if game.observers.contains_key(&role_id) {
         return observers::acquire(game, role_id, player, resume);
     }
+    if let Some(role) = game.roles.get(&role_id) {
+        teams::validate_side(game, player, role.side)?;
+        if teams::team(game, player).is_none()
+            && game
+                .roles
+                .values()
+                .any(|r| r.owner == Some(player) && r.side != role.side)
+        {
+            return Err(api_error(
+                StatusCode::FORBIDDEN,
+                "team_transfer_required",
+                "Request an approved team transfer first",
+            ));
+        }
+    }
     let role = game
         .roles
         .get_mut(&role_id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "role_not_found", "Role not found"))?;
     acquire(role, player, resume, Instant::now())?;
-    Ok(Json(observers::SeatSummary::Operational(role_summary(
-        role,
-        Some(player),
-    ))))
+    let summary = role_summary(role, Some(player));
+    let side = role.side;
+    game.teams
+        .get_or_insert_with(teams::Teams::default)
+        .members
+        .entry(player)
+        .or_insert(teams::Team::for_side(side));
+    Ok(Json(observers::SeatSummary::Operational(summary)))
 }
 #[derive(Deserialize)]
 pub(super) struct LeaseRequest {

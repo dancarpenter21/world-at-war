@@ -1,5 +1,49 @@
 # World At War Implementation Plan
 
+## White Cell team increment — 2026-10-13
+
+White Cell now has individual referee seats, approved late joining, team transfers,
+omniscient truth/plan/message and role-picture inspection, private team notes,
+shared lifecycle/speed controls and existing weather interventions. The lobby
+supports hosting as White Cell and human/AI Red selection for authored two-sided
+scenarios. Legacy observers remain limited. See
+[implemented flow, API and limits](docs/WHITE_CELL_IMPLEMENTATION.md).
+
+Validation passes 251 fast Rust tests, 18 isolated PostgreSQL tests, 47 frontend
+checks and 63 full-suite browser cases (one dedicated-database browser case skipped).
+Both White Cell browser flows pass after the final feedback change. Formatting,
+strict Clippy, dependency-pin verification, TypeScript and frontend production
+build pass. See [verified screenshots](docs/gameplay-checkpoints.md#white-cell-team).
+No long soak or development-database migration was run.
+
+This delivers the core team/referee workflow described in section 5. New exercise
+injects, outcome overrides and interactive replay remain planned. Persistence uses
+existing optional saves; stronger durability is not a feature prerequisite.
+
+## Feature review and proposed next increment — 2026-10-13
+
+The full release feature set is not implemented. The current foundation includes
+multiplayer campaign play, sensing, communications, basic combat and durable
+recovery; remaining work includes broader domain simulation, logistics,
+goal-directed Red AI and interactive replay. See the
+[feature assessment and next implementation plan](plans/2026-10-13-next-implementation.md)
+for scope, code entry points, regression requirements and acceptance criteria.
+The user has explicitly deprioritized durability. The recommended next increment
+is terrain-aware radio delivery, followed by goal-directed Red AI and logistics.
+White Cell core team/referee play is implemented; remaining referee interventions
+are specified in section 5.
+Defer the proposed durable serialization optimization and benchmark matrix;
+durable 60 Hz and exact crash replay are not prerequisites for feature development.
+Existing optional save/recovery support remains available. If persistence needs
+further work, prefer a simpler periodic/explicit save-and-resume design, with its
+save cadence and recovery window defined when scoped. Live authority, role
+isolation and command correctness remain gameplay requirements.
+
+This priority correction supersedes the next-step ordering and durable-performance
+prerequisites in older checkpoints below. Those checkpoints retain historical
+measurements; runtime persistence behavior has not changed. This is a proposal,
+not a completed implementation or a new performance result.
+
 ## Committed-frame performance baseline — 2026-10-12
 
 Measurement version 4 records actual per-game frame/time deltas only after a
@@ -314,11 +358,12 @@ The game is low fidelity in presentation and computational detail, but not in ca
 3. A national-command player issues an order through a modeled authority and communications chain.
 4. An operational or tactical player receives, acknowledges, delegates, rejects, or executes an order according to authority and capability.
 5. A unit operator controls an assigned unit but sees only local observations plus reports delivered over functioning communications.
-6. An observer or game controller can inspect ground truth only when the scenario grants that privilege.
+6. A granted White Cell referee can inspect the complete exercise across all sides, compare truth with each role's knowledge, and coordinate adjudication with other White Cell members. Ordinary observers retain their explicitly granted scope.
 
 ### Release boundaries
 
 - **Blue:** every system in this document is implemented and usable: multi-echelon authority, communications, uncertain tracks, all six domains, logistics, movement, weapons, electronic warfare, cyber effects, orbital motion, airports, terrain-aware line of sight, and role-scoped multiplayer.
+- **White Cell:** one or more human referees have an explicitly granted omniscient exercise view and shared adjudication workspace, separate from Blue/Red operational command.
 - **Red:** scenario-authored order of battle, the same platform/component model, the same sensing and communications constraints, and a basic goal-oriented AI. Red does not need a human-facing command workflow, sophisticated doctrine learning, diplomacy, or deceptive natural-language behavior for the first release.
 - **Not a first-release goal:** classified accuracy, real-world operational planning, photorealistic rendering, a public scenario marketplace, mobile-native clients, or live military feeds beyond public orbital and geographic catalogs.
 
@@ -329,7 +374,7 @@ The game is low fidelity in presentation and computational detail, but not in ca
 - Rust 2021 workspace, with **standalone `bevy_ecs`** as the authoritative simulation kernel. Bevy ECS is explicitly usable without the Bevy renderer and provides typed components, resources, relationships, change detection, ordered schedules, and parallel system execution ([Bevy ECS documentation](https://docs.rs/bevy_ecs/latest/bevy_ecs/)). Pin an exact compatible crate version in `Cargo.lock` and upgrade deliberately.
 - `tokio` + `axum` for HTTP/WebSocket services; JSON for administration and MessagePack or Protobuf for high-rate state frames after measuring the JSON vertical slice.
 - PostgreSQL for users, games, role leases, scenario versions, command/event history, and snapshots. The ECS world is memory-resident while a game is active.
-- React + TypeScript + Vite + CesiumJS for the browser client. The client renders role-visible projections and never receives hidden ground truth.
+- React + TypeScript + Vite + CesiumJS for the browser client. Operational clients render role-visible projections without hidden ground truth; explicitly authorized White Cell clients receive separate omniscient projections.
 - Docker Compose for PostgreSQL, API/simulation server, data importer, and web client.
 - One simulation process may host multiple small games initially. Define a `GameRuntime` boundary so games can later be assigned one-per-process without changing protocols.
 
@@ -481,6 +526,59 @@ Failures are observable at the appropriate echelon as rejected, pending confirma
 - Host powers are separate from in-world authority. Creating a game does not make the player President or grant truth view.
 - All command attempts, role changes, admin actions, and chat/report traffic are auditable.
 
+### White Cell: omniscient referee team
+
+White Cell core team play is implemented; the bullets below also describe planned
+follow-up interventions. White Cell is a neutral exercise-control team, with one or many
+concurrently seated human referees. It is not a combatant side or a single shared
+account. Build on the existing scenario-owned controller/monitor seats, explicit
+host grants and leases. Legacy observers see unit/weapon truth and network topology. White Cell extends
+this with privileged plan/message and role-knowledge inspection, team notes, and
+lifecycle/speed controls. Controller weather editing is an existing intervention.
+
+- **Omniscient observation:** inspect all sides' actual units, weapons, effects,
+  readiness/resources, environment, network state, orders, message contents and
+  lifecycle, and plans including unpublished or undelivered versions, wherever
+  those systems are modeled. Visibility does not depend on in-world sensors or
+  communications. Inspect each role's knowledge alongside truth to understand
+  what that player actually knew; inspection must never deliver that truth to the
+  player. Omniscience concerns game state, not account credentials or secrets.
+- **Team workflow:** allow multiple individually granted referee seats with a
+  shared roster, private notes and adjudication records. Attribute decisions to
+  the acting referee and show updates to the rest of White Cell. Use revision
+  checks for conflicting edits so simultaneous referees cannot silently overwrite
+  each other's rulings.
+- **Referee powers:** active White Cell members can start, pause, resume and
+  change shared gameplay speed, plus use existing controller weather edits.
+  Limited monitors retain read-only observation. Plan exercise injects and
+  adjudicated outcome adjustments for authorized referees; enumerate supported adjustments when
+  implementing them rather than offering unrestricted world editing. Record the
+  actor, simulation time, reason and affected state. Reuse existing controller
+  weather controls. Ordinary monitors remain read-only; hosting alone does not
+  confer White Cell access, and referees do not implicitly gain combatant roles.
+- **Player-facing rulings:** referee notes and deliberations remain private until
+  explicitly shared. A ruling or exercise inject identifies its intended audience
+  and whether it is an exercise announcement or an in-world report. In-world
+  reports obey the usual delivery rules; announcements do not silently update
+  player sensor knowledge or reveal unrelated hidden state.
+- **Dedicated workspace:** provide a clearly labelled White Cell map/inspector,
+  truth-versus-role-knowledge comparison, full exercise network/message/plan
+  inspection and shared adjudication panel. Revoke access across HTTP, streams
+  and open tabs when a grant or lease ends; clear privileged client state when
+  leaving the mode.
+
+Deliver team observation and shared referee notes first, then explicit referee
+interventions as a bounded follow-up. Use ordinary game saves for referee state;
+this feature does not require per-frame durability, exhaustive event sourcing or
+a new replay system.
+
+**Acceptance:** two White Cell players can concurrently inspect the same hidden
+unit and undelivered plan, compare two operational roles' different knowledge,
+and share a private adjudication note. Operational players receive none of that
+privileged content. Revoking one referee removes only that member's access,
+including paused sessions and active streams. Intervention tests verify explicit
+permission, conflict handling, attribution and audience-specific disclosure.
+
 ## 6. Red AI
 
 Red AI is intentionally basic but must play legally:
@@ -581,6 +679,8 @@ WebSocket client messages include `Resume`, `Intent`, `AcknowledgeFrame`, and `P
 - Track/report workspace for correlation, classification hypotheses, sharing, JTAC reports, and stale/lost contacts.
 - Communications/network view containing only nodes and links known to the role.
 - Notifications and event log filtered to the role; reconnect/resync, paused, loading, stale, denied, and disconnected states.
+- White Cell workspace for omniscient inspection, role-knowledge comparison,
+  team notes/adjudication and separately authorized referee controls.
 
 Use Cesium primitives/entities with batching and level-of-detail clustering; do not create a React component per simulated object. Keep NATO-style symbology or any third-party icon set behind a license-reviewed adapter.
 
@@ -615,6 +715,8 @@ Use Cesium primitives/entities with batching and level-of-detail clustering; do 
 - Terrain/Earth LOS, visual/radar/SIGINT measurements, uncertain track fusion and aging.
 - Multi-hop store-and-forward networks, link budgets at the selected abstraction, queues, jamming, crypto/interoperability, SATCOM geometry, JTAC report flow.
 - Complete authority graph, delegation, rules of engagement, confirmations, failure states, and audit.
+- White Cell team observation and shared adjudication, extending existing observer
+  seats; explicit referee interventions follow the bounded scope in section 5.
 
 **Exit:** scenario tests demonstrate local detection without headquarters knowledge, delayed relayed track delivery, SIGINT uncertainty reduction by triangulation, jammed satellite downlink, unauthorized order rejection, and restored communication without retroactive omniscience.
 
@@ -656,6 +758,8 @@ Use Cesium primitives/entities with batching and level-of-detail clustering; do 
 - `jtac_report_reaches_aircraft_through_valid_chain`
 - `rejects_order_outside_delegated_authority`
 - `late_join_receives_role_knowledge_not_ground_truth`
+- `white_cell_team_inspects_truth_without_sharing_it_with_operational_roles`
+- `revoking_one_white_cell_member_preserves_other_referee_access`
 - `red_ai_cannot_react_to_undetected_blue_unit`
 - `satellite_collection_waits_for_swath_and_downlink`
 - `aircraft_cannot_launch_from_short_or_damaged_runway`

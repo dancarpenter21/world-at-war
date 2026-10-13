@@ -9,7 +9,7 @@ import type { ObserverRole, TruthProjection } from "./observerTypes";
 import { updateTruthEntities } from "./truthEntities";
 import { attachMapKeyboardControls } from "./mapKeyboardControls";
 
-export function ObserverWorkspace({ apiBase, gameId, running, role, onAccessEnded, onStatus }: { apiBase: string; gameId: string; running: boolean; role: ObserverRole; onAccessEnded: () => void; onStatus: (status: PollingStatus, tick: number | null) => void }) {
+export function ObserverWorkspace({ apiBase, gameId, running, role, onAccessEnded, onStatus, renderingEnabled = true }: { apiBase: string; gameId: string; running: boolean; renderingEnabled?: boolean; role: ObserverRole; onAccessEnded: () => void; onStatus: (status: PollingStatus, tick: number | null) => void }) {
   const truth = usePollingResource<TruthProjection>(`${gameId}:${role.id}:${role.lease_generation}`, signal => apiRequest(apiBase,
     `/v1/games/${gameId}/truth?${new URLSearchParams({ role_id: role.id, lease_generation: String(role.lease_generation) })}`, { signal }));
   const statusCallback = useRef(onStatus); statusCallback.current = onStatus;
@@ -26,7 +26,7 @@ export function ObserverWorkspace({ apiBase, gameId, running, role, onAccessEnde
   const names = new Map(truth.data?.units.map(u => [u.id, u.name]));
   truth.data?.weapons.forEach(w => names.set(w.id, `Weapon ${w.id.slice(-6)}`));
   return <section className="truth-workspace" aria-label="Ground truth workspace">
-    <aside className="truth-inspector"><h1>Ground truth — read only</h1><p>{role.name} · tick {truth.data?.tick ?? "—"}</p>
+    <aside className="truth-inspector"><h1>{role.observer_kind === "white_cell" ? "White Cell ground truth" : "Ground truth — read only"}</h1><p>{role.name} · tick {truth.data?.tick ?? "—"}</p>
       <p role="status">{truth.status === "live" ? "Current simulation state" : truth.status === "reconnecting" ? "Connection interrupted — last received state" : "Connecting…"}</p>
       {truth.error && <p role="alert">{truth.error.message}</p>}
       <label className="toggle"><input type="checkbox" checked={network} onChange={e => setNetwork(e.target.checked)} /> Show network links</label>
@@ -44,10 +44,10 @@ export function ObserverWorkspace({ apiBase, gameId, running, role, onAccessEnde
         {truth.data?.communication_links.map(l => <tr key={l.id}><td>{names.get(l.from_entity_id) ?? l.from_entity_id} → {names.get(l.to_entity_id) ?? l.to_entity_id}</td><td>{l.available ? "Available" : "Unavailable"}{l.jammed > 0 ? " · jammed" : ""}</td><td>{l.queued_packets} packets / {l.queued_bytes} B</td></tr>)}
       </tbody></table></div>
     </aside>
-    {truth.data && <TruthMap animateMotion={running && truth.status === "live"} truth={truth.data} network={network} onSelect={setSelected} weatherPreview={weatherPreview} />}
+    {truth.data && <TruthMap renderingEnabled={renderingEnabled} animateMotion={running && truth.status === "live"} truth={truth.data} network={network} onSelect={setSelected} weatherPreview={weatherPreview} />}
   </section>;
 }
-function TruthMap({ truth, network, onSelect, weatherPreview, animateMotion }: { animateMotion: boolean; truth: TruthProjection; network: boolean; onSelect: (id: string) => void; weatherPreview: WeatherRegion[] }) {
+function TruthMap({ truth, network, onSelect, weatherPreview, animateMotion, renderingEnabled }: { animateMotion: boolean; renderingEnabled: boolean; truth: TruthProjection; network: boolean; onSelect: (id: string) => void; weatherPreview: WeatherRegion[] }) {
   const host = useRef<HTMLDivElement>(null), viewer = useRef<Viewer | null>(null);
   const smoothing = useRef(new SmoothPositions());
   const selection = useRef(onSelect); selection.current = onSelect;
@@ -67,6 +67,11 @@ function TruthMap({ truth, network, onSelect, weatherPreview, animateMotion }: {
     viewer.current = map;
     return () => { stopMotion(); stop(); controls.destroy(); viewer.current = null; map.destroy(); };
   }, []);
+  useEffect(() => {
+    if (!viewer.current) return;
+    viewer.current.useDefaultRenderLoop = renderingEnabled;
+    if (renderingEnabled) viewer.current.scene.requestRender();
+  }, [renderingEnabled]);
   useEffect(() => {
     if (!viewer.current) return;
     smoothing.current.setRunning(animateMotion);

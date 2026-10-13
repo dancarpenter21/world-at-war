@@ -12,7 +12,7 @@ export function WeatherEditor({ apiBase, gameId, role, onPreview }: { apiBase: s
   const dirty = useRef(false);
   useEffect(() => { if (resource.data && !dirty.current) { const current = resource.data.pending ?? resource.data; setBaseline(current.baseline); setRegions(JSON.stringify(current.regions, null, 2)); setRevision(resource.data.revision); } }, [resource.data]);
   if (!baseline) return <section aria-label="Weather controls"><h2>Weather</h2><p>{resource.error?.message ?? "Loading conditions…"}</p></section>;
-  const controller = role.observer_kind === "controller";
+  const controller = role.observer_kind === "controller" || role.observer_kind === "white_cell";
   function preview() { try { const parsed = JSON.parse(regions) as WeatherRegion[]; if (!Array.isArray(parsed)) throw new Error("Regions must be an array"); onPreview(parsed); setFeedback(`Previewing ${parsed.length} weather regions; changes are not applied.`); return parsed; } catch (error) { setFeedback(String(error)); return null; } }
   async function apply() {
     const parsed = preview(); if (!parsed || !controller || pending) return;

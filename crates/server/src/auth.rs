@@ -654,6 +654,7 @@ pub(super) async fn login(
 #[cfg(test)]
 mod tests {
     include!("observer_auth_tests.rs");
+    include!("team_auth_tests.rs");
     include!("persistence_tests.rs");
     include!("audit_auth_tests.rs");
     include!("sensing_auth_tests.rs");

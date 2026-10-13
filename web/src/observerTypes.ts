@@ -1,6 +1,6 @@
 import type { CommunicationLink, Position, Unit } from "./globeEntities";
 export type ObserverRole = {
-  id: string; name: string; kind: "controller" | "monitor"; observer_kind: "controller" | "monitor";
+  id: string; name: string; kind: "controller" | "monitor" | "white_cell"; observer_kind: "controller" | "monitor" | "white_cell";
   held: boolean; held_by_you: boolean; claimable: boolean; ai_controlled: false;
   lease_generation: number; lease_state?: "active" | "reserved" | "available";
 };

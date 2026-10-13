@@ -12,6 +12,16 @@ The scenarios include **Regional Joint Campaign** (offline collaborative plans, 
 
 The broader target architecture, planned simulation fidelity, and acceptance criteria are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Features described there are not necessarily implemented yet.
 
+## White Cell teams
+
+Create a game with **Join as → White Cell** to host as an exercise referee.
+Players can join Blue or human Red, or request White Cell admission in a lobby,
+running or paused game. The host or a connected referee approves through
+**Team & players**. White Cell shares omniscient inspection and private notes;
+every active referee can start/pause/resume and change the shared gameplay speed.
+Regional Joint Campaign and Global Crisis support human or AI Red at creation.
+See [joining, permissions, controls and API](docs/WHITE_CELL_IMPLEMENTATION.md).
+
 ## What is implemented
 
 - Delivery-gated execution acknowledgements for player orders, with four paced reply attempts, separate execution/receipt ticks, and an explicit unconfirmed outcome when replies do not arrive.
@@ -38,7 +48,7 @@ The broader target architecture, planned simulation fidelity, and acceptance cri
 - Bounded role-authorized runtime diagnostics for committed frame rate, requested/achieved game speed, frame intervals, processing/projection costs, state-request freshness, map processing and visible queues; an offline release benchmark with repeat and baseline projection-hash checks, plus [authenticated full-server load and soak tooling](docs/performance/LOAD_TESTING.md).
 - Earth-horizon sensing, scan intervals and field of regard, aging tracks, and campaign-specific delayed friendly-position/contact reports. Training exercises retain their authored friendly-unit overview and explicit sensor-report subscriptions.
 
-Current limitations: full controller inspection of messages/plans, simulation intervention, raw packet-payload export, and an interactive historical replay/export UI remain planned. The durable communications metadata audit covers C2, internal reports, fragments, acknowledgements and IFTU traffic; its API exposes terminal-local observations. Archive retention is opt-in. See [audit coverage and retention](docs/COMMUNICATIONS_AUDIT.md). The [audit write-path measurements](docs/performance/2026-10-11-audit-write-results.md) record lower regional durable p95 and storage growth; intermittent final-flush stalls keep maximum-cycle acceptance open. Sensor, airspace and combat behavior uses simplified training estimates: airspaces use shared spherical geometry and explicit MSL bounds, while the Cesium altitude rendering remains approximate; unapproved entry is reported as a violation. Regional terrain sensing is available after setup; logistics, cyber, remaining multi-domain platforms and multi-source catalogs remain planned work. The [current committed-frame baseline](docs/performance/2026-10-12-frame-results.md) records 24 valid short runs and identifies encoding, checkpoint/mutation work and shared-gate delays as follow-up priorities. Durable profiles remain below the 60 Hz target, and regional/mixed reconnects miss the three-second budget. Browser rendering, roadmap-scale loads, real-terrain reference and long-soak acceptance remain open. See [performance measurements and reproduction commands](docs/performance/README.md).
+Current limitations: new referee exercise injects and outcome overrides, raw packet-payload export, and an interactive historical replay/export UI remain planned. The durable communications metadata audit covers C2, internal reports, fragments, acknowledgements and IFTU traffic; its API exposes terminal-local observations. Archive retention is opt-in. See [audit coverage and retention](docs/COMMUNICATIONS_AUDIT.md). The [audit write-path measurements](docs/performance/2026-10-11-audit-write-results.md) record lower regional durable p95 and storage growth; intermittent final-flush stalls keep maximum-cycle acceptance open. Sensor, airspace and combat behavior uses simplified training estimates: airspaces use shared spherical geometry and explicit MSL bounds, while the Cesium altitude rendering remains approximate; unapproved entry is reported as a violation. Regional terrain sensing is available after setup; logistics, cyber, remaining multi-domain platforms and multi-source catalogs remain planned work. The [current committed-frame baseline](docs/performance/2026-10-12-frame-results.md) records 24 valid short runs and identifies encoding, checkpoint/mutation work and shared-gate delays as follow-up priorities. Durable profiles remain below the 60 Hz target, and regional/mixed reconnects miss the three-second budget. Browser rendering, roadmap-scale loads, real-terrain reference and long-soak acceptance remain open. See [performance measurements and reproduction commands](docs/performance/README.md).
 
 [Verified gameplay screenshots](docs/gameplay-checkpoints.md) show firing authorization, mission completion, delivered sensor knowledge, executed movement, network inspection, and map loading.
 

@@ -897,6 +897,14 @@ pub(super) fn process_deliveries(game: &mut Game) {
     }
 }
 
+/// Exercise-only plan inspection; never use for operational projections.
+pub(super) fn white_cell_view(game: &Game) -> serde_json::Value {
+    serde_json::json!({ "template": game.planning.template, "drafts": game.planning.drafts,
+        "published": game.planning.published, "received": game.planning.received,
+        "reports": game.planning.reports, "clearances": game.planning.clearances,
+        "handoffs": game.planning.handoffs, "proposals": game.planning.proposals })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

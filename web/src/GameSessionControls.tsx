@@ -3,6 +3,7 @@ import type { PollingStatus } from "./usePollingResource";
 
 export type Game = {
   id: string; title: string; status: "lobby" | "running" | "paused";
+  control_revision?: number; blue_roles_available?: number; red_roles_available?: number; red_control?: "human" | "ai" | null;
   host_player_id: string; player_roles_available: number; space_catalog_enabled: boolean;
   operational_error?: string | null;
   mission_complete?: boolean;
@@ -11,8 +12,8 @@ export type Game = {
   time_scale?: number; simulation_tick_hz?: number; frame?: number; tick?: number; radio_tick?: number; elapsed_seconds?: number;
 };
 
-export function GameSessionControls({ game, isHost, pending, onControl, onTimeScale }: {
-  game: Game; isHost: boolean; pending: "running" | "paused" | "speed" | null;
+export function GameSessionControls({ game, canControl, pending, onControl, onTimeScale }: {
+  game: Game; canControl: boolean; pending: "running" | "paused" | "speed" | null;
   onControl: (status: "running" | "paused") => void;
   onTimeScale: (scale: number) => void;
 }) {
@@ -21,8 +22,8 @@ export function GameSessionControls({ game, isHost, pending, onControl, onTimeSc
     <span className={"game-state " + game.status}>{game.settling_reports ? "Radio reporting" : game.status === "paused" ? "Paused" : "Running"}</span>
     <span className="simulation-time">Tick {game.tick ?? 0}{game.settling_reports ? ` · radio ${game.radio_tick ?? game.tick ?? 0}` : ""} · {formatElapsed(game.elapsed_seconds ?? 0)}</span>
     <span className="clock-rate" title="Simulation frame rate; speed scales game time per frame">{game.simulation_tick_hz ?? 60} Hz</span>
-    {isHost ? <label className="time-scale">Speed <select aria-label="Simulation speed" value={game.time_scale ?? 1} disabled={pending !== null} onChange={event => onTimeScale(Number(event.target.value))}>{[0.25, 1, 2, 5, 10, 30, 60].map(scale => <option key={scale} value={scale}>{scale}×</option>)}</select></label> : <span aria-label="Simulation speed">{game.time_scale ?? 1}×</span>}
-    {isHost && <button className="secondary" disabled={pending !== null || (game.mission_complete && !game.reporting_pending)} title={game.mission_complete && !game.reporting_pending ? "This exercise has ended. Create a new game to retry." : undefined} aria-busy={pending !== null}
+    {canControl ? <label className="time-scale">Speed <select aria-label="Simulation speed" value={game.time_scale ?? 1} disabled={pending !== null} onChange={event => onTimeScale(Number(event.target.value))}>{[0.25, 1, 2, 5, 10, 30, 60].map(scale => <option key={scale} value={scale}>{scale}×</option>)}</select></label> : <span aria-label="Simulation speed">{game.time_scale ?? 1}×</span>}
+    {canControl && <button className="secondary" disabled={pending !== null || (game.mission_complete && !game.reporting_pending)} title={game.mission_complete && !game.reporting_pending ? "This exercise has ended. Create a new game to retry." : undefined} aria-busy={pending !== null}
       onClick={() => onControl(game.status === "running" ? "paused" : "running")}>
       {pending === "paused" ? "Pausing…" : pending === "running" ? "Resuming…" : game.status === "running" ? "Pause scenario" : "Resume scenario"}
     </button>}

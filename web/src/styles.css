@@ -358,3 +358,30 @@ select, textarea { width: 100%; padding: 9px; color: #eef7fa; background: #0e171
 .weather-editor input, .weather-editor textarea { max-width: 100%; box-sizing: border-box; }
 .weather-editor textarea { width: 100%; }
 .weather-editor button { margin: 4px; }
+
+.team-panel { padding: 1rem; border: 1px solid #39515e; border-radius: .5rem; background: #14242e; }
+.team-panel-heading, .team-request { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; justify-content: space-between; }
+.team-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; }
+.team-card { display: flex; flex-direction: column; gap: .5rem; padding: 1rem; border: 1px solid #48606d; border-radius: .4rem; background: #20343e; color: #ecf0ed; text-align: left; }
+.team-card.selected { border-color: #e7c66c; }
+.team-card:disabled { opacity: .65; }
+.team-panel li { margin-bottom: .6rem; }
+.team-badge { color: #e7c66c; font-weight: 600; }
+.white-cell-workspace { width: 100%; min-height: calc(100vh - 70px); }
+.white-cell-heading { padding: .75rem 1rem; background: #182933; }
+.white-cell-heading h1, .white-cell-heading p { margin: .4rem 0; }
+.white-cell-content { width: 100%; max-width: 1100px; margin: 0 auto; padding: 1rem; flex: 1; min-height: 0; overflow: auto; }
+.white-cell-inspector { margin: 1rem 0; border: 1px solid #3a5260; border-radius: .4rem; padding: .75rem; }
+.white-cell-inspector pre { overflow: auto; max-height: 55vh; white-space: pre-wrap; overflow-wrap: anywhere; }
+.white-cell-content textarea { min-height: 120px; width: 100%; }
+.referee-notes p { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .team-cards { grid-template-columns: 1fr; } .team-panel { padding: .75rem; } }
+.white-cell-workspace { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
+.white-cell-map { flex: 1; min-height: 300px; }
+.white-cell-map .truth-workspace { height: 100%; min-height: 0; }
+.white-cell-inspector { overflow-wrap: anywhere; }
+.white-cell-inspector dl > div { margin: .5rem 0; }
+.white-cell-inspector dt { color: #d2bd80; font-weight: 600; }
+.white-cell-inspector dd { margin-left: 1rem; }
+.team-dialog { position: fixed; inset: 0; z-index: 100; background: #060e18cc; }
+.team-dialog .scenario-modal { max-height: calc(100dvh - 56px); }

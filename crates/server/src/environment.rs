@@ -25,7 +25,10 @@ fn controller(
     generation: u64,
 ) -> Result<(), (StatusCode, Json<ErrorResponse>)> {
     observers::validate(game, role, player, generation)?;
-    if game.observers[&role].definition.kind != sim_scenario::ObserverKind::Controller {
+    if !matches!(
+        game.observers[&role].definition.kind,
+        sim_scenario::ObserverKind::Controller | sim_scenario::ObserverKind::WhiteCell
+    ) {
         return Err(api_error(
             StatusCode::FORBIDDEN,
             "controller_required",

@@ -17,6 +17,7 @@ import { GameSessionControls, GameSessionNotice, type Game } from "./GameSession
 
 import type { ObserverRole } from "./observerTypes";
 import { ObserverGrants } from "./ObserverGrants";
+import { TeamPanel, teamName, type Team, type TeamView } from "./TeamPanel";
 import { AccountAccess } from "./AccountAccess";
 type Role = OperationalRole | ObserverRole;
 function isObserver(role: Role | null): role is ObserverRole { return role?.observer_kind !== undefined; }
@@ -34,11 +35,12 @@ const AuthorityWorkspace = lazy(() => import("./AuthorityWorkspace").then((modul
 const PlanningWorkspace = lazy(() => import("./PlanningWorkspace").then(module => ({ default: module.PlanningWorkspace })));
 const NetworkWorkspace = lazy(() => import("./NetworkWorkspace").then((module) => ({ default: module.NetworkWorkspace })));
 
+const WhiteCellWorkspace = lazy(() => import("./WhiteCellWorkspace").then(module => ({ default: module.WhiteCellWorkspace })));
 const ObserverWorkspace = lazy(() => import("./ObserverWorkspace").then(module => ({ default: module.ObserverWorkspace })));
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 const SAVED_PASSWORD_MASK = "••••••••••••";
-type Scenario = { id: string; title: string; description: string; version: number; authored_entity_count: number; role_count: number; requires_space_catalog: boolean; terrain_required?: boolean; terrain_ready?: boolean; terrain_setup?: string };
+type Scenario = { id: string; title: string; description: string; version: number; authored_entity_count: number; role_count: number; requires_space_catalog: boolean; terrain_required?: boolean; terrain_ready?: boolean; terrain_setup?: string; human_red_supported?: boolean };
 type SpaceStatus = { setup_auth_required: boolean; remembered_credentials: boolean; remembered_username?: string; configured: boolean; syncing: boolean; usable: boolean; stale: boolean; using_cached_fallback: boolean; synced_unix?: number; age_seconds?: number; next_sync_unix?: number; object_count: number; checksum?: string; error?: string };
 type SpaceTrackFeedback = { kind: "success" | "warning" | "error"; title: string; detail: string };
 
@@ -98,6 +100,10 @@ function App() {
   const [games, setGames] = useState<Game[]>([]);
   const [spaceStatus, setSpaceStatus] = useState<SpaceStatus | null>(null);
   const [game, setGame] = useState<Game | null>(null);
+  const [creatorTeam, setCreatorTeam] = useState<Team>("blue");
+  const [redControl, setRedControl] = useState<"human" | "ai" | "scenario">("scenario");
+  const [showTeams, setShowTeams] = useState(false);
+  const autoWhiteSeat = useRef("");
   const [roles, setRoles] = useState<Role[]>([]);
   const [role, setRole] = useState<Role | null>(null);
   const [pendingControl, setPendingControl] = useState<"running" | "paused" | "speed" | null>(null);
@@ -138,7 +144,8 @@ function App() {
   const sessionRestoreAttempted = useRef(false);
   const [playerId, setPlayerId] = useState("");
   if (game && role) rememberLease(game.id, role.id, role.lease_generation);
-  const playable = (game?.status === "running" || game?.status === "paused") && role !== null;
+  const whiteCell = isObserver(role) && role.observer_kind === "white_cell";
+  const playable = ((game?.status === "running" || game?.status === "paused") && role !== null) || (Boolean(game) && whiteCell);
   const refreshWaitSeconds = Math.max(0, (spaceStatus?.next_sync_unix ?? 0) - nowUnix);
   const catalogRefreshBlocked = refreshWaitSeconds > 0;
   const selectedScenario = scenarios.find((scenario) => scenario.id === selectedScenarioId) ?? scenarios[0];
@@ -154,6 +161,24 @@ function App() {
   }, 2_000);
   const roleResource = usePollingResource<Role[]>(game ? game.id + ":" + (role?.id ?? "") + ":" + (role?.lease_generation ?? "") : null,
     (signal) => request<Role[]>("/v1/games/" + game!.id + "/roles?" + new URLSearchParams({ player_id: playerId }), { signal }), 2_000);
+  const teamResource = usePollingResource<TeamView>(game?.control_revision !== undefined ? game.id + ":" + playerId : null,
+    signal => request<TeamView>(`/v1/games/${game!.id}/teams`, { signal }), 2000);
+  const teamView = teamResource.data;
+  const canControl = game?.host_player_id === playerId || Boolean(teamView?.can_control);
+  function refreshTeams() { teamResource.refresh(); roleResource.refresh(); gameResource.refresh(); }
+  useEffect(() => {
+    if (!teamView || !game) return;
+    if (role && ((isObserver(role) && role.observer_kind === "white_cell" && teamView.team !== "white_cell") ||
+      (!isObserver(role) && teamView.team && role.side.toLowerCase() !== teamView.team))) {
+      setRole(null); setShowAuthority(false); setShowNetwork(false); setShowPlanning(false); setAuthorityRequests([]);
+    }
+    if (teamView.team !== "white_cell") { autoWhiteSeat.current = ""; return; }
+    const seat = roles.find(r => r.id === teamView.referee_seat_id);
+    const key = `${game.id}:${seat?.id}`;
+    if (!role && seat && seat.claimable !== false && autoWhiteSeat.current !== key) {
+      autoWhiteSeat.current = key; void claim(seat);
+    }
+  }, [teamView, game?.id, roles, role?.id]);
   const authorityResource = usePollingResource<{ definition: AuthorityDefinition; requests: AuthorityRequest[] }>(
     game && !isObserver(role) && (role || game.host_player_id === playerId) ? game.id + ":" + playerId + ":" + (role?.id ?? "") + ":" + (role?.lease_generation ?? "") : null,
     async (signal) => {
@@ -423,7 +448,7 @@ function App() {
   async function createGame() {
     const scenario = selectedScenario; if (!scenario) return;
     try {
-      const created = await request<{ game: Game }>("/v1/games", { method: "POST", body: JSON.stringify({ scenario_id: scenario.id, title: gameTitle, host_player_id: playerId }) });
+      const created = await request<{ game: Game }>("/v1/games", { method: "POST", body: JSON.stringify({ scenario_id: scenario.id, title: gameTitle, host_player_id: playerId, creator_team: creatorTeam, ...(selectedScenario?.human_red_supported && redControl !== "scenario" ? { red_control: redControl } : {}) }) });
       setGame(created.game); setRoles(await request<Role[]>(`/v1/games/${created.game.id}/roles?${new URLSearchParams({ player_id: playerId })}`)); setMessage("Claim a role, then start the scenario.");
     } catch (error) { setMessage((error as Error).message); }
   }
@@ -442,26 +467,26 @@ function App() {
       if (activeGameId.current !== game.id) return;
       rememberLease(game.id, claimed.id, claimed.lease_generation);
       setRole(claimed); setRoles((items) => items.map((item) => item.id === claimed.id ? claimed : item));
-      setAuthorityRequests([]); setMessage(`${claimed.name} claimed.`);
+      setAuthorityRequests([]); teamResource.refresh(); setMessage(`${claimed.name} claimed.`);
     } catch (error) { setMessage((error as Error).message); }
   }
 
   async function controlGame(status: "running" | "paused" | "speed", scale?: number) {
-    if (!game || game.host_player_id !== playerId || controlPending.current) return;
+    if (!game || !canControl || controlPending.current) return;
     const controller = new AbortController();
     controlRequest.current = controller; controlPending.current = true;
     setPendingControl(status); setControlError("");
     try {
       const updated = await request<Game>("/v1/games/" + game.id + (status === "speed" ? "/time-scale" : status === "running" ? "/start" : "/pause"), {
-        method: status === "speed" ? "PUT" : "POST", body: JSON.stringify(status === "speed" ? { time_scale: scale } : { player_id: playerId }), signal: controller.signal
+        method: status === "speed" ? "PUT" : "POST", body: JSON.stringify(status === "speed" ? { time_scale: scale, expected_control_revision: game.control_revision } : { player_id: playerId, expected_control_revision: game.control_revision }), signal: controller.signal
       });
       if (controller.signal.aborted || activeGameId.current !== game.id) return;
-      setGame(updated); gameResource.refresh();
+      setGame(updated); gameResource.refresh(); teamResource.refresh();
       setMessage(status === "speed" ? `Simulation speed set to ${scale}×.` : status === "paused" ? "Scenario paused." : "Scenario running.");
     } catch (cause) {
       if (controller.signal.aborted || activeGameId.current !== game.id) return;
       const detail = cause instanceof Error ? cause.message : String(cause);
-      setControlError(detail); setMessage(detail);
+      setControlError(detail); setMessage(detail); gameResource.refresh(); teamResource.refresh();
     } finally {
       if (controlRequest.current === controller) { controlPending.current = false; setPendingControl(null); }
     }
@@ -499,6 +524,7 @@ function App() {
   }
 
   function leave() {
+    setShowTeams(false); autoWhiteSeat.current = "";
     setShowObserverGrants(false); setShowPlanning(false); setShowDiagnostics(false);
     activeGameId.current = null; controlRequest.current?.abort(); controlPending.current = false;
     setGame(null); setRole(null); setRoles([]); setAuthority(null); setAuthorityRequests([]);
@@ -509,10 +535,11 @@ function App() {
   return <main className="app-shell">
     <header className="app-header"><span className="brand">WORLD AT WAR</span>
       <span className={"status-dot " + (playable ? connectionStatus : "")} />
-      {game && game.status !== "lobby" ? <GameSessionControls game={game} isHost={game.host_player_id === playerId} pending={pendingControl} onControl={(status) => void controlGame(status)} onTimeScale={scale => void controlGame("speed", scale)} /> : <span>{game?.status ?? "scenario lobby"}</span>}
+      {game && game.status !== "lobby" ? <GameSessionControls game={game} canControl={canControl} pending={pendingControl} onControl={(status) => void controlGame(status)} onTimeScale={scale => void controlGame("speed", scale)} /> : <span>{game?.status ?? "scenario lobby"}</span>}
       <span className="tick">{isObserver(role) ? currentObserverStatus?.tick != null ? `TICK ${currentObserverStatus.tick}` : "" : projection ? `TICK ${projection.tick}` : ""}</span>
       {playable && !isObserver(role) && <button className="secondary mobile-command-toggle" aria-expanded={showCommands} aria-controls="command-panel" onClick={() => setShowCommands((value) => !value)}>Commands</button>}
       {game && game.host_player_id === playerId && roles.some(isObserver) && <button className="secondary" onClick={() => setShowObserverGrants(true)}>Observer access</button>}
+      {game && game.control_revision !== undefined && <><span className="team-badge">{teamName(teamView?.team)}</span><button className="secondary" onClick={() => setShowTeams(true)}>Team & players{teamView?.can_manage && teamView.requests.some(r => r.status === "pending") ? " · requests" : ""}</button></>}
       {role && <button className="secondary" onClick={() => void releaseRole()}>Release role</button>}
       {!game && <AccountAccess apiBase={API_BASE} playerId={playerId} onSignOut={endGuest} onAuthenticated={session => {
         leave(); setPlayerId(session.player_id); setDisplayName(session.display_name);
@@ -532,13 +559,15 @@ function App() {
         </div>
         {mode === "new" && <div className="modal-body scenario-setup">
           <h2>Scenario</h2>
-          {scenarios.map((scenario) => <button type="button" className={`scenario-choice ${selectedScenario?.id === scenario.id ? "selected" : ""}`} key={scenario.id} onClick={() => { setSelectedScenarioId(scenario.id); setGameTitle(scenario.title); }}><strong>{scenario.title}</strong><p>{scenario.description}</p><small>{scenario.authored_entity_count} authored entities · {scenario.role_count} roles · {scenario.requires_space_catalog ? "full public space catalog" : "no orbital catalog required"}</small></button>)}
+          <label>Join as<select aria-label="Join as" value={creatorTeam} onChange={e => setCreatorTeam(e.target.value as Team)}><option value="blue">Blue</option><option value="red" disabled={!selectedScenario?.human_red_supported || redControl !== "human"}>Red</option><option value="white_cell">White Cell</option></select></label>
+          <label>Red control<select aria-label="Red control" value={selectedScenario?.human_red_supported ? redControl : "scenario"} onChange={e => { setRedControl(e.target.value as typeof redControl); if (e.target.value !== "human" && creatorTeam === "red") setCreatorTeam("blue"); }} disabled={!selectedScenario?.human_red_supported}><option value="scenario">Scenario default</option><option value="ai">AI</option><option value="human">Human</option></select></label>
+          {scenarios.map((scenario) => <button type="button" className={`scenario-choice ${selectedScenario?.id === scenario.id ? "selected" : ""}`} key={scenario.id} onClick={() => { setSelectedScenarioId(scenario.id); setGameTitle(scenario.title); if (!scenario.human_red_supported && creatorTeam === "red") setCreatorTeam("blue"); }}><strong>{scenario.title}</strong><p>{scenario.description}</p><small>{scenario.authored_entity_count} authored entities · {scenario.role_count} roles · {scenario.requires_space_catalog ? "full public space catalog" : "no orbital catalog required"}</small></button>)}
           <label>Game title<input value={gameTitle} onChange={(event) => setGameTitle(event.target.value)} /></label>
           <button className="command" disabled={!selectedScenario || (selectedScenario.requires_space_catalog && !spaceStatus?.usable) || (selectedScenario.terrain_required && !selectedScenario.terrain_ready)} onClick={() => void createGame()}>Create game</button>
           {selectedScenario?.terrain_required && !selectedScenario.terrain_ready && <p role="status">Regional terrain setup required. {selectedScenario.terrain_setup}</p>}
           {selectedScenario?.requires_space_catalog && !spaceStatus?.usable && <p className="catalog-required">A usable space catalog is required to create this scenario. <button className="text-command" onClick={() => setMode("space")}>Open Space Configuration</button></p>}
         </div>}
-        {mode === "join" && <div className="modal-body"><label>Display name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label><h2>Available games</h2><div className="game-list">{games.length ? games.map((item) => <button className="game-row" key={item.id} onClick={() => void selectGame(item)}><span>{item.title}</span><small>{item.status} · {item.player_roles_available} open roles</small></button>) : <p className="muted">No games have been created.</p>}</div></div>}
+        {mode === "join" && <div className="modal-body"><label>Display name<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></label><h2>Available games</h2><div className="game-list">{games.length ? games.map((item) => <button className="game-row" key={item.id} onClick={() => void selectGame(item)}><span>{item.title}</span><small>{item.status} · {item.blue_roles_available ?? item.player_roles_available} Blue / {item.red_roles_available ?? 0} Red roles · White Cell approval required</small></button>) : <p className="muted">No games have been created.</p>}</div></div>}
         {mode === "space" && <div className="modal-body space-configuration">
           <h2>Space-Track setup</h2>
           <p className="muted">Credentials are held in server memory. Remembering them stores encrypted data in an HttpOnly cookie.</p>
@@ -555,18 +584,19 @@ function App() {
           {spaceStatus?.remembered_credentials && <button className="text-command" onClick={() => void forgetSpaceTrack()}>Forget saved credentials</button>}
         </div>}
       </>}
-      {game && <div className="modal-body"><h2>{game.title}</h2><p className="muted">{game.status === "lobby" ? "Claim a command role. The operational map remains offline until the scenario starts." : game.status === "paused" ? "Choose your role to return to the operational map. The scenario remains paused." : "Choose your role to open its operational map."}</p><div className="role-grid">{roles.map((item) => <button key={item.id} className={`role ${role?.id === item.id ? "selected" : ""}`} disabled={item.ai_controlled || item.claimable === false || (item.held && !item.held_by_you && role?.id !== item.id)} onClick={() => void claim(item)}><span>{item.name}</span><small>{item.ai_controlled ? "AI" : item.claimable === false ? isObserver(item) ? "host grant required" : "unavailable" : item.held_by_you ? "your role" : item.held ? "held" : item.kind.replaceAll("_", " ")}</small></button>)}</div><div className="modal-actions"><button className="secondary" onClick={leave}>Back</button>{game.host_player_id === playerId && <button className="secondary" onClick={() => setShowAuthority(true)}>Configure authorities</button>}{game.host_player_id === playerId && <button className="command" disabled={!role || pendingControl !== null} aria-busy={pendingControl !== null} onClick={() => void start()}>{pendingControl ? "Starting…" : game.status === "paused" ? "Resume scenario" : "Start scenario"}</button>}{game.host_player_id !== playerId && <span className="muted">Waiting for host to start</span>}</div></div>}
+      {game && <div className="modal-body"><h2>{game.title}</h2><p className="muted">{game.status === "lobby" ? "Claim a command role. The operational map remains offline until the scenario starts." : game.status === "paused" ? "Choose your role to return to the operational map. The scenario remains paused." : "Choose your role to open its operational map."}</p>{game.control_revision !== undefined && <TeamPanel apiBase={API_BASE} gameId={game.id} playerId={playerId} hostId={game.host_player_id} view={teamView} onChanged={refreshTeams} onEnter={id => { const seat = roles.find(r => r.id === id); if (seat) void claim(seat); }} />}
+        <div className="role-grid">{roles.filter(item => isObserver(item) ? item.observer_kind !== "white_cell" || item.held_by_you || item.claimable : !teamView?.team || item.side.toLowerCase() === teamView.team).map((item) => <button key={item.id} className={`role ${role?.id === item.id ? "selected" : ""}`} disabled={item.ai_controlled || item.claimable === false || (item.held && !item.held_by_you && role?.id !== item.id)} onClick={() => void claim(item)}><span>{item.name}</span><small>{item.ai_controlled ? "AI" : item.claimable === false ? isObserver(item) ? "host grant required" : "unavailable" : item.held_by_you ? "your role" : item.held ? "held" : item.kind.replaceAll("_", " ")}</small></button>)}</div><div className="modal-actions"><button className="secondary" onClick={leave}>Back</button>{game.host_player_id === playerId && <button className="secondary" onClick={() => setShowAuthority(true)}>Configure authorities</button>}{canControl && <button className="command" disabled={!role || pendingControl !== null} aria-busy={pendingControl !== null} onClick={() => void start()}>{pendingControl ? "Starting…" : game.status === "paused" ? "Resume scenario" : "Start scenario"}</button>}{!canControl && <span className="muted">Waiting for host or White Cell to start</span>}</div></div>}
     </section></div>}
     {playable && !isObserver(role) && !projection && game && <section className="workspace-loading">
       <GameSessionNotice game={game} status={connectionStatus} error={connectionError} controlError={controlError} hasProjection={false} onRetry={retryConnection} />
     </section>}
-    {playable && !isObserver(role) && projection && <section className={`workspace ${showCommands ? "commands-open" : ""}`}>
+    {playable && game && role && !isObserver(role) && projection && <section className={`workspace ${showCommands ? "commands-open" : ""}`}>
       <aside id="command-panel" className={`sidebar ${showCommands ? "commands-open" : ""}`}><h1>{role.name}</h1><p className="message">{game.title}</p><RadarControls key={`radar:${game.id}:${role.id}:${role.lease_generation}`} apiBase={API_BASE} gameId={game.id} role={role} projection={projection} enabled={canIssueOrders} recoverable={connectionStatus === "live"} /><CombatOrders key={`combat:${game.id}:${role.id}:${role.lease_generation}`} apiBase={API_BASE} gameId={game.id} playerId={playerId} role={role} projection={projection} canIssueOrders={canIssueOrders} canRecoverOrder={connectionStatus === "live"} onExecuted={projectionResource.refresh} settlingReports={game.settling_reports} /><IftuPanel key={`iftu:${game.id}:${role.id}:${role.lease_generation}`} apiBase={API_BASE} gameId={game.id} playerId={playerId} role={role} projection={projection} canIssueOrders={canIssueOrders} /><MovementOrders key={`${game.id}:${role.id}:${role.lease_generation}`} apiBase={API_BASE} gameId={game.id} playerId={playerId} role={role} projection={projection} canIssueOrders={canIssueOrders} canRecoverOrder={connectionStatus === "live"} onExecuted={projectionResource.refresh} /><h2>Command</h2><button className="command" onClick={() => setShowAuthority(true)}>Authorities {authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length ? `(${authorityRequests.filter((item) => item.status.state === "pending_human" || item.status.state === "pending_external").length})` : ""}</button><button className="command network-launch" onClick={() => setShowNetwork(true)}>Network</button><button className="command map-filter-launch" onClick={() => setShowMapFilters((value) => !value)}>Map filters</button><button className="command" onClick={() => setShowDiagnostics(value => !value)}>Diagnostics</button><h2>Catalog</h2><p className="muted">{game.space_catalog_enabled ? spaceStatus ? `${spaceStatus.object_count.toLocaleString()} game-pinned public objects` : "Loading catalog status" : "No orbital catalog in this scenario"}</p><p className="session-command-feedback" role="status">{message}</p></aside>
       <section className="map-region">
         <button className="planning-launch" onClick={() => setShowPlanning(true)}>Joint planning</button>
         <GameSessionNotice game={game} status={connectionStatus} error={connectionError} controlError={controlError} hasProjection={true} onRetry={retryConnection} mission={projection?.combat?.mission} />
         <Suspense fallback={<div className="map-loading" role="status">Loading operational map…</div>}>
-        <Globe key={`${game.id}:${role.id}:${role.lease_generation}`} projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} onMapUpdate={recordMapUpdate} keyboardEnabled={!showAuthority && !showNetwork && !showMapFilters && !showPlanning && !showDiagnostics} renderingEnabled={!showAuthority && !showNetwork && !showPlanning} animateMotion={game.status === "running" && connectionStatus === "live"} />
+        <Globe key={`${game.id}:${role.id}:${role.lease_generation}`} projection={projection} filters={mapFilters} gameId={game.id} playerId={playerId} roleId={role.id} spaceCatalogEnabled={game.space_catalog_enabled} onMapUpdate={recordMapUpdate} keyboardEnabled={!showAuthority && !showNetwork && !showMapFilters && !showPlanning && !showDiagnostics && !showTeams} renderingEnabled={!showAuthority && !showNetwork && !showPlanning && !showTeams} animateMotion={game.status === "running" && connectionStatus === "live"} />
         </Suspense>
         {showMapFilters && <MapFilterDialog filters={mapFilters} spaceAssetsAvailable={game.space_catalog_enabled} onChange={setMapFilters} onClose={() => setShowMapFilters(false)} />}
         <div className="map-caption">{role.name} · {role.side} · operational picture</div>
@@ -577,8 +607,10 @@ function App() {
     {showDiagnostics && game && role && !isObserver(role) && <DiagnosticsPanel apiBase={API_BASE} gameId={game.id} playerId={playerId} roleId={role.id} client={clientDiagnostics} onClose={() => setShowDiagnostics(false)} />}
     {showPlanning && game && role && !isObserver(role) && <Suspense fallback={<div className="authority-loading">Loading joint planning…</div>}><PlanningWorkspace apiBase={API_BASE} gameId={game.id} playerId={playerId} role={role} roles={roles.filter((r): r is OperationalRole => !isObserver(r))} onClose={() => setShowPlanning(false)} /></Suspense>}
     {showNetwork && game && role && !isObserver(role) && <Suspense fallback={<div className="authority-loading">Loading C2 network…</div>}><NetworkWorkspace key={`${game.id}:${role.id}`} apiBase={API_BASE} gameId={game.id} playerId={playerId} roleId={role.id} initialFocusNodeId={role.location_unit_id} onClose={() => setShowNetwork(false)} /></Suspense>}
-    {playable && game && isObserver(role) && <Suspense fallback={<p>Loading ground truth…</p>}><ObserverWorkspace key={`${game.id}:${role.id}:${role.lease_generation}`} apiBase={API_BASE} gameId={game.id} running={game.status === "running"} role={role} onStatus={(status, tick) => setObserverStatus({ key: `${game.id}:${role.id}:${role.lease_generation}`, status, tick })} onAccessEnded={() => { setRole(null); setMessage("Observer access ended. Choose an available role."); }} /></Suspense>}
-    {showObserverGrants && game && game.host_player_id === playerId && <ObserverGrants key={game.id} apiBase={API_BASE} gameId={game.id} seats={roles.filter(isObserver)} onChanged={roleResource.refresh} onClose={() => setShowObserverGrants(false)} />}
+    {playable && game && whiteCell && isObserver(role) && <Suspense fallback={<p>Loading White Cell…</p>}><WhiteCellWorkspace controlError={controlError} renderingEnabled={!showTeams} key={`${game.id}:${role.id}:${role.lease_generation}`} apiBase={API_BASE} gameId={game.id} running={game.status === "running"} lobby={game.status === "lobby"} role={role} onStart={() => void start()} onStatus={(status, tick) => setObserverStatus({ key: `${game.id}:${role.id}:${role.lease_generation}`, status, tick })} onAccessEnded={() => { setRole(null); refreshTeams(); setMessage("White Cell access ended."); }} /></Suspense>}
+    {playable && game && isObserver(role) && !whiteCell && <Suspense fallback={<p>Loading ground truth…</p>}><ObserverWorkspace key={`${game.id}:${role.id}:${role.lease_generation}`} apiBase={API_BASE} gameId={game.id} renderingEnabled={!showTeams && !showObserverGrants} running={game.status === "running"} role={role} onStatus={(status, tick) => setObserverStatus({ key: `${game.id}:${role.id}:${role.lease_generation}`, status, tick })} onAccessEnded={() => { setRole(null); setMessage("Observer access ended. Choose an available role."); }} /></Suspense>}
+    {showTeams && game && <div className="lobby-stage team-dialog"><section className="scenario-modal" role="dialog" aria-modal="true" aria-label="Team management"><TeamPanel key={game.id} apiBase={API_BASE} gameId={game.id} playerId={playerId} hostId={game.host_player_id} view={teamView} onChanged={refreshTeams} onEnter={id => { const seat = roles.find(r => r.id === id); if (seat) void claim(seat); setShowTeams(false); }} onClose={() => setShowTeams(false)} /></section></div>}
+    {showObserverGrants && game && game.host_player_id === playerId && <ObserverGrants key={game.id} apiBase={API_BASE} gameId={game.id} seats={roles.filter(isObserver).filter(r => r.observer_kind !== "white_cell")} onChanged={roleResource.refresh} onClose={() => setShowObserverGrants(false)} />}
   </main>;
 }
 

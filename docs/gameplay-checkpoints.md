@@ -1,5 +1,21 @@
 # Verified gameplay checkpoints
 
+## White Cell team
+
+The real-server browser regressions create an exercise hosted by White Cell,
+join human Blue and Red commanders, approve another referee during play, change
+shared speed, pause, share a private note and restore the referee seat in another
+tab. Revocation removes that member's views and closes their truth stream while
+preserving the hosting referee's access. A separate flow covers joining a paused
+game, visible control-conflict feedback and an approved transfer to Blue.
+The regional fixture uses labelled synthetic terrain and offline imagery.
+
+![White Cell omniscient map and referee controls](screenshots/white-cell-truth.png)
+
+![Private shared referee notebook](screenshots/white-cell-notebook.png)
+
+![White Cell notebook and clock controls on a phone](screenshots/white-cell-phone.png)
+
 These screenshots come from the deterministic Playwright regressions. Training radio settings and target motion are authored scenario data; catalog-dependent tests use an isolated local provider fixture.
 
 ## Read-only observer truth

@@ -1,4 +1,4 @@
-//! Scenario-owned read-only seats. No observer belongs to the authority graph.
+//! Leased scenario observers and game-owned White Cell seats outside command authority.
 use super::*;
 use sim_scenario::{ObserverKind, ObserverSeatDefinition};
 
@@ -163,6 +163,17 @@ fn change_grant(
     player: Option<Uuid>,
     actor: Uuid,
 ) -> ApiResult<ObserverSummary> {
+    if game
+        .observers
+        .get(&id)
+        .is_some_and(|s| s.definition.kind == ObserverKind::WhiteCell)
+    {
+        return Err(api_error(
+            StatusCode::FORBIDDEN,
+            "team_access_required",
+            "Manage White Cell through team requests and membership",
+        ));
+    }
     let seat = game.observers.get_mut(&id).ok_or_else(|| {
         api_error(
             StatusCode::NOT_FOUND,
@@ -212,7 +223,9 @@ pub(super) fn validate(
     generation: u64,
 ) -> Result<(), (StatusCode, Json<ErrorResponse>)> {
     let valid = game.observers.get(&id).is_some_and(|seat| {
-        seat.granted_player == Some(player)
+        (seat.definition.kind != ObserverKind::WhiteCell
+            || teams::team(game, player) == Some(teams::Team::WhiteCell))
+            && seat.granted_player == Some(player)
             && seat.occupancy.owner == Some(player)
             && seat.occupancy.lease_generation == generation
             && leases::active(&seat.occupancy)

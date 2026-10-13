@@ -62,6 +62,7 @@ pub struct Scenario {
 pub enum ObserverKind {
     Controller,
     Monitor,
+    WhiteCell,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -34,6 +34,7 @@ impl Scheduler {
 #[derive(Deserialize)]
 pub(super) struct Request {
     pub time_scale: f64,
+    pub expected_control_revision: Option<u64>,
 }
 
 pub(super) async fn set_scale(
@@ -53,14 +54,13 @@ pub(super) async fn set_scale(
     let game = games
         .get_mut(&id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "game_not_found", "Game not found"))?;
-    if game.host != session.player_id {
-        return Err(api_error(
-            StatusCode::FORBIDDEN,
-            "host_required",
-            "Only the host can change game speed",
-        ));
-    }
+    teams::control(game, session.player_id, request.expected_control_revision)?;
     if game.time_scale.unwrap_or(1.0) != request.time_scale {
+        teams::record_control(
+            game,
+            session.player_id,
+            format!("speed {}×", request.time_scale),
+        );
         game.scheduler.reset();
         game.diagnostics.reset_rate();
     }
