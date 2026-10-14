@@ -575,8 +575,19 @@ async fn main() -> anyhow::Result<()> {
     let mut scenarios: Vec<_> = legacy_scenarios()
         .into_iter()
         .map(sim_scenario::upgrade_sensing)
+        .map(|s| {
+            if matches!(
+                s.id.as_str(),
+                "regional-campaign.v1" | "iftu-exercise.v1" | "global-crisis.v2"
+            ) {
+                sim_scenario::upgrade_radio_propagation(s)
+            } else {
+                s
+            }
+        })
         .collect();
     scenarios.push(sim_scenario::sensing_exercise_scenario());
+    scenarios.push(sim_scenario::ridge_relay_exercise_scenario());
     for scenario in &scenarios {
         scenario.validate()?;
     }
@@ -2315,7 +2326,7 @@ fn network_message_visible(record: &NetworkMessageRecord, role: &Role) -> bool {
     if record.message.profile_id == execution_acks::ACK_PROFILE {
         return record.message.header.origin_entity_id == role.location_unit_id
             || (record.message.header.recipient_entity_id == role.location_unit_id
-                && record.state == MessageState::Delivered);
+                && record.delivered_at_ns.is_some());
     }
     record.message.header.origin_role_id == role.id
         || (record.message.header.recipient_entity_id == role.location_unit_id

@@ -12,6 +12,16 @@ The scenarios include **Regional Joint Campaign** (offline collaborative plans, 
 
 The broader target architecture, planned simulation fidelity, and acceptance criteria are in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Features described there are not necessarily implemented yet.
 
+## Terrain-aware radio
+
+New Regional Joint Campaign games and its IFTU derivative use terrain-aware radio;
+Global Crisis uses Earth obstruction by default. **Ridge Relay Exercise** runs
+offline: a ridge blocks direct orders and reports until a scripted relay climbs
+into position. The network inspector distinguishes terrain blockage, unknown
+coverage, range and receiver interference. Commands execute only after complete
+delivery, with separate return-radio confirmation. Older saves retain their rules.
+See [the walkthrough, configuration and limits](docs/RADIO_PROPAGATION_IMPLEMENTATION.md).
+
 ## White Cell teams
 
 Create a game with **Join as → White Cell** to host as an exercise referee.

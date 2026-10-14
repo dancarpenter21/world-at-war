@@ -12,6 +12,8 @@ struct RadioScenarioDefinition {
     version: u32,
     provenance: String,
     units: Vec<ScenarioUnit>,
+    #[serde(default)]
+    terrain: Option<sim_geo::terrain::Grid>,
     radio: TrainingRadio,
     authority: AuthorityDefinition,
     #[serde(default)]
@@ -99,6 +101,13 @@ fn parse_radio_scenario(data: &str) -> Result<Scenario, ScenarioError> {
         impact_report_routes: definition.impact_report_routes,
         reporting_window_ticks: definition.reporting_window_ticks,
     };
+    let scenario = if let Some(terrain) = definition.terrain {
+        let mut scenario = upgrade_sensing(scenario);
+        scenario.sensing.as_mut().unwrap().terrain_fixture = Some(terrain);
+        upgrade_radio_propagation(scenario)
+    } else {
+        scenario
+    };
     scenario.validate()?;
     Ok(scenario)
 }
@@ -130,6 +139,14 @@ pub fn contested_combat_scenario() -> Scenario {
         "../../../data/scenarios/contested-combat.v1.json"
     ))
     .expect("committed contested combat data must be valid")
+}
+
+/// A scripted relay restores radio delivery across a fictional ridge.
+pub fn ridge_relay_exercise_scenario() -> Scenario {
+    parse_radio_scenario(include_str!(
+        "../../../data/scenarios/ridge-relay-exercise.v1.json"
+    ))
+    .expect("committed ridge relay exercise must be valid")
 }
 
 #[cfg(test)]

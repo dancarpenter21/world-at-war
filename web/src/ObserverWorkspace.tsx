@@ -1,3 +1,4 @@
+import { formatGeometry } from "./networkModel";
 import { SmoothPositions } from "./smoothPositions";
 import { useEffect, useRef, useState } from "react";
 import { Cartesian3, Color, EllipsoidTerrainProvider, ImageryLayer, OpenStreetMapImageryProvider, Viewer } from "cesium";
@@ -41,7 +42,7 @@ export function ObserverWorkspace({ apiBase, gameId, running, role, onAccessEnde
       <WeatherEditor apiBase={apiBase} gameId={gameId} role={role} onPreview={setWeatherPreview} />
       <h2>Network topology</h2><p>Current links and queues. Message contents are not included.</p>
       <div className="truth-links"><table><thead><tr><th>Link</th><th>State</th><th>Queue</th></tr></thead><tbody>
-        {truth.data?.communication_links.map(l => <tr key={l.id}><td>{names.get(l.from_entity_id) ?? l.from_entity_id} → {names.get(l.to_entity_id) ?? l.to_entity_id}</td><td>{l.available ? "Available" : "Unavailable"}{l.jammed > 0 ? " · jammed" : ""}</td><td>{l.queued_packets} packets / {l.queued_bytes} B</td></tr>)}
+        {truth.data?.communication_links.map(l => <tr key={l.id}><td>{names.get(l.from_entity_id) ?? l.from_entity_id} → {names.get(l.to_entity_id) ?? l.to_entity_id}</td><td>{l.available ? "Available" : "Unavailable"}{l.geometry_status ? ` · ${formatGeometry(l.geometry_status)}` : ""}{l.jammed > 0 ? " · jammed" : ""}</td><td>{l.queued_packets} packets / {l.queued_bytes} B</td></tr>)}
       </tbody></table></div>
     </aside>
     {truth.data && <TruthMap renderingEnabled={renderingEnabled} animateMotion={running && truth.status === "live"} truth={truth.data} network={network} onSelect={setSelected} weatherPreview={weatherPreview} />}

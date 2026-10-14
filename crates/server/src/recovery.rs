@@ -394,23 +394,24 @@ async fn load_internal(state: &AppState, migration: Option<bool>) -> anyhow::Res
             .scenarios
             .get(&game.scenario_id)
             .ok_or_else(|| anyhow::anyhow!("snapshot scenario unavailable"))?;
-        let legacy = legacy_scenarios()
+        let predecessors: Vec<_> = legacy_scenarios()
             .into_iter()
-            .find(|scenario| scenario.id == game.scenario_id);
+            .flat_map(|s| [s.clone(), sim_scenario::upgrade_sensing(s)])
+            .chain(std::iter::once(sim_scenario::sensing_exercise_scenario()))
+            .collect();
         let source = if current.version == game.scenario_version
             && digest(&serde_json::to_vec(current)?) == game.scenario_checksum
         {
             current
         } else {
-            let predecessor = legacy
-                .as_ref()
-                .ok_or_else(|| anyhow::anyhow!("unsupported predecessor scenario"))?;
-            anyhow::ensure!(
-                predecessor.version == game.scenario_version
-                    && digest(&serde_json::to_vec(predecessor)?) == game.scenario_checksum,
-                "snapshot scenario incompatible"
-            );
-            predecessor
+            predecessors
+                .iter()
+                .find(|s| {
+                    s.id == game.scenario_id
+                        && s.version == game.scenario_version
+                        && serde_json::to_vec(s).is_ok_and(|v| digest(&v) == game.scenario_checksum)
+                })
+                .ok_or_else(|| anyhow::anyhow!("snapshot scenario incompatible"))?
         };
         anyhow::ensure!(
             state.communications_catalog.checksum() == game.communications_catalog_checksum

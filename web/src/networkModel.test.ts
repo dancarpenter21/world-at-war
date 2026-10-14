@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  DEFAULT_NETWORK_FILTERS, decodeNetworkFrame, filterMessages, filterNetwork, formatBitRate, reconcileNetworkNodes,
+  formatGeometry, DEFAULT_NETWORK_FILTERS, decodeNetworkFrame, filterMessages, filterNetwork, formatBitRate, reconcileNetworkNodes,
   type MessageRecord, type NetworkProjection
 } from "./networkModel";
 
@@ -138,4 +138,16 @@ describe("stream frames and telemetry", () => {
     expect(formatBitRate(32_000_000)).toBe("32.00 Mbit/s");
     expect(formatBitRate(1_000_000_000)).toBe("1.00 Gbit/s");
   });
+});
+
+it("accepts optional geometry telemetry and rejects invalid statuses", () => {
+  const snapshot = projection();
+  const raw = () => JSON.stringify({ sequence: 1, resync: true, projection: snapshot });
+  expect(decodeNetworkFrame(raw())).not.toBeNull();
+  snapshot.messages[0].state = "unacknowledged";
+  snapshot.links[0].geometry_status = "terrain_blocked";
+  expect(decodeNetworkFrame(raw())?.projection.links[0].geometry_status).toBe("terrain_blocked");
+  expect(formatGeometry("terrain_unknown")).toBe("Terrain coverage unknown");
+  Object.assign(snapshot.links[0], { geometry_status: "invented" });
+  expect(decodeNetworkFrame(raw())).toBeNull();
 });

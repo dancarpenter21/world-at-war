@@ -4,7 +4,7 @@ mod radio_exercise;
 
 pub use radio_exercise::{
     combat_training_scenario, command_link_exercise_scenario, contested_combat_scenario,
-    sensor_relay_exercise_scenario,
+    ridge_relay_exercise_scenario, sensor_relay_exercise_scenario,
 };
 
 use std::collections::BTreeMap;
@@ -330,6 +330,9 @@ impl Scenario {
                     .map_err(ScenarioError::InvalidSimulation)?;
             }
         }
+        simulation
+            .initialize_radio_geometry()
+            .map_err(ScenarioError::InvalidSimulation)?;
         Ok(simulation)
     }
 
@@ -716,6 +719,7 @@ fn global_communications(
                 },
             );
             links.push(CommunicationLinkDefinition {
+                propagation: None,
                 id: format!("{from}-to-{to}"),
                 from_entity_id: from,
                 to_entity_id: to,
@@ -1326,6 +1330,7 @@ pub fn jammed_flight_scenario() -> Scenario {
     };
     let communication_links = vec![
         CommunicationLinkDefinition {
+            propagation: None,
             id: "aircraft-1-to-aircraft-2".into(),
             from_entity_id: aircraft_1,
             to_entity_id: aircraft_2,
@@ -1334,6 +1339,7 @@ pub fn jammed_flight_scenario() -> Scenario {
             channel_id: aircraft_1_channel.clone(),
         },
         CommunicationLinkDefinition {
+            propagation: None,
             id: "aircraft-2-to-aircraft-1".into(),
             from_entity_id: aircraft_2,
             to_entity_id: aircraft_1,
@@ -1675,6 +1681,47 @@ pub fn upgrade_sensing(mut scenario: Scenario) -> Scenario {
     scenario
 }
 
+/// Explicit radio rules upgrade for new campaign games; predecessors remain available.
+pub fn upgrade_radio_propagation(mut scenario: Scenario) -> Scenario {
+    let height = |domain| match domain {
+        Domain::Land => 10.0,
+        Domain::Sea => 20.0,
+        _ => 2.0,
+    };
+    let terrain = scenario
+        .sensing
+        .as_ref()
+        .is_some_and(|s| s.terrain_required || s.terrain_fixture.is_some());
+    let domains: BTreeMap<_, _> = scenario.units.iter().map(|u| (u.id, u.domain)).collect();
+    let mut changed = false;
+    for link in &mut scenario.communication_links {
+        let from = domains[&link.from_entity_id];
+        let to = domains[&link.to_entity_id];
+        if matches!(from, Domain::Undersea | Domain::Space | Domain::Cyber)
+            || matches!(to, Domain::Undersea | Domain::Space | Domain::Cyber)
+            || !scenario
+                .network
+                .channels
+                .iter()
+                .any(|c| c.id == link.channel_id && c.radio.is_some())
+        {
+            continue;
+        }
+        link.propagation = Some(sim_core::propagation::Configuration {
+            version: 1,
+            terrain,
+            source_antenna_height_m: height(from),
+            destination_antenna_height_m: height(to),
+            max_range_m: 550_000.0,
+        });
+        changed = true;
+    }
+    if changed {
+        scenario.version += 1;
+    }
+    scenario
+}
+
 pub fn sensing_exercise_scenario() -> Scenario {
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
@@ -1889,3 +1936,6 @@ mod tests {
         ));
     }
 }
+
+#[cfg(test)]
+mod radio_propagation_tests;

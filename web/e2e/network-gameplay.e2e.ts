@@ -334,19 +334,19 @@ test("runs a real game, persists networked command delivery, and retains the map
   expect(receipt.intent).toEqual(orderBody.intent);
   const authorization = new URLSearchParams({ player_id: playerId, role_id: roleId });
   const messageUrl = `${backend.url}/v1/games/${gameId}/network/messages/${submission.message_id}?${authorization}`;
-  await expect.poll(async () => (await (await request.get(messageUrl)).json()).state, { timeout: 10_000 }).toBe("delivered");
+  await expect.poll(async () => (await (await request.get(messageUrl)).json()).state, { timeout: 10_000 }).toBe("acknowledged");
   const history = await (await request.get(`${backend.url}/v1/games/${gameId}/network/events?${authorization}`)).json() as {
     events: { sequence: number; state: string; message: { id: string }; started_at_ns: number | null; delivered_at_ns: number | null }[]
   };
   const transitions = history.events.filter((record) => record.message.id === submission.message_id);
-  expect(transitions.map((record) => record.state)).toEqual(["queued", "in_transit", "delivered"]);
+  expect(transitions.map((record) => record.state)).toEqual(["queued", "in_transit", "delivered", "acknowledged"]);
   expect(transitions[0].started_at_ns).toBeNull();
   expect(transitions[1].started_at_ns).not.toBeNull();
   expect(transitions[2].delivered_at_ns).toBeGreaterThan(transitions[1].started_at_ns!);
   const eventsFile = path.join(backend.runDirectory, "var/network-events", `${gameId}.network-events.jsonl`);
   const persisted = (await readFile(eventsFile, "utf8")).trim().split("\n").map((line) => JSON.parse(line) as { state?: string; message?: { id: string } });
   expect(persisted.filter((record) => record.message?.id === submission.message_id).map((record) => record.state))
-    .toEqual(["queued", "in_transit", "delivered"]);
+    .toEqual(["queued", "in_transit", "delivered", "acknowledged"]);
 
   await mark("command-delivered");
   const outsider = await request.get(`${backend.url}/v1/games/${gameId}/network?player_id=00000000-0000-4000-8000-000000008099&role_id=${roleId}`);
@@ -369,7 +369,7 @@ test("runs a real game, persists networked command delivery, and retains the map
   await expect(page.getByRole("button", { name: /^Inspect message: move order/ })).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: /^Inspect message: move order/ }).click();
   const details = page.getByRole("region", { name: "Message details" });
-  await expect(details.locator(".network-state")).toHaveText("delivered");
+  await expect(details.locator(".network-state")).toHaveText("acknowledged");
   await expect(details.getByText("Queue wait", { exact: true })).toBeVisible();
   await expect(details.getByText("Network transit", { exact: true })).toBeVisible();
   await mark("message-inspected");
@@ -653,7 +653,8 @@ test("reacquires a patrolling target after a blackout and receives its final imp
   const entry = after.entries[0];
   expect(entry.intent_id).toBe(intentId);
   expect(entry.observed_tick).toBeGreaterThanOrEqual(20);
-  expect(entry.launch_tick).toBeGreaterThan(entry.submitted_tick);
+  // Fractional frames can deliver and launch within one legacy whole-second tick.
+  expect(entry.launch_tick).toBeGreaterThanOrEqual(entry.submitted_tick);
   expect(entry.acknowledged_tick).toBeGreaterThan(entry.launch_tick);
   expect(entry.impact_tick).toBeGreaterThan(entry.launch_tick);
   expect(entry.report_received_tick).toBeGreaterThan(entry.impact_tick);

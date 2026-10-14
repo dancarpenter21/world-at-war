@@ -877,16 +877,27 @@ pub(super) fn process_deliveries(game: &mut Game) {
         };
         record.state = match event.state {
             DeliveryState::Queued => MessageState::Queued,
+            DeliveryState::InTransit => MessageState::InTransit,
             DeliveryState::Delivered => MessageState::Delivered,
             DeliveryState::Acknowledged => MessageState::Acknowledged,
             DeliveryState::Expired => MessageState::Expired,
             DeliveryState::Dropped => MessageState::Dropped,
             DeliveryState::Unacknowledged => MessageState::Unacknowledged,
         };
+        if event.state == DeliveryState::InTransit {
+            record.started_at_ns = event.at_ns;
+            // Track reports are application aggregates, not a single physical
+            // packet. Keep their established sender acknowledgement boundary.
+            if record.message.profile_id != sensor_reports::TRACK_REPORT_PROFILE {
+                record.packet_id = event.packet_id;
+            }
+        }
         if event.state == DeliveryState::Delivered {
             record.delivered_at_ns = Some(game.simulation.radio_tick() * 1_000_000_000);
         }
-        record.terminal_at_ns = Some(game.simulation.radio_tick() * 1_000_000_000);
+        if event.state != DeliveryState::InTransit {
+            record.terminal_at_ns = Some(game.simulation.radio_tick() * 1_000_000_000);
+        }
         if !transport::record_transition(game, record) {
             return;
         }

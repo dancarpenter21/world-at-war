@@ -9,6 +9,7 @@ const MAX_ATTEMPTS: u8 = 3;
 #[serde(rename_all = "snake_case")]
 pub enum DeliveryState {
     Queued,
+    InTransit,
     Delivered,
     Acknowledged,
     Expired,
@@ -18,14 +19,28 @@ pub enum DeliveryState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeliveryEvent {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at_ns: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub packet_id: Option<u64>,
     pub id: Uuid,
     pub state: DeliveryState,
     pub recipient: Uuid,
     pub payload: Vec<u8>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MessageOptions {
+    pub hop_limit: u16,
+    pub metadata: PacketMetadata,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub(super) struct Message {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    started_at_ns: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    options: Option<MessageOptions>,
     from: Uuid,
     to: Uuid,
     payload: Vec<u8>,
@@ -95,6 +110,20 @@ impl Simulation {
         payload: Vec<u8>,
         expires: u64,
     ) -> Result<(), String> {
+        self.send_message_with_options(id, from, to, payload, expires, None)
+    }
+
+    /// Preserve scheduling metadata and the application route's forwarding budget.
+    #[allow(clippy::too_many_arguments)]
+    pub fn send_message_with_options(
+        &mut self,
+        id: Uuid,
+        from: Uuid,
+        to: Uuid,
+        payload: Vec<u8>,
+        expires: u64,
+        options: Option<MessageOptions>,
+    ) -> Result<(), String> {
         if self.transport.finished.contains(&id) || self.transport.messages.contains_key(&id) {
             self.audit_application(
                 audit::Kind::DuplicateSuppressed,
@@ -150,6 +179,8 @@ impl Simulation {
         self.transport.messages.insert(
             id,
             Message {
+                started_at_ns: None,
+                options,
                 from,
                 to,
                 payload,
@@ -257,11 +288,25 @@ impl Simulation {
             let start = fragment.index * FRAGMENT_BYTES;
             message.payload[start..(start + FRAGMENT_BYTES).min(message.payload.len())].to_vec()
         };
-        if let Ok(packet) = self.queue_transmission(
-            fragment.route[fragment.hop],
-            fragment.route[fragment.hop + 1],
-            bytes,
-        ) {
+        let queued = if let Some(options) = message.options.clone() {
+            if fragment.route.len().saturating_sub(1) > usize::from(options.hop_limit) {
+                return;
+            }
+            self.queue_transmission_with_metadata(
+                fragment.route[fragment.hop],
+                fragment.route[fragment.hop + 1],
+                bytes,
+                options.hop_limit.saturating_sub(fragment.hop as u16),
+                options.metadata,
+            )
+        } else {
+            self.queue_transmission(
+                fragment.route[fragment.hop],
+                fragment.route[fragment.hop + 1],
+                bytes,
+            )
+        };
+        if let Ok(packet) = queued {
             let attempt = self.transport.messages[&fragment.message].attempts;
             self.annotate_audit_packet(
                 packet.get(),
@@ -315,6 +360,8 @@ impl Simulation {
                     None,
                 );
                 self.transport.events.push(DeliveryEvent {
+                    at_ns: None,
+                    packet_id: None,
                     id,
                     state: if m.delivered {
                         DeliveryState::Unacknowledged
@@ -369,12 +416,16 @@ impl Simulation {
                     None,
                 );
                 self.transport.events.push(DeliveryEvent {
+                    at_ns: None,
+                    packet_id: None,
                     id,
                     state: DeliveryState::Delivered,
                     recipient: to,
                     payload: m.payload,
                 });
                 self.transport.events.push(DeliveryEvent {
+                    at_ns: None,
+                    packet_id: None,
                     id,
                     state: DeliveryState::Acknowledged,
                     recipient: from,
@@ -418,6 +469,29 @@ impl Simulation {
                 self.pending_network_events.push(event);
                 continue;
             }
+            if let NetworkEvent::TransmissionStarted { at, packet, .. } = &event {
+                if let Some(fragment) = self.transport.packets.get(&packet.id().get()) {
+                    if let Some(message) = self.transport.messages.get_mut(&fragment.message) {
+                        // Emit lifecycle timing only for opted-in metadata-aware C2
+                        // traffic. Historical reliable messages keep their prior events.
+                        if !fragment.ack
+                            && message.options.is_some()
+                            && message.started_at_ns.is_none()
+                        {
+                            message.started_at_ns = Some(at.as_nanos());
+                            self.transport.events.push(DeliveryEvent {
+                                at_ns: Some(at.as_nanos()),
+                                packet_id: Some(packet.id().get()),
+                                id: fragment.message,
+                                state: DeliveryState::InTransit,
+                                recipient: message.from,
+                                payload: Vec::new(),
+                            });
+                        }
+                    }
+                }
+                continue;
+            }
             let (packet_id, delivered) = match event {
                 NetworkEvent::PacketDelivered { packet, .. } => (packet.id().get(), true),
                 NetworkEvent::PacketDropped { packet, .. } => (packet.id().get(), false),
@@ -445,6 +519,8 @@ impl Simulation {
                     None,
                 );
                 self.transport.events.push(DeliveryEvent {
+                    at_ns: None,
+                    packet_id: None,
                     id: f.message,
                     state: DeliveryState::Acknowledged,
                     recipient: m.from,
@@ -473,6 +549,8 @@ impl Simulation {
                 {
                     m.delivered = true;
                     self.transport.events.push(DeliveryEvent {
+                        at_ns: None,
+                        packet_id: None,
                         id: f.message,
                         state: DeliveryState::Delivered,
                         recipient: m.to,

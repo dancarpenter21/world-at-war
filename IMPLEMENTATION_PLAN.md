@@ -1,5 +1,25 @@
 # World At War Implementation Plan
 
+## Terrain-aware radio increment — 2026-10-13
+
+New campaign games opt eligible radio links into Earth/terrain obstruction with
+explicit antenna heights, range and role-visible geometry diagnostics. Regional
+uses its existing terrain pin; Global defaults to Earth-only geometry. The offline
+Ridge Relay Exercise restores blocked reports, commands and replies through a
+scripted relay. Nonlocal ordinary C2 messages use fragmented reliable delivery
+in opted-in scenarios. Earlier saves retain their original rules.
+See [implemented behavior and limits](docs/RADIO_PROPAGATION_IMPLEMENTATION.md).
+
+Validation passes 265 fast Rust tests, 19 isolated PostgreSQL tests, 48 frontend
+tests and all 66 Chromium cases. Formatting, strict Clippy, dependency-pin
+verification, Rust 1.89 compilation, TypeScript and production builds pass. See
+[verified gameplay](docs/gameplay-checkpoints.md#ridge-relay-radio) and
+[short radio measurements](docs/performance/2026-10-13-radio-results.md). No long
+soak or development-database migration was run.
+
+Goal-directed Red AI is the next recommended gameplay increment, followed by
+logistics and basing. Stronger durability remains deprioritized.
+
 ## White Cell team increment — 2026-10-13
 
 White Cell now has individual referee seats, approved late joining, team transfers,
@@ -28,8 +48,8 @@ recovery; remaining work includes broader domain simulation, logistics,
 goal-directed Red AI and interactive replay. See the
 [feature assessment and next implementation plan](plans/2026-10-13-next-implementation.md)
 for scope, code entry points, regression requirements and acceptance criteria.
-The user has explicitly deprioritized durability. The recommended next increment
-is terrain-aware radio delivery, followed by goal-directed Red AI and logistics.
+The user has explicitly deprioritized durability. Terrain-aware radio delivery is now implemented. The recommended next increment
+is goal-directed Red AI, followed by logistics.
 White Cell core team/referee play is implemented; remaining referee interventions
 are specified in section 5.
 Defer the proposed durable serialization optimization and benchmark matrix;

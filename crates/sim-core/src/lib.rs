@@ -7,7 +7,7 @@ use frame_clock::FrameClock;
 pub use frame_clock::TICKS_PER_SECOND;
 mod transport;
 pub mod truth;
-pub use transport::{DeliveryEvent, DeliveryState};
+pub use transport::{DeliveryEvent, DeliveryState, MessageOptions};
 pub mod combat;
 pub mod geodesy;
 pub mod iftu;
@@ -63,7 +63,7 @@ pub struct Ownership(pub Side);
 #[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct DomainKind(pub Domain);
 
-#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct GeoPose {
     pub latitude_deg: f64,
     pub longitude_deg: f64,
@@ -185,6 +185,8 @@ impl JammingRegion {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommunicationLinkDefinition {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub propagation: Option<propagation::Configuration>,
     pub id: String,
     pub from_entity_id: Uuid,
     pub to_entity_id: Uuid,
@@ -639,6 +641,8 @@ pub enum CommunicationOutcome {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommunicationLinkStatus {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub geometry_status: Option<propagation::GeometryStatus>,
     pub id: String,
     pub from_entity_id: Uuid,
     pub to_entity_id: Uuid,
@@ -651,6 +655,8 @@ pub struct CommunicationLinkStatus {
 
 #[derive(Clone, Serialize, Deserialize)]
 struct CommunicationsRuntime {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    propagation: Option<propagation::Runtime>,
     #[serde(with = "snapshot::network")]
     simulator: NetworkSimulator,
     entity_devices: BTreeMap<Uuid, Vec<DeviceId>>,
@@ -666,6 +672,7 @@ struct CommunicationsRuntime {
 }
 
 pub mod audit;
+pub mod propagation;
 pub mod snapshot;
 
 pub struct Simulation {
@@ -839,6 +846,16 @@ impl Simulation {
                     link.id
                 )));
             };
+            if let Some(config) = &link.propagation {
+                config
+                    .validate()
+                    .map_err(SimulationBuildError::InvalidConfiguration)?;
+                if channel.radio.is_none() {
+                    return Err(SimulationBuildError::InvalidConfiguration(
+                        "LOS propagation requires a radio channel".into(),
+                    ));
+                }
+            }
             if !channel.endpoints.contains(&link.source_device_id)
                 || !channel.endpoints.contains(&link.destination_device_id)
             {
@@ -930,6 +947,7 @@ impl Simulation {
                 .or_insert(index);
         }
         let seed = communications.simulator_options.seed;
+        let propagation = propagation::Runtime::new(&communications);
         let simulator = NetworkSimulator::new_with_options(
             communications.network,
             communications.simulator_options,
@@ -978,6 +996,7 @@ impl Simulation {
             pending_fragment_events: Vec::new(),
             audit: audit::Audit::default(),
             communications: CommunicationsRuntime {
+                propagation,
                 simulator,
                 entity_devices,
                 baseline_interference,
@@ -1819,6 +1838,7 @@ impl Simulation {
     }
 
     fn sync_network_interference(&mut self) -> Result<(), c3mesh::SimulationError> {
+        self.sync_radio_geometry()?;
         let at = self.network_time();
         let mut query = self.world.query::<(&SimEntityId, &GeoPose)>();
         let positions: BTreeMap<_, _> = query
@@ -1859,6 +1879,7 @@ impl Simulation {
                         positions.get(&link.from_entity_id),
                     ) {
                         if self.campaign_mode
+                            && link.propagation.is_none()
                             && (!line_of_sight(*source, *position)
                                 || great_circle_distance_m(*source, *position) > 550_000.0)
                         {
@@ -1929,6 +1950,7 @@ impl Simulation {
                     .channel_queue_metrics(link.channel_id.clone())
                     .expect("validated monitored link queue must remain queryable");
                 CommunicationLinkStatus {
+                    geometry_status: self.radio_geometry_status(&link.id),
                     id: link.id.clone(),
                     from_entity_id: link.from_entity_id,
                     to_entity_id: link.to_entity_id,

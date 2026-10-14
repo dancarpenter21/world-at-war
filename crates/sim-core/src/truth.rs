@@ -114,6 +114,7 @@ impl Simulation {
             links.insert(
                 link.id.clone(),
                 CommunicationLinkStatus {
+                    geometry_status: self.radio_geometry_status(&link.id),
                     id: link.id.clone(),
                     from_entity_id: link.from_entity_id,
                     to_entity_id: link.to_entity_id,

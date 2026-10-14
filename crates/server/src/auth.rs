@@ -658,6 +658,7 @@ mod tests {
     include!("persistence_tests.rs");
     include!("audit_auth_tests.rs");
     include!("sensing_auth_tests.rs");
+    include!("radio_auth_tests.rs");
     use super::*;
     use axum::body::{to_bytes, Body};
     use serde_json::{json, Value};

@@ -170,7 +170,7 @@ select, textarea { width: 100%; padding: 9px; color: #eef7fa; background: #0e171
 .network-state { display: inline-flex; width: fit-content; padding: 3px 6px; border: 1px solid #3d5965; border-radius: 3px; color: #abc4d0; background: #20323d; font-size: 9px; text-transform: capitalize; white-space: nowrap; }
 .network-state.delivered, .network-state.acknowledged { color: #93dabb; background: #19362a; border-color: #35654e; }
 .network-state.queued, .network-state.retrying, .network-state.in_transit { color: #eac888; background: #332b1b; border-color: #6e5730; }
-.network-state.dropped, .network-state.expired { color: #efaaa2; background: #3c2422; border-color: #75443e; }
+.network-state.dropped, .network-state.expired, .network-state.unacknowledged { color: #efaaa2; background: #3c2422; border-color: #75443e; }
 .network-terminal-list, .network-link-list, .network-message-list { display: grid; gap: 7px; }
 .network-terminal-list button, .network-link-list button, .network-message-list > button { display: grid; gap: 5px; width: 100%; padding: 10px 12px; color: #d2e1e7; border: 1px solid #304751; border-radius: 3px; background: #15252e; text-align: left; }
 .network-terminal-list button:hover, .network-link-list button:hover, .network-message-list > button:hover { border-color: #5f899a; background: #1c313c; }

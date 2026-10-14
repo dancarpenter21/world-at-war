@@ -92,6 +92,7 @@ fn fixture() -> Simulation {
             },
         );
         links.push(CommunicationLinkDefinition {
+            propagation: None,
             id: format!("link-{i}"),
             from_entity_id: from,
             to_entity_id: to,

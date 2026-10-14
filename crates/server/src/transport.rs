@@ -112,17 +112,31 @@ pub(super) fn transmit_c2_message_from_entity(
     };
     let encoded_bytes = message.encoded();
     let local = origin_entity_id == recipient_entity_id;
-    let reliable_report = !local
-        && profile_id == sensor_reports::TRACK_REPORT_PROFILE
-        && game.simulation.sensing_configuration().is_some();
-    let queued = if reliable_report {
+    let reliable = !local
+        && (game.simulation.uses_radio_propagation()
+            || (profile_id == sensor_reports::TRACK_REPORT_PROFILE
+                && game.simulation.sensing_configuration().is_some()));
+    let queued = if reliable {
         game.simulation
-            .send_message(
+            .send_message_with_options(
                 message.id,
                 origin_entity_id,
                 recipient_entity_id,
                 encoded_bytes.clone(),
                 message.header.expires_tick,
+                game.simulation
+                    .uses_radio_propagation()
+                    .then(|| sim_core::MessageOptions {
+                        hop_limit: profile.ttl_hops,
+                        metadata: PacketMetadata {
+                            priority: profile.default_priority,
+                            traffic_class: profile.default_priority / 64,
+                            flow_id: flow_identity(origin_role_id, recipient_entity_id, profile_id),
+                            expires_at: Some(NetworkTime::from_nanos(tick_time_ns(
+                                message.header.expires_tick,
+                            ))),
+                        },
+                    }),
             )
             .map(|()| None)
             .map_err(|error| error.to_string())
@@ -150,7 +164,7 @@ pub(super) fn transmit_c2_message_from_entity(
     let (state, packet_id, drop_reason) = match queued {
         Ok(Some(id)) => (MessageState::Queued, Some(id.get()), None),
         Ok(None) => (
-            if reliable_report {
+            if reliable {
                 MessageState::Queued
             } else {
                 MessageState::Delivered
@@ -216,7 +230,7 @@ pub(super) fn reliable_delivery(game: &mut Game, event: &sim_core::DeliveryEvent
 fn message_delivered(game: &Game, message_id: Uuid) -> bool {
     game.network_messages
         .iter()
-        .any(|record| record.message.id == message_id && record.state == MessageState::Delivered)
+        .any(|record| record.message.id == message_id && record.delivered_at_ns.is_some())
 }
 
 pub(super) fn await_message_delivery(game: &mut Game, message_id: Uuid, action: DeliveryAction) {

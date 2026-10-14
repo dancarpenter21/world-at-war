@@ -27,7 +27,7 @@ impl ImpactReportState {
 
 fn delivered(game: &Game, route: &ImpactReportRoute, intent: Uuid) -> bool {
     game.network_messages.iter().any(|record| {
-        record.state == MessageState::Delivered
+        record.delivered_at_ns.is_some()
             && record.message.profile_id == IMPACT_REPORT_PROFILE
             && record.message.header.origin_role_id == route.origin_role_id
             && record.message.header.recipient_entity_id == route.recipient_unit_id

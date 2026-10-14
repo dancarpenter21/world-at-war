@@ -1,8 +1,9 @@
 # Feature status and next implementation step — 2026-10-13
 
-Status: proposed; source review against `ca71e40`. This is a planning increment,
-not an implementation or a new validation run. The newest checkpoints supersede
-older statements in IMPLEMENTATION_PLAN.md that persistence or sensing is absent.
+Status: feature assessment initially reviewed against `ca71e40`, updated after
+the White Cell and terrain-aware radio increments. Implementation evidence lives
+in their checkpoint documents; the remaining release work below is planned.
+Newest checkpoints supersede older statements that persistence or sensing is absent.
 
 ## Are all game features implemented?
 
@@ -15,7 +16,7 @@ the corresponding domain's complete gameplay loop.
 | --- | --- | --- |
 | Multiplayer and command | Sessions/accounts, roles/leases, authority workflows, delivered commands, execution acknowledgements, collaborative campaign plans and airspace orders | Broader controller inspection and interventions beyond weather; release hardening and playtest evidence |
 | White Cell referees | Individual referee seats, approved joining/transfers, omniscient truth/plan/message/role inspection, shared notes, lifecycle/speed and weather controls | Exercise injects, outcome overrides, richer adjudication and interactive review |
-| Information warfare | Terrain/Earth sensing, visual/IR/radar models, uncertain tracks, passive bearings/fixes, delayed reports, network queues/jamming, metadata audit | Richer target recognition, radio-terrain propagation and full information-management fidelity; real-terrain reference acceptance |
+| Information warfare | Terrain/Earth sensing, visual/IR/radar models, uncertain tracks, passive bearings/fixes, delayed reports, network queues/jamming, terrain-aware ordinary radio, metadata audit | Richer target recognition, full information-management fidelity; real-terrain reference acceptance |
 | Combat and domains | Air mission execution, simplified weapons/damage, fictional IFTU, public orbital propagation/viewing and authority-routed satellite requests | Complete naval, undersea/acoustic, ground and cyber gameplay; orbital collection/tasking/downlink effects |
 | Logistics and basing | Training fuel/ammunition abstractions and airport/runway catalog | Resupply, refueling/rearming/repair, operational runway/port capacity, embarkation and readiness |
 | Red AI | Projection-constrained airborne patrol orders with delivery/retry handling | Goal scoring, doctrine/task packages, allocation, reactive replanning and coverage of remaining domains |
@@ -48,7 +49,9 @@ the older durable-performance prerequisites in IMPLEMENTATION_PLAN.md.
   deployment requires PostgreSQL and persistence blocks play, scope a small
   save/load simplification before adding more durability optimization machinery.
 
-## Recommended next increment: terrain-aware radio delivery
+## Terrain-aware radio delivery — implemented checkpoint
+
+The terrain-aware radio increment is implemented; see [behavior and limits](../docs/RADIO_PROPAGATION_IMPLEMENTATION.md). The implementation outline below records its intended scope. Goal-directed Red AI is the next recommended increment.
 
 Make terrain affect whether orders and reports can actually reach their
 recipients. The playable result is an offline ridge exercise in which a direct

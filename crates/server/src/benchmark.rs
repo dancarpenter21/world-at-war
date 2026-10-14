@@ -25,7 +25,7 @@ pub(super) fn run(args: &[String]) -> anyhow::Result<()> {
     while let Some(flag) = options.next() {
         anyhow::ensure!(seen.insert(flag), "duplicate option {flag}");
         match flag.as_str() {
-            "--check" | "--sensing" => (),
+            "--check" | "--sensing" | "--radio" => (),
             "--ticks" | "--warmup" | "--seed" | "--repeats" | "--baseline" => {
                 anyhow::ensure!(options.next().is_some(), "missing value for {flag}");
             }
@@ -49,8 +49,16 @@ pub(super) fn run(args: &[String]) -> anyhow::Result<()> {
     );
     let mut results = vec![];
     for scenario in [regional_campaign_scenario(), global_crisis_scenario()] {
-        let scenario = if args.iter().any(|flag| flag == "--sensing") {
+        let scenario = if args
+            .iter()
+            .any(|flag| flag == "--sensing" || flag == "--radio")
+        {
             sim_scenario::upgrade_sensing(scenario)
+        } else {
+            scenario
+        };
+        let scenario = if args.iter().any(|flag| flag == "--radio") {
+            sim_scenario::upgrade_radio_propagation(scenario)
         } else {
             scenario
         };
@@ -148,6 +156,8 @@ pub(super) fn run(args: &[String]) -> anyhow::Result<()> {
                 "elapsed_seconds": started.elapsed().as_secs_f64(), "projection_sha256": hash,
                 "simulation_tick_ms": total,
                 "sensing": simulation.sensing_statistics(),
+                "radio_propagation": simulation.uses_radio_propagation(),
+                "terrain_manifest": simulation.sensing_terrain_pin(),
                 "ecs_ms": summary(timings.iter().map(|s| s.ecs_ms).collect()),
                 "interference_ms": summary(timings.iter().map(|s| s.interference_ms).collect()),
                 "transport_ms": summary(timings.iter().map(|s| s.transport_ms).collect()),

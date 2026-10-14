@@ -112,3 +112,10 @@ also exposes the latest simulation-stage timings and scheduling delay. Queue
 totals include only links present in that role's projection, never global queues
 or hidden entity/contact identifiers. Timing samples are excluded from canonical
 simulation state and deterministic hashes.
+
+## Terrain-aware radio checkpoint
+
+[2026-10-13 short radio measurements](2026-10-13-radio-results.md) enable the
+new propagation model with labelled synthetic regional terrain and Earth-only
+Global geometry. They include final/initial core results and a source fingerprint;
+these are bounded core measurements, not a durable or sustained-frame acceptance.

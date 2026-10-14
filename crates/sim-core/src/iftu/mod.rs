@@ -1294,6 +1294,7 @@ impl Simulation {
                         },
                     );
                     path.push(CommunicationLinkDefinition {
+                        propagation: None,
                         id: label,
                         from_entity_id: pair[0],
                         to_entity_id: pair[1],

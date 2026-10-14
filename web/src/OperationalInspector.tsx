@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { Role } from "./AuthorityWorkspace";
 import type { Projection } from "./globeEntities";
-import { formatBitRate } from "./networkModel";
+import { formatBitRate, formatGeometry } from "./networkModel";
 import { latestBearings, trackTiming } from "./trackTiming";
 
 const MAX_LINK_PREVIEW = 8;
@@ -52,6 +52,7 @@ export function OperationalInspector({ projection, role, onInspectNetwork }: {
       {communications.preview.map((link) => <div className={`communication-status ${link.available ? "available" : "blocked"}`} key={link.id}>
         <span>{communications.names.get(link.from_entity_id) ?? "Unknown terminal"} → {communications.names.get(link.to_entity_id) ?? "Unknown terminal"}</span>
         <small>{link.available ? formatBitRate(link.effective_bit_rate_bps) : "Unavailable"}
+          {link.geometry_status ? ` · ${formatGeometry(link.geometry_status)}` : ""}
           {link.jammed > 0 ? ` · ${Math.round(link.jammed * 100)}% interference` : ""}
           {(link.queued_packets ?? 0) > 0 ? ` · ${link.queued_packets} queued` : ""}</small>
       </div>)}

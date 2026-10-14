@@ -349,7 +349,7 @@ pub struct Runtime {
     pub configuration: Configuration,
     pub terrain_pin: Option<Manifest>,
     #[serde(skip)]
-    terrain: Option<Arc<Terrain>>,
+    pub(crate) terrain: Option<Arc<Terrain>>,
     pub seed: u64,
     pub namespace: Uuid,
     pub environment: Environment,

@@ -388,3 +388,251 @@ fn approval_cannot_execute_when_the_final_command_link_is_severed() {
     ));
     assert!(game.simulation.drain_order_results().is_empty());
 }
+
+fn ridge_intent_game(scenario: Scenario) -> (Game, PlayerIntent) {
+    let mut game = game_from_scenario(scenario);
+    let role = Uuid::from_u128(20102);
+    let held = game.roles.get_mut(&role).unwrap();
+    held.owner = Some(Uuid::from_u128(8101));
+    held.lease_generation = 4;
+    let intent = PlayerIntent {
+        intent_id: Uuid::from_u128(98001),
+        issuer_role: role,
+        target: Uuid::from_u128(11),
+        kind: OrderKind::Move {
+            north_mps: 10.0,
+            east_mps: 0.0,
+        },
+        requested_tick: 0,
+    };
+    (game, intent)
+}
+fn ridge_submit(game: &mut Game, intent: &PlayerIntent) {
+    intents::submit_player_intent(
+        game,
+        intent.issuer_role,
+        SubmitIntentRequest {
+            player_id: Uuid::from_u128(8101),
+            lease_generation: 4,
+            intent: intent.clone(),
+        },
+    )
+    .unwrap();
+}
+fn ridge_receipt(game: &Game, intent: &PlayerIntent) -> serde_json::Value {
+    serde_json::to_value(
+        intents::receipt_for(
+            game,
+            intent.issuer_role,
+            intent.intent_id,
+            &serde_json::from_value(
+                serde_json::json!({ "player_id": Uuid::from_u128(8101), "lease_generation": 4 }),
+            )
+            .unwrap(),
+        )
+        .unwrap(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn ridge_reports_and_commands_wait_for_relay_and_execution_is_confirmed_once() {
+    let (mut game, intent) = ridge_intent_game(sim_scenario::ridge_relay_exercise_scenario());
+    ridge_submit(&mut game, &intent);
+    for _ in 0..7 {
+        advance_game_tick(&mut game);
+    }
+    assert!(game
+        .simulation
+        .projection_for(Uuid::from_u128(5), Side::Blue)
+        .tracks
+        .is_empty());
+    assert!(!game
+        .simulation
+        .projection_for(Uuid::from_u128(11), Side::Blue)
+        .tracks
+        .is_empty());
+    assert!(ridge_receipt(&game, &intent).get("executed_tick").is_none());
+    let bytes = recovery::encode(&game).unwrap();
+    game = recovery::decode(&bytes).unwrap();
+    assert_eq!(bytes, recovery::encode(&game).unwrap());
+    for _ in 0..25 {
+        advance_game_tick(&mut game);
+        let pilot = &game.roles[&Uuid::from_u128(20103)];
+        for record in &game.network_messages {
+            if record.message.profile_id == sensor_reports::TRACK_REPORT_PROFILE
+                && record.state != MessageState::Acknowledged
+            {
+                assert!(network_record_for_role(record, pilot)
+                    .delivered_at_ns
+                    .is_none());
+            }
+        }
+    }
+    let receipt = ridge_receipt(&game, &intent);
+    assert_eq!(receipt["state"], "executed", "{receipt}");
+    assert!(
+        receipt["acknowledged_tick"].as_u64().unwrap() > receipt["executed_tick"].as_u64().unwrap()
+    );
+    let picture = game
+        .simulation
+        .projection_for(Uuid::from_u128(5), Side::Blue);
+    assert!(!picture.tracks.is_empty());
+    assert!(picture
+        .tracks
+        .iter()
+        .all(|t| t.received_tick > t.observed_tick));
+    let role = &game.roles[&intent.issuer_role];
+    assert!(game
+        .network_messages
+        .iter()
+        .any(|r| r.message.profile_id == execution_acks::ACK_PROFILE
+            && r.state == MessageState::Acknowledged
+            && network_message_visible(r, role)));
+    let count = game.network_messages.len();
+    ridge_submit(&mut game, &intent);
+    assert_eq!(game.network_messages.len(), count);
+    for _ in 0..20 {
+        advance_game_tick(&mut game);
+    }
+    assert_eq!(
+        ridge_receipt(&game, &intent)["executed_tick"],
+        receipt["executed_tick"]
+    );
+    assert!(game.simulation.drain_order_results().is_empty());
+}
+
+#[test]
+fn ridge_execution_return_path_failure_withholds_confirmation() {
+    let mut scenario = sim_scenario::ridge_relay_exercise_scenario();
+    for link in &mut scenario.communication_links {
+        if link.to_entity_id == Uuid::from_u128(5) {
+            link.propagation.as_mut().unwrap().max_range_m = 1.0;
+        }
+    }
+    let (mut game, intent) = ridge_intent_game(scenario);
+    ridge_submit(&mut game, &intent);
+    for _ in 0..60 {
+        advance_game_tick(&mut game);
+    }
+    let receipt = ridge_receipt(&game, &intent);
+    assert_ne!(receipt["state"], "executed");
+    assert!(receipt.get("executed_tick").is_none());
+    assert!(receipt.get("acknowledged_tick").is_none());
+    let local = game
+        .simulation
+        .projection_for(Uuid::from_u128(11), Side::Blue);
+    assert_eq!(
+        local
+            .own_units
+            .iter()
+            .find(|u| u.id == intent.target)
+            .unwrap()
+            .velocity
+            .north_mps,
+        10.0
+    );
+    assert!(game
+        .simulation
+        .projection_for(Uuid::from_u128(5), Side::Blue)
+        .tracks
+        .is_empty());
+}
+
+#[test]
+fn fragmented_relay_command_preserves_metadata_and_waits_for_complete_reassembly() {
+    let mut scenario = sim_scenario::ridge_relay_exercise_scenario();
+    for channel in &mut scenario.network.channels {
+        channel.bit_rate_bps = 8000;
+    }
+    let (mut game, intent) = ridge_intent_game(scenario);
+    for _ in 0..8 {
+        game.simulation.step();
+    }
+    game.simulation.enable_audit();
+    let profile = game.message_profiles.get_mut(MOVE_PROFILE).unwrap();
+    profile.default_priority = 191;
+    profile.ttl_hops = 2;
+    profile.expiry_ticks = 30;
+    let message = transmit_c2_message_with_fields(
+        &mut game,
+        intent.issuer_role,
+        intent.target,
+        MOVE_PROFILE,
+        "Large command payload ".repeat(100),
+        BTreeMap::new(),
+    )
+    .unwrap();
+    let policy_id = game.authority.policies[0].id;
+    let policy_version = game.authority.version;
+    await_message_delivery(
+        &mut game,
+        message,
+        DeliveryAction::ExecuteIntent(AuthorizedIntent {
+            intent: intent.clone(),
+            authorization: AuthorizationRecord {
+                policy_id,
+                policy_version,
+                requester_role_id: intent.issuer_role,
+                granting_role_id: intent.issuer_role,
+                request_id: None,
+            },
+        }),
+    );
+    assert!(record(&game, message).encoded_bytes.len() > 512);
+    game.simulation.step();
+    planning::process_deliveries(&mut game);
+    let snapshot = serde_json::to_value(game.simulation.snapshot()).unwrap();
+    fn packets<'a>(value: &'a serde_json::Value, found: &mut Vec<&'a serde_json::Value>) {
+        match value {
+            serde_json::Value::Object(map) => {
+                if map.contains_key("payload") && map.contains_key("hops_remaining") {
+                    found.push(value);
+                }
+                for v in map.values() {
+                    packets(v, found);
+                }
+            }
+            serde_json::Value::Array(values) => {
+                for v in values {
+                    packets(v, found);
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut physical = vec![];
+    packets(&snapshot["communications"]["simulator"], &mut physical);
+    assert!(!physical.is_empty());
+    for p in physical {
+        assert_eq!(p["metadata"]["priority"], 191);
+        assert_eq!(p["metadata"]["traffic_class"], 2);
+        assert_eq!(p["metadata"]["expires_at"], 38_000_000_000_u64);
+        assert_eq!(p["hops_remaining"], 2);
+    }
+    let mut saw_partial = false;
+    let mut results = vec![];
+    for _ in 0..20 {
+        game.simulation.step();
+        planning::process_deliveries(&mut game);
+        let events = game.simulation.drain_audit();
+        let partial = events.iter().any(|e| {
+            e.context.message_id.as_deref() == Some(&message.to_string())
+                && e.kind == sim_core::audit::Kind::Delivered
+                && e.context.hop == Some(1)
+        });
+        let delivered = record(&game, message).delivered_at_ns.is_some();
+        let executions = game.simulation.drain_order_results();
+        if !delivered {
+            assert!(executions.is_empty());
+            saw_partial |= partial;
+        }
+        results.extend(executions);
+    }
+    assert!(
+        saw_partial,
+        "at least one final-hop fragment must precede complete application delivery"
+    );
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].intent_id, intent.intent_id);
+}

@@ -1,12 +1,18 @@
 import type { IftuProjection } from "./IftuPanel";
 import type { Node } from "@xyflow/react";
 
+export const GEOMETRY_STATUSES = ["clear", "earth_blocked", "terrain_blocked", "terrain_unknown", "out_of_range"] as const;
+export type GeometryStatus = typeof GEOMETRY_STATUSES[number];
+export function formatGeometry(status: GeometryStatus): string {
+  return { clear: "Clear line of sight", earth_blocked: "Earth blocked", terrain_blocked: "Terrain blocked", terrain_unknown: "Terrain coverage unknown", out_of_range: "Out of range" }[status];
+}
 export type NetworkNode = { id: string; name: string; domain: string; receiver_jammed: boolean; receiver_status_known?: boolean };
 export type NetworkLink = {
   id: string; from_entity_id: string; to_entity_id: string; available: boolean; jammed: number; availability_known?: boolean;
+  geometry_status?: GeometryStatus;
   effective_bit_rate_bps?: number | null; queued_packets: number; queued_bytes: number;
 };
-export const MESSAGE_STATES = ["queued", "in_transit", "delivered", "acknowledged", "retrying", "dropped", "expired"] as const;
+export const MESSAGE_STATES = ["queued", "in_transit", "delivered", "acknowledged", "retrying", "dropped", "expired", "unacknowledged"] as const;
 export type MessageState = typeof MESSAGE_STATES[number];
 export type MessageRecord = {
   sequence: number; state: MessageState; packet_id?: number | null; started_at_ns?: number | null; terminal_at_ns?: number | null;
@@ -129,6 +135,7 @@ function isLink(value: unknown): value is NetworkLink {
     && typeof value.to_entity_id === "string" && typeof value.available === "boolean"
     && typeof value.jammed === "number" && Number.isFinite(value.jammed) && value.jammed >= 0 && value.jammed <= 1
     && (value.effective_bit_rate_bps == null || isCounter(value.effective_bit_rate_bps))
+    && (value.geometry_status === undefined || GEOMETRY_STATUSES.includes(value.geometry_status as GeometryStatus))
     && isCounter(value.queued_packets) && isCounter(value.queued_bytes);
 }
 function isMessage(value: unknown): value is MessageRecord {

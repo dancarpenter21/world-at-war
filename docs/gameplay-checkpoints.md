@@ -1,5 +1,25 @@
 # Verified gameplay checkpoints
 
+## Ridge relay radio
+
+The real-server browser regression sends a movement order while a synthetic ridge
+blocks headquarters' direct radio path. A separate pilot sees a contact locally;
+headquarters sees no track until a report arrives. The inspector shows **Terrain
+blocked** with **0% interference**.
+
+![Terrain-blocked direct radio path](screenshots/ridge-blocked-desktop.png)
+
+The scripted relay climbs into position. Its two hops carry the queued order,
+reports and execution reply while the direct path stays blocked. Reload preserves
+the confirmed receipt and paused game. This fixture establishes software behavior,
+not real-terrain RF accuracy.
+
+![Relay restores authorized radio delivery](screenshots/ridge-restored-desktop.png)
+
+The same flow runs at 390 pixels wide with scrollable network inspection.
+
+![Terrain radio inspection on a phone](screenshots/ridge-blocked-phone.png)
+
 ## White Cell team
 
 The real-server browser regressions create an exercise hosted by White Cell,

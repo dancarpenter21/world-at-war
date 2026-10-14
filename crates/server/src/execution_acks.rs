@@ -136,7 +136,7 @@ pub(super) fn receive(game: &mut Game, message_id: Uuid, intent_id: Uuid) {
     let Some(ack) = game.execution_acks.results.get_mut(&intent_id) else {
         return;
     };
-    if record.state == MessageState::Delivered
+    if record.delivered_at_ns.is_some()
         && record.message.profile_id == ACK_PROFILE
         && record.message.header.origin_entity_id == ack.executor_entity_id
         && record.message.header.recipient_entity_id == ack.recipient_entity_id

@@ -180,7 +180,15 @@ pub(super) fn record_execution_results(game: &mut Game) {
 fn message_state(record: Option<&NetworkMessageRecord>) -> IntentState {
     match record.map(|record| record.state) {
         Some(MessageState::InTransit) => IntentState::InTransit,
-        Some(MessageState::Delivered) => IntentState::AwaitingExecution,
+        Some(MessageState::Delivered | MessageState::Acknowledged) => {
+            IntentState::AwaitingExecution
+        }
+        Some(MessageState::Unacknowledged)
+            if record.is_some_and(|r| r.delivered_at_ns.is_some()) =>
+        {
+            IntentState::AwaitingExecution
+        }
+        Some(MessageState::Unacknowledged) => IntentState::Dropped,
         Some(MessageState::Dropped) => IntentState::Dropped,
         Some(MessageState::Expired) => IntentState::Expired,
         _ => IntentState::Queued,
@@ -557,7 +565,7 @@ pub(super) fn mission_debrief(game: &mut Game, role: &Role) -> MissionDebrief {
                 .network_messages
                 .iter()
                 .find(|record| {
-                    record.state == MessageState::Delivered
+                    record.delivered_at_ns.is_some()
                         && record.message.profile_id == impact_reports::IMPACT_REPORT_PROFILE
                         && record.message.header.recipient_entity_id == role.location_unit_id
                         && record.message.fields.get("intent_id").is_some_and(|id| {

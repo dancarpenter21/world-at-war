@@ -1,0 +1,512 @@
+{
+  "arch": "x86_64",
+  "c3mesh_revision": "2f13199e665806b5d0ac0f0f4db07eb436e0a008",
+  "communications_catalog_sha256": "6ee5ced6ca0c783c4e27210c764ce67474245c108befb7fc550e23e7f07256fb",
+  "cpu": "AMD Ryzen 7 9800X3D 8-Core Processor",
+  "dirty": true,
+  "logical_cpus": 16,
+  "os": "linux",
+  "profile": "release",
+  "results": [
+    {
+      "ecs_ms": {
+        "max": 11.916718999999999,
+        "mean": 2.9134678666666662,
+        "p50": 1.5580749999999999,
+        "p95": 10.872748,
+        "samples": 30
+      },
+      "elapsed_seconds": 0.354660776,
+      "interference_ms": {
+        "max": 27.066962,
+        "mean": 3.2014082666666672,
+        "p50": 0.362935,
+        "p95": 24.177310000000002,
+        "samples": 30
+      },
+      "links": 78,
+      "measured_ticks": 30,
+      "network_advance_ms": {
+        "max": 2.46548,
+        "mean": 0.2751148,
+        "p50": 0.00619,
+        "p95": 1.791139,
+        "samples": 30
+      },
+      "peak_visible_queue_bytes": 433061,
+      "peak_visible_queue_packets": 851,
+      "projection_sha256": "4603022f5818dd81d13d284fd1542797b2a1deffd330c2564693f961909d5c8f",
+      "radio_propagation": true,
+      "reassembly_ms": {
+        "max": 2.3536289999999997,
+        "mean": 0.2715094333333333,
+        "p50": 0.07202099999999999,
+        "p95": 1.8469300000000002,
+        "samples": 30
+      },
+      "regional_simulation_budget_met": true,
+      "repeat": 1,
+      "reports_ms": {
+        "max": 27.693742,
+        "mean": 2.394624966666667,
+        "p50": 0.00023999999999999998,
+        "p95": 16.887161000000003,
+        "samples": 30
+      },
+      "role_projection_ms": {
+        "max": 0.324715,
+        "mean": 0.10976335333333335,
+        "p50": 0.093142,
+        "p95": 0.238064,
+        "samples": 300
+      },
+      "role_serialization_ms": {
+        "max": 0.085992,
+        "mean": 0.03407021333333334,
+        "p50": 0.033531,
+        "p95": 0.056281,
+        "samples": 300
+      },
+      "roles_projected_per_tick": 10,
+      "scenario": "regional-campaign.v1",
+      "scenario_version": 4,
+      "seed": 12787750,
+      "sensing": {
+        "candidate_checks": 132,
+        "observation_ms": 9.179404,
+        "terrain_checks": 84
+      },
+      "simulation_tick_ms": {
+        "max": 59.938099,
+        "mean": 9.222736900000001,
+        "p50": 2.8739820000000003,
+        "p95": 44.132711,
+        "samples": 30
+      },
+      "snapshot_bytes_uncompressed": {
+        "max": 93794.0,
+        "mean": 43086.77,
+        "p50": 41420.0,
+        "p95": 67919.0,
+        "samples": 300
+      },
+      "terrain_manifest": {
+        "source": "Synthetic flat terrain for isolated radio benchmark; not real-terrain acceptance",
+        "tiles": [
+          {
+            "file": "N37W078.hgt",
+            "latitude": 37,
+            "longitude": -78,
+            "samples": 1201,
+            "sha256": "b2517a7ba04d246ffda4a0f19a4b7e62608ffc9c71a54366308b900d7a97c616"
+          },
+          {
+            "file": "N37W077.hgt",
+            "latitude": 37,
+            "longitude": -77,
+            "samples": 1201,
+            "sha256": "b2517a7ba04d246ffda4a0f19a4b7e62608ffc9c71a54366308b900d7a97c616"
+          },
+          {
+            "file": "N37W076.hgt",
+            "latitude": 37,
+            "longitude": -76,
+            "samples": 1201,
+            "sha256": "b2517a7ba04d246ffda4a0f19a4b7e62608ffc9c71a54366308b900d7a97c616"
+          },
+          {
+            "file": "N38W078.hgt",
+            "latitude": 38,
+            "longitude": -78,
+            "samples": 1201,
+            "sha256": "b2517a7ba04d246ffda4a0f19a4b7e62608ffc9c71a54366308b900d7a97c616"
+          },
+          {
+            "file": "N38W077.hgt",
+            "latitude": 38,
+            "longitude": -77,
+            "samples": 1201,
+            "sha256": "b2517a7ba04d246ffda4a0f19a4b7e62608ffc9c71a54366308b900d7a97c616"
+          },
+          {
+            "file": "N38W076.hgt",
+            "latitude": 38,
+            "longitude": -76,
+            "samples": 1201,
+            "sha256": "b2517a7ba04d246ffda4a0f19a4b7e62608ffc9c71a54366308b900d7a97c616"
+          }
+        ],
+        "version": 1,
+        "vertical_datum": "EGM96"
+      },
+      "transmission_ms": {
+        "max": 1.855621,
+        "mean": 0.1649742,
+        "p50": 0.032101000000000005,
+        "p95": 1.3571119999999999,
+        "samples": 30
+      },
+      "transport_ms": {
+        "max": 4.415923,
+        "mean": 0.7132358,
+        "p50": 0.085732,
+        "p95": 3.344565,
+        "samples": 30
+      },
+      "units": 12,
+      "warmup_ticks": 5
+    },
+    {
+      "ecs_ms": {
+        "max": 12.022931,
+        "mean": 2.9624755333333335,
+        "p50": 1.5680049999999999,
+        "p95": 10.880673,
+        "samples": 30
+      },
+      "elapsed_seconds": 0.350964665,
+      "interference_ms": {
+        "max": 26.864593,
+        "mean": 3.0121613,
+        "p50": 0.37723599999999996,
+        "p95": 21.398345,
+        "samples": 30
+      },
+      "links": 78,
+      "measured_ticks": 30,
+      "network_advance_ms": {
+        "max": 2.537191,
+        "mean": 0.2052580333333333,
+        "p50": 0.00774,
+        "p95": 1.840801,
+        "samples": 30
+      },
+      "peak_visible_queue_bytes": 433061,
+      "peak_visible_queue_packets": 851,
+      "projection_sha256": "4603022f5818dd81d13d284fd1542797b2a1deffd330c2564693f961909d5c8f",
+      "radio_propagation": true,
+      "reassembly_ms": {
+        "max": 4.079787,
+        "mean": 0.31945083333333335,
+        "p50": 0.059141,
+        "p95": 1.817199,
+        "samples": 30
+      },
+      "regional_simulation_budget_met": true,
+      "repeat": 2,
+      "reports_ms": {
+        "max": 28.295047,
+        "mean": 2.4027957666666664,
+        "p50": 0.00023,
+        "p95": 16.776343999999998,
+        "samples": 30
+      },
+      "role_projection_ms": {
+        "max": 0.321876,
+        "mean": 0.11172664666666675,
+        "p50": 0.09442099999999999,
+        "p95": 0.24694400000000002,
+        "samples": 300
+      },
+      "role_serialization_ms": {
+        "max": 0.08079199999999999,
+        "mean": 0.03445057333333333,
+        "p50": 0.03356,
+        "p95": 0.061991,
+        "samples": 300
+      },
+      "roles_projected_per_tick": 10,
+      "scenario": "regional-campaign.v1",
+      "scenario_version": 4,
+      "seed": 12787750,
+      "sensing": {
+        "candidate_checks": 132,
+        "observation_ms": 9.270286,
+        "terrain_checks": 84
+      },
+      "simulation_tick_ms": {
+        "max": 61.440914,
+        "mean": 9.070545333333333,
+        "p50": 2.355908,
+        "p95": 40.953754,
+        "samples": 30
+      },
+      "snapshot_bytes_uncompressed": {
+        "max": 93794.0,
+        "mean": 43086.77,
+        "p50": 41420.0,
+        "p95": 67919.0,
+        "samples": 300
+      },
+      "terrain_manifest": {
+        "source": "Synthetic flat terrain for isolated radio benchmark; not real-terrain acceptance",
+        "tiles": [
+          {
+            "file": "N37W078.hgt",
+            "latitude": 37,
+            "longitude": -78,
+            "samples": 1201,
+            "sha256": "b2517a7ba04d246ffda4a0f19a4b7e62608ffc9c71a54366308b900d7a97c616"
+          },
+          {
+            "file": "N37W077.hgt",
+            "latitude": 37,
+            "longitude": -77,
+            "samples": 1201,
+            "sha256": "b2517a7ba04d246ffda4a0f19a4b7e62608ffc9c71a54366308b900d7a97c616"
+          },
+          {
+            "file": "N37W076.hgt",
+            "latitude": 37,
+            "longitude": -76,
+            "samples": 1201,
+            "sha256": "b2517a7ba04d246ffda4a0f19a4b7e62608ffc9c71a54366308b900d7a97c616"
+          },
+          {
+            "file": "N38W078.hgt",
+            "latitude": 38,
+            "longitude": -78,
+            "samples": 1201,
+            "sha256": "b2517a7ba04d246ffda4a0f19a4b7e62608ffc9c71a54366308b900d7a97c616"
+          },
+          {
+            "file": "N38W077.hgt",
+            "latitude": 38,
+            "longitude": -77,
+            "samples": 1201,
+            "sha256": "b2517a7ba04d246ffda4a0f19a4b7e62608ffc9c71a54366308b900d7a97c616"
+          },
+          {
+            "file": "N38W076.hgt",
+            "latitude": 38,
+            "longitude": -76,
+            "samples": 1201,
+            "sha256": "b2517a7ba04d246ffda4a0f19a4b7e62608ffc9c71a54366308b900d7a97c616"
+          }
+        ],
+        "version": 1,
+        "vertical_datum": "EGM96"
+      },
+      "transmission_ms": {
+        "max": 2.3213090000000003,
+        "mean": 0.16657983333333334,
+        "p50": 0.035731,
+        "p95": 1.3861819999999998,
+        "samples": 30
+      },
+      "transport_ms": {
+        "max": 4.936521,
+        "mean": 0.6931127333333332,
+        "p50": 0.06792200000000001,
+        "p95": 4.428123,
+        "samples": 30
+      },
+      "units": 12,
+      "warmup_ticks": 5
+    },
+    {
+      "ecs_ms": {
+        "max": 0.158202,
+        "mean": 0.04853243333333333,
+        "p50": 0.029461,
+        "p95": 0.136892,
+        "samples": 30
+      },
+      "elapsed_seconds": 1.051114046,
+      "interference_ms": {
+        "max": 3.2088669999999997,
+        "mean": 2.656701500000001,
+        "p50": 2.626093,
+        "p95": 2.797565,
+        "samples": 30
+      },
+      "links": 2496,
+      "measured_ticks": 30,
+      "network_advance_ms": {
+        "max": 0.198324,
+        "mean": 0.12726926666666666,
+        "p50": 0.117062,
+        "p95": 0.196865,
+        "samples": 30
+      },
+      "peak_visible_queue_bytes": 0,
+      "peak_visible_queue_packets": 0,
+      "projection_sha256": "0b8841d4400339e2b7ec4183077be5a58b1024794f8510c390995df4a4158c23",
+      "radio_propagation": true,
+      "reassembly_ms": {
+        "max": 0.00019,
+        "mean": 0.00009833333333333333,
+        "p50": 0.00008999999999999999,
+        "p95": 0.00017999999999999998,
+        "samples": 30
+      },
+      "regional_simulation_budget_met": null,
+      "repeat": 1,
+      "reports_ms": {
+        "max": 0.00045,
+        "mean": 0.00008833333333333332,
+        "p50": 0.00008,
+        "p95": 0.00009999999999999999,
+        "samples": 30
+      },
+      "role_projection_ms": {
+        "max": 2.0725029999999998,
+        "mean": 1.2434022111111114,
+        "p50": 1.3865830000000001,
+        "p95": 1.491694,
+        "samples": 450
+      },
+      "role_serialization_ms": {
+        "max": 0.562029,
+        "mean": 0.28932300444444436,
+        "p50": 0.319215,
+        "p95": 0.353605,
+        "samples": 450
+      },
+      "roles_projected_per_tick": 15,
+      "scenario": "global-crisis.v2",
+      "scenario_version": 4,
+      "seed": 12787750,
+      "sensing": {
+        "candidate_checks": 269,
+        "observation_ms": 0.127742,
+        "terrain_checks": 0
+      },
+      "simulation_tick_ms": {
+        "max": 3.4381809999999997,
+        "mean": 2.833405866666667,
+        "p50": 2.796325,
+        "p95": 3.042949,
+        "samples": 30
+      },
+      "snapshot_bytes_uncompressed": {
+        "max": 730868.0,
+        "mean": 644221.8711111111,
+        "p50": 730863.0,
+        "p95": 730868.0,
+        "samples": 450
+      },
+      "terrain_manifest": null,
+      "transmission_ms": {
+        "max": 0.00091,
+        "mean": 0.00039333333333333326,
+        "p50": 0.00037,
+        "p95": 0.0005700000000000001,
+        "samples": 30
+      },
+      "transport_ms": {
+        "max": 0.199434,
+        "mean": 0.12808360000000002,
+        "p50": 0.117852,
+        "p95": 0.197855,
+        "samples": 30
+      },
+      "units": 64,
+      "warmup_ticks": 5
+    },
+    {
+      "ecs_ms": {
+        "max": 0.191083,
+        "mean": 0.052720766666666655,
+        "p50": 0.032961,
+        "p95": 0.137592,
+        "samples": 30
+      },
+      "elapsed_seconds": 1.049875365,
+      "interference_ms": {
+        "max": 2.815836,
+        "mean": 2.6288788000000003,
+        "p50": 2.639444,
+        "p95": 2.813276,
+        "samples": 30
+      },
+      "links": 2496,
+      "measured_ticks": 30,
+      "network_advance_ms": {
+        "max": 0.194733,
+        "mean": 0.120677,
+        "p50": 0.116072,
+        "p95": 0.14167300000000002,
+        "samples": 30
+      },
+      "peak_visible_queue_bytes": 0,
+      "peak_visible_queue_packets": 0,
+      "projection_sha256": "0b8841d4400339e2b7ec4183077be5a58b1024794f8510c390995df4a4158c23",
+      "radio_propagation": true,
+      "reassembly_ms": {
+        "max": 0.00016,
+        "mean": 0.00009866666666666665,
+        "p50": 0.00008999999999999999,
+        "p95": 0.00016,
+        "samples": 30
+      },
+      "regional_simulation_budget_met": null,
+      "repeat": 2,
+      "reports_ms": {
+        "max": 0.00016999999999999999,
+        "mean": 0.00010133333333333332,
+        "p50": 0.00008,
+        "p95": 0.00016999999999999999,
+        "samples": 30
+      },
+      "role_projection_ms": {
+        "max": 2.225685,
+        "mean": 1.2395529177777775,
+        "p50": 1.374213,
+        "p95": 1.509274,
+        "samples": 450
+      },
+      "role_serialization_ms": {
+        "max": 0.5738,
+        "mean": 0.290506902222222,
+        "p50": 0.31825499999999995,
+        "p95": 0.357936,
+        "samples": 450
+      },
+      "roles_projected_per_tick": 15,
+      "scenario": "global-crisis.v2",
+      "scenario_version": 4,
+      "seed": 12787750,
+      "sensing": {
+        "candidate_checks": 269,
+        "observation_ms": 0.10992199999999999,
+        "terrain_checks": 0
+      },
+      "simulation_tick_ms": {
+        "max": 3.0343,
+        "mean": 2.8033225666666666,
+        "p50": 2.8111360000000003,
+        "p95": 2.994729,
+        "samples": 30
+      },
+      "snapshot_bytes_uncompressed": {
+        "max": 730868.0,
+        "mean": 644221.8711111111,
+        "p50": 730863.0,
+        "p95": 730868.0,
+        "samples": 450
+      },
+      "terrain_manifest": null,
+      "transmission_ms": {
+        "max": 0.00109,
+        "mean": 0.000453,
+        "p50": 0.00038,
+        "p95": 0.00088,
+        "samples": 30
+      },
+      "transport_ms": {
+        "max": 0.19612300000000002,
+        "mean": 0.12162166666666666,
+        "p50": 0.117022,
+        "p95": 0.143423,
+        "samples": 30
+      },
+      "units": 64,
+      "warmup_ticks": 5
+    }
+  ],
+  "revision": "3a2f9bdb51a0dc69881cebeadfee39f9e2f9a05b",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "schema_version": 1,
+  "workload": "Seeded scenario ECS, communications and reports; every scenario role projected/serialized each tick. No gateway, wall-clock pacing, server AI/authority/audit, live catalogs or browser rendering."
+}
