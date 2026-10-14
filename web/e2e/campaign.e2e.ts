@@ -106,8 +106,8 @@ test("real players receive published plans only after delivery and cannot read a
     await expect(page.getByLabel("Commander intent", { exact: true })).toBeDisabled();
     await expect(page.getByText("Import airspace order", { exact: true })).toHaveCount(0);
   }
-  await commander.screenshot({ path: "test-results/campaign-commander.png", fullPage: true });
-  await pilot.screenshot({ path: "test-results/campaign-pilot.png", fullPage: true });
+  await commander.screenshot({ path: test.info().outputPath("campaign-commander.png"), fullPage: true });
+  await pilot.screenshot({ path: test.info().outputPath("campaign-pilot.png"), fullPage: true });
 });
 
 test("reload restores the held role without changing its lease and a severed network stream resynchronizes", async ({ browser }) => {
@@ -215,7 +215,7 @@ test("ACO preview, resolutions, atomic apply, deduplication and publication use 
   await expect.poll(async () => (await planning(pilot)).received?.revision, { timeout: 100_000 }).toBe(3);
   await expect(pilot.getByRole("cell", { name: "TRAINING", exact: true })).toBeVisible();
   await expect(pilot.getByRole("cell", { name: "0–600, 900–1200", exact: true })).toBeVisible();
-  await commander.screenshot({ path: "test-results/airspace-import.png", fullPage: true });
+  await commander.screenshot({ path: test.info().outputPath("airspace-import.png"), fullPage: true });
 });
 
 test("invalid imports, excluded records and stale previews cannot overwrite a campaign draft", async ({ browser }) => {
@@ -298,7 +298,7 @@ test("diagnostics measure the held role, distinguish pause and recover after sta
   await control(page, "start");
   await expect(panel).toContainText("running · tick");
   await expect(panel).not.toContainText("Simulation is paused");
-  await page.screenshot({ path: "test-results/campaign-diagnostics.png", fullPage: true });
+  await page.screenshot({ path: test.info().outputPath("campaign-diagnostics.png"), fullPage: true });
 });
 
 async function planningAction(page: Page, action: Record<string, unknown>) {
@@ -379,7 +379,7 @@ test("clearances, handoffs and cancellation wait for delivery and enforce contro
   await control(commander, "start");
   await expect.poll(async () => (await planning(pilot)).reports.find(item => item.mission_id === mission.id)?.state, { timeout: 30_000 }).toBe("cancelled");
   await expect(report).toContainText("cancelled", { timeout: 30_000 });
-  await pilot.screenshot({ path: "test-results/campaign-handoff-cancellation.png", fullPage: true });
+  await pilot.screenshot({ path: test.info().outputPath("campaign-handoff-cancellation.png"), fullPage: true });
   const canvas = pilot.locator(".globe canvas");
   await canvas.evaluate(element => element.setAttribute("data-retained", "planning"));
   await pilot.getByRole("button", { name: "Close planning", exact: true }).click();

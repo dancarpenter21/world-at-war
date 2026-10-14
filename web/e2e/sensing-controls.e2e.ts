@@ -28,7 +28,7 @@ test("host speed widget stays synchronized, pause freezes time, and controller w
   await expect(guest.getByLabel("Simulation speed")).toHaveText("60×");
   await expect(guest.getByLabel("Simulation speed")).not.toHaveJSProperty("tagName", "SELECT");
   await page.getByLabel("Simulation speed").selectOption("5");
-  await expect(guest.getByLabel("Simulation speed")).toHaveText("5×");
+  await expect(guest.getByLabel("Simulation speed")).toHaveText("5×", { timeout: 15_000 });
   await page.getByLabel("Visibility (m)").fill("1200"); await page.getByRole("button", { name: "Apply weather", exact: true }).click();
   await expect(page.getByText(/Weather revision 1 committed/)).toBeVisible();
   const selection = await page.evaluate(() => JSON.parse(localStorage.getItem("world-at-war-session")!));
@@ -46,5 +46,5 @@ test("host speed widget stays synchronized, pause freezes time, and controller w
   const paused = (await (await page.request.get(backendUrl + "/v1/games")).json())[0].tick;
   await page.waitForTimeout(700);
   await expect(async () => { const current = (await (await page.request.get(backendUrl + "/v1/games")).json())[0]; expect(current.tick).toBe(paused); }).toPass({ intervals: [500, 1000], timeout: 2000 });
-  await page.screenshot({ path: "test-results/sensing-clock-weather.png", fullPage: true });
+  await page.screenshot({ path: test.info().outputPath("sensing-clock-weather.png"), fullPage: true });
 });

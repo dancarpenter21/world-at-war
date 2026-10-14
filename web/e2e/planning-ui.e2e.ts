@@ -48,5 +48,5 @@ test("commander compares, edits and publishes a campaign through the planning wo
   await expect(page.getByText("Received revision 2",{exact:false})).toBeVisible();
   expect(actions).toEqual(["save","publish"]);
   await page.locator(".planning-workspace").evaluate(element => { if ("scrollTop" in element) element.scrollTop = 0; });
-  await page.screenshot({path:"test-results/joint-planning.png",fullPage:true});
+  await page.screenshot({path:test.info().outputPath("joint-planning.png"),fullPage:true});
 });

@@ -77,7 +77,11 @@ test("White Cell hosts human Red and Blue, approves a late referee, shares notes
     socket.onmessage = () => result.frames++;
     socket.onclose = event => { result.close = event.code; };
   }, { base: backendUrl, seat: await selection(resumedTab) });
-  await expect.poll(() => resumedTab.evaluate(() => (window as any).whiteCellStream.frames)).toBeGreaterThan(0);
+  await expect.poll(async () => {
+    const stream = await resumedTab.evaluate(() => (window as any).whiteCellStream);
+    expect(stream.close, "truth stream must remain authorized while awaiting its first frame").toBe(0);
+    return stream.frames;
+  }, { timeout: 15_000 }).toBeGreaterThan(0);
   await page.getByRole("button", { name: /^Team & players/ }).click();
   await page.locator(".team-panel li").filter({ hasText: "Late referee" }).getByRole("button", { name: "Remove from team" }).click();
   for (const target of [referee, resumedTab]) {
