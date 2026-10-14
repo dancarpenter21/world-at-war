@@ -393,7 +393,7 @@ CI divides the browser suite across three independent runners with one worker pe
 runner and separate diagnostics artifacts. Locally, use `npm run test:e2e -- --shard=1/3`
 (and shards `2/3`, `3/3`) to select the same groups.
 
-Functional browser tests limit operational and truth-map rendering to 5 FPS at half resolution so
+Functional browser tests limit operational and truth-map rendering to 5 FPS at quarter resolution so
 several isolated, software-rendered player contexts can share a hosted runner.
 They retain real Cesium canvases, interpolation, polling and WebSocket streams;
 the simulation still targets 60 Hz. Set `E2E_MAP_FRAME_RATE=60 E2E_MAP_RESOLUTION_SCALE=1` for an explicit

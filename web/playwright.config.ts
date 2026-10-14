@@ -31,7 +31,7 @@ export default defineConfig({
       // software rendering for functional tests while keeping real canvases,
       // interpolation, polling, streams and the server clock active.
       VITE_MAP_FRAME_RATE: process.env.E2E_MAP_FRAME_RATE ?? "5",
-      VITE_MAP_RESOLUTION_SCALE: process.env.E2E_MAP_RESOLUTION_SCALE ?? "0.5"
+      VITE_MAP_RESOLUTION_SCALE: process.env.E2E_MAP_RESOLUTION_SCALE ?? "0.25"
     }
   }
 });
