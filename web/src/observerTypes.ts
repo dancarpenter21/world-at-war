@@ -1,3 +1,4 @@
+import type { LogisticsProjection } from "./logisticsModel";
 import type { CommunicationLink, Position, Unit } from "./globeEntities";
 export type ObserverRole = {
   id: string; name: string; kind: "controller" | "monitor" | "white_cell"; observer_kind: "controller" | "monitor" | "white_cell";
@@ -10,7 +11,7 @@ export type TruthWeapon = {
   position: Position | null; aim_point: Position | null; impact_tick: number | null;
   phase: string; provider_id: string | null;
 };
-export type TruthProjection = {
+export type TruthProjection = { logistics?: LogisticsProjection;
   tick: number; units: TruthUnit[]; weapons: TruthWeapon[];
   jamming_regions: { id: string; name: string; center: Position; radius_m: number }[];
   communication_links: CommunicationLink[];

@@ -1,3 +1,4 @@
+import type { LogisticsProjection } from "./logisticsModel";
 import type { GeometryStatus } from "./networkModel";
 import { SmoothPositions } from "./smoothPositions";
 import type { IftuProjection } from "./IftuPanel";
@@ -25,10 +26,10 @@ export type CombatProjection = {
   mission: { title: string; status: "active" | "succeeded" | "failed"; deadline_tick: number; finished_tick: number | null; reason: string | null } | null;
   local_shots_in_flight: number; local_impacts: ImpactReport[]; received_impacts?: { report: ImpactReport; received_tick: number }[];
 };
-export type Weather = { visibility_m: number; cloud_base_m: number; cloud_top_m: number; cloud_opacity: number; precipitation: number; thermal_contrast: number };
+export type Weather = { wind_north_mps?: number; wind_east_mps?: number; sea_state?: number; visibility_m: number; cloud_base_m: number; cloud_top_m: number; cloud_opacity: number; precipitation: number; thermal_contrast: number };
 export type Bearing = { source: string; maximum_range_m: number; id: string; receiver_position: Position; bearing_deg: number; uncertainty_deg: number; observed_tick: number; received_tick: number; emitter_class: string };
 export type SensingView = { weather_reports?: { source: string; position: Position; conditions: Weather; observed_tick: number; received_tick: number }[]; bearings: Bearing[]; radar_emitting: boolean; weather: Weather; source_modalities: Record<string, string[]> };
-export type Projection = { frame?: number; elapsed_seconds?: number; sensing?: SensingView; iftu?: IftuProjection; combat?: CombatProjection; tick: number; own_units: Unit[]; tracks: Track[]; jamming_regions: JammingRegion[]; communication_links: CommunicationLink[] };
+export type Projection = { logistics?: LogisticsProjection; frame?: number; elapsed_seconds?: number; sensing?: SensingView; iftu?: IftuProjection; combat?: CombatProjection; tick: number; own_units: Unit[]; tracks: Track[]; jamming_regions: JammingRegion[]; communication_links: CommunicationLink[] };
 
 type SymbolImage = string | HTMLImageElement | HTMLCanvasElement;
 type EntityKind = "unit" | "track";

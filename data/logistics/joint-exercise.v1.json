@@ -1,0 +1,1495 @@
+{
+  "version": 1,
+  "units": [
+    {
+      "unit_id": "00000000-0000-0000-0000-00000000000b",
+      "profile": {
+        "id": "fictional-boom-fighter",
+        "fictional": true,
+        "fuel_type": "fictional-joint-fuel",
+        "fuel_capacity_kg": 1000,
+        "dry_mass_kg": 1000,
+        "reserve_kg": 50,
+        "minimum_departure_kg": 100,
+        "cargo_capacity_kg": 500,
+        "ammunition_capacity": 2,
+        "home": "00000000-0000-0000-0000-000000000005",
+        "alternates": [],
+        "compatible_facility_kinds": [
+          "airfield"
+        ],
+        "cruise_speed_mps": 100,
+        "burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "intake": [
+          {
+            "interface": "boom",
+            "rate_kg_s": 10,
+            "evidence": {
+              "source": "authored:joint-sustainment-exercise.v1",
+              "locator": "data/logistics/joint-exercise.v1.json",
+              "retrieved": "2026-10-14",
+              "applicability": "Fictional exercise only; not a real platform specification",
+              "license": "MIT"
+            }
+          }
+        ],
+        "outlets": [],
+        "shared_rate_kg_s": 30,
+        "envelope": {
+          "min_altitude_m": 0,
+          "max_altitude_m": 15000,
+          "min_speed_mps": 0,
+          "max_speed_mps": 350,
+          "max_relative_speed_mps": 30,
+          "connection_distance_m": 1000,
+          "connection_seconds": 2,
+          "disconnection_seconds": 2,
+          "max_sea_state": 5,
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "evidence": {
+          "source": "authored:joint-sustainment-exercise.v1",
+          "locator": "data/logistics/joint-exercise.v1.json",
+          "retrieved": "2026-10-14",
+          "applicability": "Fictional exercise only; not a real platform specification",
+          "license": "MIT"
+        },
+        "climb_burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "idle_burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "combat_burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "combat_phase_seconds": 10,
+        "required_runway_m": 500,
+        "required_runway_width_m": 20,
+        "maximum_takeoff_mass_kg": 2500,
+        "maximum_landing_mass_kg": 2500,
+        "minimum_departure_hit_points": 20
+      },
+      "fuel_kg": 250,
+      "ammunition": 1,
+      "initial_facility": null
+    },
+    {
+      "unit_id": "00000000-0000-0000-0000-00000000000c",
+      "profile": {
+        "id": "fictional-drogue-fighter",
+        "fictional": true,
+        "fuel_type": "fictional-joint-fuel",
+        "fuel_capacity_kg": 1000,
+        "dry_mass_kg": 1000,
+        "reserve_kg": 50,
+        "minimum_departure_kg": 100,
+        "cargo_capacity_kg": 500,
+        "ammunition_capacity": 2,
+        "home": "00000000-0000-0000-0000-00000000001b",
+        "alternates": [],
+        "compatible_facility_kinds": [
+          "carrier"
+        ],
+        "cruise_speed_mps": 100,
+        "burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "intake": [
+          {
+            "interface": "drogue",
+            "rate_kg_s": 10,
+            "evidence": {
+              "source": "authored:joint-sustainment-exercise.v1",
+              "locator": "data/logistics/joint-exercise.v1.json",
+              "retrieved": "2026-10-14",
+              "applicability": "Fictional exercise only; not a real platform specification",
+              "license": "MIT"
+            }
+          }
+        ],
+        "outlets": [],
+        "shared_rate_kg_s": 30,
+        "envelope": {
+          "min_altitude_m": 0,
+          "max_altitude_m": 15000,
+          "min_speed_mps": 0,
+          "max_speed_mps": 350,
+          "max_relative_speed_mps": 30,
+          "connection_distance_m": 1000,
+          "connection_seconds": 2,
+          "disconnection_seconds": 2,
+          "max_sea_state": 5,
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "evidence": {
+          "source": "authored:joint-sustainment-exercise.v1",
+          "locator": "data/logistics/joint-exercise.v1.json",
+          "retrieved": "2026-10-14",
+          "applicability": "Fictional exercise only; not a real platform specification",
+          "license": "MIT"
+        },
+        "climb_burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "idle_burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "combat_burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "combat_phase_seconds": 10,
+        "required_runway_m": 500,
+        "required_runway_width_m": 20,
+        "maximum_takeoff_mass_kg": 2500,
+        "maximum_landing_mass_kg": 2500,
+        "minimum_departure_hit_points": 20
+      },
+      "fuel_kg": 250,
+      "ammunition": 1,
+      "initial_facility": null
+    },
+    {
+      "unit_id": "00000000-0000-0000-0000-00000000000d",
+      "profile": {
+        "id": "fictional-joint-tanker",
+        "fictional": true,
+        "fuel_type": "fictional-joint-fuel",
+        "fuel_capacity_kg": 1000,
+        "dry_mass_kg": 1000,
+        "reserve_kg": 50,
+        "minimum_departure_kg": 100,
+        "cargo_capacity_kg": 500,
+        "ammunition_capacity": 2,
+        "home": "00000000-0000-0000-0000-000000000005",
+        "alternates": [],
+        "compatible_facility_kinds": [
+          "airfield"
+        ],
+        "cruise_speed_mps": 100,
+        "burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "intake": [
+          {
+            "interface": "boom",
+            "rate_kg_s": 10,
+            "evidence": {
+              "source": "authored:joint-sustainment-exercise.v1",
+              "locator": "data/logistics/joint-exercise.v1.json",
+              "retrieved": "2026-10-14",
+              "applicability": "Fictional exercise only; not a real platform specification",
+              "license": "MIT"
+            }
+          }
+        ],
+        "outlets": [
+          {
+            "interface": "boom",
+            "rate_kg_s": 20,
+            "evidence": {
+              "source": "authored:joint-sustainment-exercise.v1",
+              "locator": "data/logistics/joint-exercise.v1.json",
+              "retrieved": "2026-10-14",
+              "applicability": "Fictional exercise only; not a real platform specification",
+              "license": "MIT"
+            }
+          },
+          {
+            "interface": "drogue",
+            "rate_kg_s": 20,
+            "evidence": {
+              "source": "authored:joint-sustainment-exercise.v1",
+              "locator": "data/logistics/joint-exercise.v1.json",
+              "retrieved": "2026-10-14",
+              "applicability": "Fictional exercise only; not a real platform specification",
+              "license": "MIT"
+            }
+          }
+        ],
+        "shared_rate_kg_s": 30,
+        "envelope": {
+          "min_altitude_m": 0,
+          "max_altitude_m": 15000,
+          "min_speed_mps": 0,
+          "max_speed_mps": 350,
+          "max_relative_speed_mps": 30,
+          "connection_distance_m": 1000,
+          "connection_seconds": 2,
+          "disconnection_seconds": 2,
+          "max_sea_state": 5,
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "evidence": {
+          "source": "authored:joint-sustainment-exercise.v1",
+          "locator": "data/logistics/joint-exercise.v1.json",
+          "retrieved": "2026-10-14",
+          "applicability": "Fictional exercise only; not a real platform specification",
+          "license": "MIT"
+        },
+        "climb_burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "idle_burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "combat_burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "combat_phase_seconds": 10,
+        "required_runway_m": 500,
+        "required_runway_width_m": 20,
+        "maximum_takeoff_mass_kg": 2500,
+        "maximum_landing_mass_kg": 2500,
+        "minimum_departure_hit_points": 20
+      },
+      "fuel_kg": 900,
+      "ammunition": 1,
+      "initial_facility": null
+    },
+    {
+      "unit_id": "00000000-0000-0000-0000-00000000000e",
+      "profile": {
+        "id": "fictional-cargo-aircraft",
+        "fictional": true,
+        "fuel_type": "fictional-joint-fuel",
+        "fuel_capacity_kg": 1000,
+        "dry_mass_kg": 1000,
+        "reserve_kg": 50,
+        "minimum_departure_kg": 100,
+        "cargo_capacity_kg": 500,
+        "ammunition_capacity": 2,
+        "home": "00000000-0000-0000-0000-000000000005",
+        "alternates": [],
+        "compatible_facility_kinds": [
+          "airfield"
+        ],
+        "cruise_speed_mps": 100,
+        "burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "intake": [
+          {
+            "interface": "boom",
+            "rate_kg_s": 10,
+            "evidence": {
+              "source": "authored:joint-sustainment-exercise.v1",
+              "locator": "data/logistics/joint-exercise.v1.json",
+              "retrieved": "2026-10-14",
+              "applicability": "Fictional exercise only; not a real platform specification",
+              "license": "MIT"
+            }
+          }
+        ],
+        "outlets": [],
+        "shared_rate_kg_s": 30,
+        "envelope": {
+          "min_altitude_m": 0,
+          "max_altitude_m": 15000,
+          "min_speed_mps": 0,
+          "max_speed_mps": 350,
+          "max_relative_speed_mps": 30,
+          "connection_distance_m": 1000,
+          "connection_seconds": 2,
+          "disconnection_seconds": 2,
+          "max_sea_state": 5,
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "evidence": {
+          "source": "authored:joint-sustainment-exercise.v1",
+          "locator": "data/logistics/joint-exercise.v1.json",
+          "retrieved": "2026-10-14",
+          "applicability": "Fictional exercise only; not a real platform specification",
+          "license": "MIT"
+        },
+        "climb_burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "idle_burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "combat_burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "combat_phase_seconds": 10,
+        "required_runway_m": 500,
+        "required_runway_width_m": 20,
+        "maximum_takeoff_mass_kg": 2500,
+        "maximum_landing_mass_kg": 2500,
+        "minimum_departure_hit_points": 20
+      },
+      "fuel_kg": 600,
+      "ammunition": 1,
+      "initial_facility": "00000000-0000-0000-0000-000000000005"
+    },
+    {
+      "unit_id": "00000000-0000-0000-0000-00000000000f",
+      "profile": {
+        "id": "fictional-surface-escort",
+        "fictional": true,
+        "fuel_type": "fictional-joint-fuel",
+        "fuel_capacity_kg": 1000,
+        "dry_mass_kg": 1000,
+        "reserve_kg": 50,
+        "minimum_departure_kg": 100,
+        "cargo_capacity_kg": 500,
+        "ammunition_capacity": 2,
+        "home": "00000000-0000-0000-0000-00000000001a",
+        "alternates": [],
+        "compatible_facility_kinds": [
+          "port",
+          "supply_ship"
+        ],
+        "cruise_speed_mps": 10,
+        "burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "intake": [
+          {
+            "interface": "underway",
+            "rate_kg_s": 10,
+            "evidence": {
+              "source": "authored:joint-sustainment-exercise.v1",
+              "locator": "data/logistics/joint-exercise.v1.json",
+              "retrieved": "2026-10-14",
+              "applicability": "Fictional exercise only; not a real platform specification",
+              "license": "MIT"
+            }
+          }
+        ],
+        "outlets": [],
+        "shared_rate_kg_s": 30,
+        "envelope": {
+          "min_altitude_m": 0,
+          "max_altitude_m": 15000,
+          "min_speed_mps": 0,
+          "max_speed_mps": 350,
+          "max_relative_speed_mps": 30,
+          "connection_distance_m": 1000,
+          "connection_seconds": 2,
+          "disconnection_seconds": 2,
+          "max_sea_state": 5,
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "evidence": {
+          "source": "authored:joint-sustainment-exercise.v1",
+          "locator": "data/logistics/joint-exercise.v1.json",
+          "retrieved": "2026-10-14",
+          "applicability": "Fictional exercise only; not a real platform specification",
+          "license": "MIT"
+        },
+        "climb_burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "idle_burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "combat_burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "combat_phase_seconds": 10,
+        "required_runway_m": 500,
+        "required_runway_width_m": 20,
+        "maximum_takeoff_mass_kg": 2500,
+        "maximum_landing_mass_kg": 2500,
+        "minimum_departure_hit_points": 20
+      },
+      "fuel_kg": 250,
+      "ammunition": 1,
+      "initial_facility": null
+    },
+    {
+      "unit_id": "00000000-0000-0000-0000-000000000010",
+      "profile": {
+        "id": "fictional-supply-ship",
+        "fictional": true,
+        "fuel_type": "fictional-joint-fuel",
+        "fuel_capacity_kg": 1000,
+        "dry_mass_kg": 1000,
+        "reserve_kg": 50,
+        "minimum_departure_kg": 100,
+        "cargo_capacity_kg": 500,
+        "ammunition_capacity": 2,
+        "home": "00000000-0000-0000-0000-00000000001a",
+        "alternates": [],
+        "compatible_facility_kinds": [
+          "port",
+          "supply_ship"
+        ],
+        "cruise_speed_mps": 10,
+        "burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "intake": [
+          {
+            "interface": "underway",
+            "rate_kg_s": 10,
+            "evidence": {
+              "source": "authored:joint-sustainment-exercise.v1",
+              "locator": "data/logistics/joint-exercise.v1.json",
+              "retrieved": "2026-10-14",
+              "applicability": "Fictional exercise only; not a real platform specification",
+              "license": "MIT"
+            }
+          }
+        ],
+        "outlets": [
+          {
+            "interface": "underway",
+            "rate_kg_s": 20,
+            "evidence": {
+              "source": "authored:joint-sustainment-exercise.v1",
+              "locator": "data/logistics/joint-exercise.v1.json",
+              "retrieved": "2026-10-14",
+              "applicability": "Fictional exercise only; not a real platform specification",
+              "license": "MIT"
+            }
+          }
+        ],
+        "shared_rate_kg_s": 30,
+        "envelope": {
+          "min_altitude_m": 0,
+          "max_altitude_m": 15000,
+          "min_speed_mps": 0,
+          "max_speed_mps": 350,
+          "max_relative_speed_mps": 30,
+          "connection_distance_m": 1000,
+          "connection_seconds": 2,
+          "disconnection_seconds": 2,
+          "max_sea_state": 5,
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "evidence": {
+          "source": "authored:joint-sustainment-exercise.v1",
+          "locator": "data/logistics/joint-exercise.v1.json",
+          "retrieved": "2026-10-14",
+          "applicability": "Fictional exercise only; not a real platform specification",
+          "license": "MIT"
+        },
+        "climb_burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "idle_burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "combat_burn": {
+          "altitude_m": [
+            0,
+            15000
+          ],
+          "airspeed_mps": [
+            0,
+            350
+          ],
+          "gross_mass_kg": [
+            1000,
+            2500
+          ],
+          "kg_per_second": [
+            1,
+            1.5,
+            2,
+            2.5,
+            1.2,
+            1.7,
+            2.2,
+            2.7
+          ],
+          "evidence": {
+            "source": "authored:joint-sustainment-exercise.v1",
+            "locator": "data/logistics/joint-exercise.v1.json",
+            "retrieved": "2026-10-14",
+            "applicability": "Fictional exercise only; not a real platform specification",
+            "license": "MIT"
+          }
+        },
+        "combat_phase_seconds": 10,
+        "required_runway_m": 500,
+        "required_runway_width_m": 20,
+        "maximum_takeoff_mass_kg": 2500,
+        "maximum_landing_mass_kg": 2500,
+        "minimum_departure_hit_points": 20
+      },
+      "fuel_kg": 900,
+      "ammunition": 1,
+      "initial_facility": null
+    }
+  ],
+  "facilities": [
+    {
+      "unit_id": "00000000-0000-0000-0000-000000000005",
+      "kind": "airfield",
+      "fuel_type": "fictional-joint-fuel",
+      "stock": {
+        "fuel_kg": 400,
+        "ammunition": 20,
+        "repair_points": 100
+      },
+      "capacity": {
+        "fuel_kg": 10000,
+        "ammunition": 100,
+        "repair_points": 1000
+      },
+      "parking_capacity": 4,
+      "movement_slots": 1,
+      "service_slots": 1,
+      "compatible_profile_ids": [
+        "fictional-boom-fighter",
+        "fictional-joint-tanker",
+        "fictional-cargo-aircraft"
+      ],
+      "fuel_rate_kg_s": 20,
+      "ammunition_seconds": 2,
+      "repair_rate_points_s": 2,
+      "cargo_rate_kg_s": 20,
+      "max_sea_state": 5,
+      "min_wind_over_deck_mps": 0,
+      "max_wind_over_deck_mps": 40,
+      "approach": [
+        {
+          "north_m": 0,
+          "east_m": 0,
+          "altitude_m": 0
+        }
+      ],
+      "movement_seconds": 2,
+      "evidence": {
+        "source": "authored:joint-sustainment-exercise.v1",
+        "locator": "data/logistics/joint-exercise.v1.json",
+        "retrieved": "2026-10-14",
+        "applicability": "Fictional exercise only; not a real platform specification",
+        "license": "MIT"
+      },
+      "runway_length_m": 1000,
+      "runway_width_m": 30,
+      "maximum_operating_mass_kg": 10000,
+      "heading_deg": 0,
+      "max_crosswind_mps": 20
+    },
+    {
+      "unit_id": "00000000-0000-0000-0000-000000000019",
+      "kind": "airfield",
+      "fuel_type": "fictional-joint-fuel",
+      "stock": {
+        "fuel_kg": 40,
+        "ammunition": 20,
+        "repair_points": 100
+      },
+      "capacity": {
+        "fuel_kg": 10000,
+        "ammunition": 100,
+        "repair_points": 1000
+      },
+      "parking_capacity": 4,
+      "movement_slots": 1,
+      "service_slots": 1,
+      "compatible_profile_ids": [
+        "fictional-boom-fighter",
+        "fictional-cargo-aircraft",
+        "fictional-joint-tanker"
+      ],
+      "fuel_rate_kg_s": 20,
+      "ammunition_seconds": 2,
+      "repair_rate_points_s": 2,
+      "cargo_rate_kg_s": 20,
+      "max_sea_state": 5,
+      "min_wind_over_deck_mps": 0,
+      "max_wind_over_deck_mps": 40,
+      "approach": [
+        {
+          "north_m": 0,
+          "east_m": 0,
+          "altitude_m": 0
+        }
+      ],
+      "movement_seconds": 2,
+      "evidence": {
+        "source": "authored:joint-sustainment-exercise.v1",
+        "locator": "data/logistics/joint-exercise.v1.json",
+        "retrieved": "2026-10-14",
+        "applicability": "Fictional exercise only; not a real platform specification",
+        "license": "MIT"
+      },
+      "runway_length_m": 1000,
+      "runway_width_m": 30,
+      "maximum_operating_mass_kg": 10000,
+      "heading_deg": 0,
+      "max_crosswind_mps": 20
+    },
+    {
+      "unit_id": "00000000-0000-0000-0000-00000000001a",
+      "kind": "port",
+      "fuel_type": "fictional-joint-fuel",
+      "stock": {
+        "fuel_kg": 1000,
+        "ammunition": 20,
+        "repair_points": 100
+      },
+      "capacity": {
+        "fuel_kg": 10000,
+        "ammunition": 100,
+        "repair_points": 1000
+      },
+      "parking_capacity": 4,
+      "movement_slots": 1,
+      "service_slots": 1,
+      "compatible_profile_ids": [
+        "fictional-surface-escort",
+        "fictional-supply-ship"
+      ],
+      "fuel_rate_kg_s": 20,
+      "ammunition_seconds": 2,
+      "repair_rate_points_s": 2,
+      "cargo_rate_kg_s": 20,
+      "max_sea_state": 5,
+      "min_wind_over_deck_mps": 0,
+      "max_wind_over_deck_mps": 40,
+      "approach": [
+        {
+          "north_m": 0,
+          "east_m": 0,
+          "altitude_m": 0
+        }
+      ],
+      "movement_seconds": 2,
+      "evidence": {
+        "source": "authored:joint-sustainment-exercise.v1",
+        "locator": "data/logistics/joint-exercise.v1.json",
+        "retrieved": "2026-10-14",
+        "applicability": "Fictional exercise only; not a real platform specification",
+        "license": "MIT"
+      },
+      "runway_length_m": 1000,
+      "runway_width_m": 30,
+      "maximum_operating_mass_kg": 10000,
+      "heading_deg": 0,
+      "max_crosswind_mps": 20
+    },
+    {
+      "unit_id": "00000000-0000-0000-0000-00000000001b",
+      "kind": "carrier",
+      "fuel_type": "fictional-joint-fuel",
+      "stock": {
+        "fuel_kg": 40,
+        "ammunition": 20,
+        "repair_points": 100
+      },
+      "capacity": {
+        "fuel_kg": 10000,
+        "ammunition": 100,
+        "repair_points": 1000
+      },
+      "parking_capacity": 4,
+      "movement_slots": 1,
+      "service_slots": 1,
+      "compatible_profile_ids": [
+        "fictional-drogue-fighter"
+      ],
+      "fuel_rate_kg_s": 20,
+      "ammunition_seconds": 2,
+      "repair_rate_points_s": 2,
+      "cargo_rate_kg_s": 20,
+      "max_sea_state": 5,
+      "min_wind_over_deck_mps": 0,
+      "max_wind_over_deck_mps": 40,
+      "approach": [
+        {
+          "north_m": 0,
+          "east_m": 0,
+          "altitude_m": 0
+        }
+      ],
+      "movement_seconds": 2,
+      "evidence": {
+        "source": "authored:joint-sustainment-exercise.v1",
+        "locator": "data/logistics/joint-exercise.v1.json",
+        "retrieved": "2026-10-14",
+        "applicability": "Fictional exercise only; not a real platform specification",
+        "license": "MIT"
+      },
+      "runway_length_m": 1000,
+      "runway_width_m": 30,
+      "maximum_operating_mass_kg": 10000,
+      "heading_deg": 0,
+      "max_crosswind_mps": 20
+    },
+    {
+      "unit_id": "00000000-0000-0000-0000-000000000010",
+      "kind": "supply_ship",
+      "fuel_type": "fictional-joint-fuel",
+      "stock": {
+        "fuel_kg": 500,
+        "ammunition": 20,
+        "repair_points": 100
+      },
+      "capacity": {
+        "fuel_kg": 10000,
+        "ammunition": 100,
+        "repair_points": 1000
+      },
+      "parking_capacity": 4,
+      "movement_slots": 1,
+      "service_slots": 1,
+      "compatible_profile_ids": [
+        "fictional-surface-escort",
+        "fictional-supply-ship"
+      ],
+      "fuel_rate_kg_s": 20,
+      "ammunition_seconds": 2,
+      "repair_rate_points_s": 2,
+      "cargo_rate_kg_s": 20,
+      "max_sea_state": 5,
+      "min_wind_over_deck_mps": 0,
+      "max_wind_over_deck_mps": 40,
+      "approach": [
+        {
+          "north_m": 0,
+          "east_m": 0,
+          "altitude_m": 0
+        }
+      ],
+      "movement_seconds": 2,
+      "evidence": {
+        "source": "authored:joint-sustainment-exercise.v1",
+        "locator": "data/logistics/joint-exercise.v1.json",
+        "retrieved": "2026-10-14",
+        "applicability": "Fictional exercise only; not a real platform specification",
+        "license": "MIT"
+      },
+      "runway_length_m": 1000,
+      "runway_width_m": 30,
+      "maximum_operating_mass_kg": 10000,
+      "heading_deg": 0,
+      "max_crosswind_mps": 20
+    }
+  ],
+  "reports": [
+    {
+      "source": "00000000-0000-0000-0000-00000000000b",
+      "recipient": "00000000-0000-0000-0000-000000000005",
+      "interval_ticks": 5
+    },
+    {
+      "source": "00000000-0000-0000-0000-00000000000c",
+      "recipient": "00000000-0000-0000-0000-000000000005",
+      "interval_ticks": 5
+    },
+    {
+      "source": "00000000-0000-0000-0000-00000000000d",
+      "recipient": "00000000-0000-0000-0000-000000000005",
+      "interval_ticks": 5
+    },
+    {
+      "source": "00000000-0000-0000-0000-00000000000e",
+      "recipient": "00000000-0000-0000-0000-000000000005",
+      "interval_ticks": 5
+    },
+    {
+      "source": "00000000-0000-0000-0000-00000000000f",
+      "recipient": "00000000-0000-0000-0000-000000000005",
+      "interval_ticks": 5
+    },
+    {
+      "source": "00000000-0000-0000-0000-000000000010",
+      "recipient": "00000000-0000-0000-0000-000000000005",
+      "interval_ticks": 5
+    },
+    {
+      "source": "00000000-0000-0000-0000-000000000019",
+      "recipient": "00000000-0000-0000-0000-000000000005",
+      "interval_ticks": 5
+    },
+    {
+      "source": "00000000-0000-0000-0000-00000000001a",
+      "recipient": "00000000-0000-0000-0000-000000000005",
+      "interval_ticks": 5
+    },
+    {
+      "source": "00000000-0000-0000-0000-00000000001b",
+      "recipient": "00000000-0000-0000-0000-000000000005",
+      "interval_ticks": 5
+    }
+  ]
+}

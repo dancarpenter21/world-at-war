@@ -983,6 +983,22 @@ pub(super) fn advance_operations(world: &mut World) {
     let mut shots = BTreeSet::new();
     for m in ops.missions.values_mut() {
         let task = &m.task;
+        if world
+            .resource::<crate::logistics::Runtime>()
+            .configured(task.unit_id)
+            && !world
+                .resource::<crate::logistics::Runtime>()
+                .movement_allowed(task.unit_id)
+        {
+            if !matches!(
+                m.state,
+                MissionState::Completed | MissionState::Cancelled | MissionState::Failed
+            ) {
+                m.state = MissionState::Holding;
+                m.detail = "Awaiting logistics readiness or return/refueling completion".into();
+            }
+            continue;
+        }
         if tick < task.start_tick
             || matches!(
                 m.state,
@@ -1191,6 +1207,15 @@ pub(super) fn advance_operations(world: &mut World) {
         };
         motion.insert(task.unit_id, velocity);
     }
+    let logistics_units: BTreeSet<_> = states
+        .keys()
+        .copied()
+        .filter(|id| {
+            world
+                .resource::<crate::logistics::Runtime>()
+                .configured(*id)
+        })
+        .collect();
     let mut query = world.query::<(
         &SimEntityId,
         &mut Velocity,
@@ -1206,7 +1231,10 @@ pub(super) fn advance_operations(world: &mut World) {
             if let Some(p) = path.as_deref_mut() {
                 p.active = false;
             }
-            combat.profile.fuel_seconds = (combat.profile.fuel_seconds - delta_seconds).max(0.0);
+            if !logistics_units.contains(&id.0) {
+                combat.profile.fuel_seconds =
+                    (combat.profile.fuel_seconds - delta_seconds).max(0.0);
+            }
         }
         if shots.contains(&id.0) {
             combat.profile.ammunition = combat.profile.ammunition.saturating_sub(1);

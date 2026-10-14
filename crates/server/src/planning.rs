@@ -88,6 +88,11 @@ enum PlanningAction {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 enum OperationMessage {
+    LogisticsReport {
+        recipient: Uuid,
+        source: Uuid,
+        report: sim_core::logistics::Projection,
+    },
     Heartbeat {
         unit_id: Uuid,
         controller_role: Uuid,
@@ -595,6 +600,26 @@ pub(super) fn receive(game: &mut Game, payload: &[u8]) {
         return;
     };
     match operation {
+        OperationMessage::LogisticsReport {
+            recipient,
+            source,
+            report,
+        } => {
+            if message.header.recipient_entity_id == recipient
+                && game
+                    .roles
+                    .get(&message.header.origin_role_id)
+                    .is_some_and(|r| r.location_unit_id == source)
+                && game
+                    .simulation
+                    .logistics_report_routes()
+                    .iter()
+                    .any(|r| r.source == source && r.recipient == recipient)
+            {
+                game.simulation
+                    .receive_logistics_report(recipient, source, report);
+            }
+        }
         OperationMessage::Heartbeat {
             unit_id,
             controller_role,
@@ -720,6 +745,28 @@ pub(super) fn receive(game: &mut Game, payload: &[u8]) {
 }
 
 pub(super) fn report_tick(game: &mut Game) {
+    let tick = game.simulation.tick();
+    for route in game.simulation.logistics_report_routes() {
+        if !tick.is_multiple_of(route.interval_ticks) {
+            continue;
+        }
+        let Some(origin) = role_at_unit(game, route.source) else {
+            continue;
+        };
+        let Some(report) = game.simulation.local_logistics_report(route.source) else {
+            continue;
+        };
+        let _ = send(
+            game,
+            origin,
+            route.recipient,
+            OperationMessage::LogisticsReport {
+                recipient: route.recipient,
+                source: route.source,
+                report,
+            },
+        );
+    }
     if !game.simulation.tick().is_multiple_of(5) {
         return;
     }

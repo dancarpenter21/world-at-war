@@ -396,7 +396,11 @@ async fn load_internal(state: &AppState, migration: Option<bool>) -> anyhow::Res
             .ok_or_else(|| anyhow::anyhow!("snapshot scenario unavailable"))?;
         let predecessors: Vec<_> = legacy_scenarios()
             .into_iter()
-            .flat_map(|s| [s.clone(), sim_scenario::upgrade_sensing(s)])
+            .flat_map(|s| {
+                let sensing = sim_scenario::upgrade_sensing(s.clone());
+                let radio = sim_scenario::upgrade_radio_propagation(sensing.clone());
+                [s, sensing, radio]
+            })
             .chain(std::iter::once(sim_scenario::sensing_exercise_scenario()))
             .collect();
         let source = if current.version == game.scenario_version

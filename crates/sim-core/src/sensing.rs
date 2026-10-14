@@ -156,6 +156,12 @@ impl Configuration {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Weather {
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub wind_north_mps: f64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub wind_east_mps: f64,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub sea_state: f64,
     pub visibility_m: f64,
     pub cloud_base_m: f64,
     pub cloud_top_m: f64,
@@ -163,9 +169,15 @@ pub struct Weather {
     pub precipitation: f64,
     pub thermal_contrast: f64,
 }
+fn is_zero(value: &f64) -> bool {
+    *value == 0.0
+}
 impl Default for Weather {
     fn default() -> Self {
         Self {
+            wind_north_mps: 0.0,
+            wind_east_mps: 0.0,
+            sea_state: 0.0,
             visibility_m: 100_000.0,
             cloud_base_m: 2000.0,
             cloud_top_m: 4000.0,
@@ -177,7 +189,13 @@ impl Default for Weather {
 }
 impl Weather {
     pub fn validate(&self) -> Result<(), String> {
-        if !self.visibility_m.is_finite()
+        if !self.wind_north_mps.is_finite()
+            || !self.wind_east_mps.is_finite()
+            || !self.sea_state.is_finite()
+            || !(0.0..=9.0).contains(&self.sea_state)
+            || self.wind_north_mps.abs() > 100.0
+            || self.wind_east_mps.abs() > 100.0
+            || !self.visibility_m.is_finite()
             || !(1.0..=1_000_000.0).contains(&self.visibility_m)
             || !self.cloud_base_m.is_finite()
             || !self.cloud_top_m.is_finite()

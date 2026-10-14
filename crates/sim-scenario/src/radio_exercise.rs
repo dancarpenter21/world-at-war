@@ -6,6 +6,10 @@ const EXERCISE_DATA: &str = include_str!("../../../data/scenarios/command-link-e
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RadioScenarioDefinition {
+    #[serde(default)]
+    logistics: Option<sim_core::logistics::Configuration>,
+    #[serde(default)]
+    logistics_config: Option<String>,
     id: String,
     title: String,
     description: String,
@@ -58,6 +62,20 @@ fn parse_radio_scenario(data: &str) -> Result<Scenario, ScenarioError> {
             "training scenario metadata and radio limits must be populated".into(),
         ));
     }
+    let logistics = match definition.logistics_config.as_deref() {
+        None => definition.logistics,
+        Some("joint-exercise.v1") if definition.logistics.is_none() => Some(
+            serde_json::from_str(include_str!(
+                "../../../data/logistics/joint-exercise.v1.json"
+            ))
+            .map_err(|e| ScenarioError::InvalidAuthoredData(e.to_string()))?,
+        ),
+        Some(_) => {
+            return Err(ScenarioError::InvalidAuthoredData(
+                "unknown or conflicting logistics fixture".into(),
+            ))
+        }
+    };
     let mut units = definition.units;
     let (mut network, communication_links, mut simulator_options) =
         global_communications(&mut units);
@@ -81,6 +99,7 @@ fn parse_radio_scenario(data: &str) -> Result<Scenario, ScenarioError> {
     }
     simulator_options.seed = definition.radio.seed;
     let scenario = Scenario {
+        logistics,
         sensing: None,
         observer_seats: vec![],
         iftu: None,
@@ -361,5 +380,39 @@ mod report_route_tests {
             .unwrap_err()
             .to_string()
             .contains("sensor report routes"));
+    }
+}
+
+/// Entirely fictional supplies, carrier operations and tanker/receiver profiles.
+pub fn joint_sustainment_exercise_scenario() -> Scenario {
+    let mut scenario = parse_radio_scenario(include_str!(
+        "../../../data/scenarios/joint-sustainment-exercise.v1.json"
+    ))
+    .expect("committed joint sustainment exercise must be valid");
+    scenario.observer_seats = training_observers();
+    upgrade_radio_propagation(upgrade_sensing(scenario))
+}
+#[cfg(test)]
+mod logistics_tests {
+    use super::*;
+    #[test]
+    fn joint_exercise_is_offline_fictional_and_spawns_all_basing_modes() {
+        let scenario = joint_sustainment_exercise_scenario();
+        scenario.validate().unwrap();
+        assert!(!scenario.requires_space_catalog);
+        let config = scenario.logistics.as_ref().unwrap();
+        assert!(config.units.iter().all(|u| u.profile.fictional));
+        assert_eq!(config.facilities.len(), 5);
+        let sim = scenario.spawn().unwrap();
+        assert_eq!(sim.logistics_truth().unwrap().units.len(), 6);
+    }
+    #[test]
+    fn regional_upgrade_exposes_gaps_without_inventing_real_aircraft_profiles() {
+        let scenario = upgrade_logistics(regional_campaign_scenario());
+        scenario.validate().unwrap();
+        let config = scenario.logistics.unwrap();
+        assert!(config.units.is_empty());
+        assert_eq!(config.unavailable.len(), 3);
+        assert!(iftu_exercise_scenario().logistics.is_none());
     }
 }

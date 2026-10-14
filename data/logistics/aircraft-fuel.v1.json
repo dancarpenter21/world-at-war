@@ -1,0 +1,291 @@
+{
+  "version": 1,
+  "aircraft": [
+    {
+      "id": "f-35a",
+      "display_name": "F-35A",
+      "configuration": "Baseline internal fuel unless source explicitly specifies otherwise; external stores not inferred",
+      "facts": [
+        {
+          "field": "fuel_capacity",
+          "value": 18250,
+          "unit": "lb",
+          "source_url": "https://www.lockheedmartin.com/content/dam/lockheed-martin/aero/documents/F-35/F-35_Lightning_II_Program_Fast_Facts_-_November_2020.pdf",
+          "locator": "Variant specifications / Internal fuel",
+          "applicability": "F-35A internal fuel only; no external tanks",
+          "retrieved_on": "2026-10-14",
+          "license": "Publicly accessible source; factual values only, no source-document redistribution",
+          "normalized_value": 8278.0607525,
+          "normalized_unit": "kg",
+          "conversion": "1 international pound = 0.45359237 kg exactly"
+        }
+      ],
+      "missing": [
+        "Variant/configuration-specific flight-performance tables indexed by altitude, airspeed and gross mass",
+        "Sourced service timings and basing operating limits",
+        "Verified receiver intake rate and certified refueling envelope"
+      ],
+      "aerial_refueling": "unavailable_pending_evidence"
+    },
+    {
+      "id": "f-35c",
+      "display_name": "F-35C",
+      "configuration": "Baseline internal fuel unless source explicitly specifies otherwise; external stores not inferred",
+      "facts": [
+        {
+          "field": "fuel_capacity",
+          "value": 19750,
+          "unit": "lb",
+          "source_url": "https://www.aviation.marines.mil/Portals/11/Documents/Aviation%20Plan/2022%20Marine%20Aviation%20Plan%20FINAL%20April%202022.pdf",
+          "locator": "Variant specifications / Internal fuel",
+          "applicability": "F-35C internal fuel only; no external tanks",
+          "retrieved_on": "2026-10-14",
+          "license": "Publicly accessible source; factual values only, no source-document redistribution",
+          "normalized_value": 8958.449307500001,
+          "normalized_unit": "kg",
+          "conversion": "1 international pound = 0.45359237 kg exactly"
+        }
+      ],
+      "missing": [
+        "Variant/configuration-specific flight-performance tables indexed by altitude, airspeed and gross mass",
+        "Sourced service timings and basing operating limits",
+        "Verified receiver intake rate and certified refueling envelope"
+      ],
+      "aerial_refueling": "unavailable_pending_evidence"
+    },
+    {
+      "id": "f-15ex",
+      "display_name": "F-15EX",
+      "configuration": "Baseline internal fuel unless source explicitly specifies otherwise; external stores not inferred",
+      "facts": [],
+      "missing": [
+        "Variant/configuration-specific flight-performance tables indexed by altitude, airspeed and gross mass",
+        "Sourced service timings and basing operating limits",
+        "Verified variant-specific fuel capacity",
+        "Verified receiver intake rate and certified refueling envelope"
+      ],
+      "aerial_refueling": "unavailable_pending_evidence"
+    },
+    {
+      "id": "b-2a",
+      "display_name": "B-2A",
+      "configuration": "Baseline internal fuel unless source explicitly specifies otherwise; external stores not inferred",
+      "facts": [
+        {
+          "field": "fuel_capacity",
+          "value": 167000,
+          "unit": "lb",
+          "source_url": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104482/b-2-spirit/",
+          "locator": "Specifications / Fuel Capacity",
+          "applicability": "B-2A; published capacity configuration, not transferable fuel or consumption",
+          "retrieved_on": "2026-10-14",
+          "license": "Publicly accessible source; factual values only, no source-document redistribution",
+          "normalized_value": 75749.92579000001,
+          "normalized_unit": "kg",
+          "conversion": "1 international pound = 0.45359237 kg exactly"
+        }
+      ],
+      "missing": [
+        "Variant/configuration-specific flight-performance tables indexed by altitude, airspeed and gross mass",
+        "Sourced service timings and basing operating limits",
+        "Verified receiver intake rate and certified refueling envelope"
+      ],
+      "aerial_refueling": "unavailable_pending_evidence"
+    },
+    {
+      "id": "b-52h",
+      "display_name": "B-52H",
+      "configuration": "Baseline internal fuel unless source explicitly specifies otherwise; external stores not inferred",
+      "facts": [
+        {
+          "field": "fuel_capacity",
+          "value": 312197,
+          "unit": "lb",
+          "source_url": "https://www.boeing.com/defense/fighters-and-bombers/b-52",
+          "locator": "Specifications / Fuel Capacity",
+          "applicability": "B-52H; published capacity configuration, not transferable fuel or consumption",
+          "retrieved_on": "2026-10-14",
+          "license": "Publicly accessible source; factual values only, no source-document redistribution",
+          "normalized_value": 141610.17713689,
+          "normalized_unit": "kg",
+          "conversion": "1 international pound = 0.45359237 kg exactly"
+        }
+      ],
+      "missing": [
+        "Variant/configuration-specific flight-performance tables indexed by altitude, airspeed and gross mass",
+        "Sourced service timings and basing operating limits",
+        "Verified receiver intake rate and certified refueling envelope"
+      ],
+      "aerial_refueling": "unavailable_pending_evidence"
+    },
+    {
+      "id": "e-3g",
+      "display_name": "E-3G",
+      "configuration": "Baseline internal fuel unless source explicitly specifies otherwise; external stores not inferred",
+      "facts": [
+        {
+          "field": "fuel_capacity",
+          "value": 21000,
+          "unit": "US_gal",
+          "source_url": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104504/e-3-sentry-awacs/",
+          "locator": "Specifications / Fuel Capacity",
+          "applicability": "E-3G; published capacity configuration, not transferable fuel or consumption",
+          "retrieved_on": "2026-10-14",
+          "license": "Publicly accessible source; factual values only, no source-document redistribution",
+          "normalized_value": null,
+          "normalized_unit": null,
+          "conversion": "Mass conversion unavailable without sourced fuel density and reference conditions"
+        }
+      ],
+      "missing": [
+        "Variant/configuration-specific flight-performance tables indexed by altitude, airspeed and gross mass",
+        "Sourced service timings and basing operating limits",
+        "Verified receiver intake rate and certified refueling envelope"
+      ],
+      "aerial_refueling": "unavailable_pending_evidence"
+    },
+    {
+      "id": "e-2d",
+      "display_name": "E-2D",
+      "configuration": "Baseline internal fuel unless source explicitly specifies otherwise; external stores not inferred",
+      "facts": [],
+      "missing": [
+        "Variant/configuration-specific flight-performance tables indexed by altitude, airspeed and gross mass",
+        "Sourced service timings and basing operating limits",
+        "Verified variant-specific fuel capacity",
+        "Verified receiver intake rate and certified refueling envelope"
+      ],
+      "aerial_refueling": "unavailable_pending_evidence"
+    },
+    {
+      "id": "kc-46a",
+      "display_name": "KC-46A",
+      "configuration": "Baseline internal fuel unless source explicitly specifies otherwise; external stores not inferred",
+      "facts": [
+        {
+          "field": "fuel_capacity",
+          "value": 96297,
+          "unit": "kg",
+          "source_url": "https://www.boeing.com/defense/tankers-and-transports/kc-46-pegasus",
+          "locator": "Specifications / Fuel Capacity",
+          "applicability": "KC-46A; published capacity configuration, not transferable fuel or consumption",
+          "retrieved_on": "2026-10-14",
+          "license": "Publicly accessible source; factual values only, no source-document redistribution",
+          "normalized_value": 96297,
+          "normalized_unit": "kg",
+          "conversion": "Published SI value"
+        },
+        {
+          "field": "boom_offload_rate",
+          "value": 1200,
+          "unit": "US_gal/min",
+          "source_url": "https://www.boeing.com/defense/tankers-and-transports/kc-46-pegasus",
+          "locator": "Specifications / boom_offload_rate",
+          "applicability": "KC-46A; published capacity configuration, not transferable fuel or consumption",
+          "retrieved_on": "2026-10-14",
+          "license": "Publicly accessible source; factual values only, no source-document redistribution",
+          "normalized_value": null,
+          "normalized_unit": null,
+          "conversion": "Mass conversion unavailable without sourced fuel density and reference conditions"
+        },
+        {
+          "field": "drogue_offload_rate",
+          "value": 400,
+          "unit": "US_gal/min",
+          "source_url": "https://www.boeing.com/defense/tankers-and-transports/kc-46-pegasus",
+          "locator": "Specifications / drogue_offload_rate",
+          "applicability": "KC-46A; published capacity configuration, not transferable fuel or consumption",
+          "retrieved_on": "2026-10-14",
+          "license": "Publicly accessible source; factual values only, no source-document redistribution",
+          "normalized_value": null,
+          "normalized_unit": null,
+          "conversion": "Mass conversion unavailable without sourced fuel density and reference conditions"
+        },
+        {
+          "field": "boom_receiver_rate",
+          "value": 1200,
+          "unit": "US_gal/min",
+          "source_url": "https://www.boeing.com/defense/tankers-and-transports/kc-46-pegasus",
+          "locator": "Specifications / boom_receiver_rate",
+          "applicability": "KC-46A; published capacity configuration, not transferable fuel or consumption",
+          "retrieved_on": "2026-10-14",
+          "license": "Publicly accessible source; factual values only, no source-document redistribution",
+          "normalized_value": null,
+          "normalized_unit": null,
+          "conversion": "Mass conversion unavailable without sourced fuel density and reference conditions"
+        }
+      ],
+      "missing": [
+        "Variant/configuration-specific flight-performance tables indexed by altitude, airspeed and gross mass",
+        "Sourced service timings and basing operating limits",
+        "Sourced fuel density and installed station simultaneous-use restrictions"
+      ],
+      "aerial_refueling": "unavailable_pending_evidence"
+    },
+    {
+      "id": "p-8a",
+      "display_name": "P-8A",
+      "configuration": "Baseline internal fuel unless source explicitly specifies otherwise; external stores not inferred",
+      "facts": [],
+      "missing": [
+        "Variant/configuration-specific flight-performance tables indexed by altitude, airspeed and gross mass",
+        "Sourced service timings and basing operating limits",
+        "Verified variant-specific fuel capacity",
+        "Verified receiver intake rate and certified refueling envelope"
+      ],
+      "aerial_refueling": "unavailable_pending_evidence"
+    },
+    {
+      "id": "mq-9a",
+      "display_name": "MQ-9A",
+      "configuration": "Baseline internal fuel unless source explicitly specifies otherwise; external stores not inferred",
+      "facts": [
+        {
+          "field": "fuel_capacity",
+          "value": 4000,
+          "unit": "lb",
+          "source_url": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104470/mq-9-reaper/",
+          "locator": "Specifications / Fuel Capacity",
+          "applicability": "MQ-9A; published capacity configuration, not transferable fuel or consumption",
+          "retrieved_on": "2026-10-14",
+          "license": "Publicly accessible source; factual values only, no source-document redistribution",
+          "normalized_value": 1814.36948,
+          "normalized_unit": "kg",
+          "conversion": "1 international pound = 0.45359237 kg exactly"
+        }
+      ],
+      "missing": [
+        "Variant/configuration-specific flight-performance tables indexed by altitude, airspeed and gross mass",
+        "Sourced service timings and basing operating limits",
+        "Verified receiver intake rate and certified refueling envelope"
+      ],
+      "aerial_refueling": "unavailable_pending_evidence"
+    },
+    {
+      "id": "rq-4",
+      "display_name": "RQ-4",
+      "configuration": "Baseline internal fuel unless source explicitly specifies otherwise; external stores not inferred",
+      "facts": [
+        {
+          "field": "fuel_capacity",
+          "value": 17300,
+          "unit": "lb",
+          "source_url": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104516/rq-4-global-hawk/",
+          "locator": "Specifications / Fuel Capacity",
+          "applicability": "RQ-4; published capacity configuration, not transferable fuel or consumption",
+          "retrieved_on": "2026-10-14",
+          "license": "Publicly accessible source; factual values only, no source-document redistribution",
+          "normalized_value": 7847.1480010000005,
+          "normalized_unit": "kg",
+          "conversion": "1 international pound = 0.45359237 kg exactly"
+        }
+      ],
+      "missing": [
+        "Variant/configuration-specific flight-performance tables indexed by altitude, airspeed and gross mass",
+        "Sourced service timings and basing operating limits",
+        "Verified receiver intake rate and certified refueling envelope"
+      ],
+      "aerial_refueling": "unavailable_pending_evidence"
+    }
+  ]
+}

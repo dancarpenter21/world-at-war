@@ -26,6 +26,8 @@ pub struct TruthWeapon {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TruthProjection {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub logistics: Option<logistics::Projection>,
     pub tick: u64,
     pub units: Vec<TruthUnit>,
     pub weapons: Vec<TruthWeapon>,
@@ -127,6 +129,7 @@ impl Simulation {
             );
         }
         TruthProjection {
+            logistics: self.logistics_truth(),
             tick,
             units,
             weapons,

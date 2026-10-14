@@ -1,3 +1,4 @@
+import { LogisticsStatus } from "./LogisticsWorkspace";
 import { MAP_FRAME_RATE, MAP_RESOLUTION_SCALE } from "./mapFrameRate";
 import { formatGeometry } from "./networkModel";
 import { SmoothPositions } from "./smoothPositions";
@@ -38,8 +39,9 @@ export function ObserverWorkspace({ apiBase, gameId, running, role, onAccessEnde
         {truth.data?.units.map(u => <option key={u.id} value={`unit:${u.id}`}>{u.side} · {u.name}</option>)}
         {truth.data?.weapons.map(w => <option key={w.id} value={`weapon:${w.id}`}>{w.kind} · {w.phase}</option>)}
       </select>
-      {unit && <dl><dt>Name</dt><dd>{unit.name}</dd><dt>Side</dt><dd>{unit.side}</dd><dt>Position</dt><dd>{unit.position.latitude_deg.toFixed(4)}, {unit.position.longitude_deg.toFixed(4)} · {unit.position.altitude_m.toFixed(0)} m</dd><dt>Damage</dt><dd>{unit.destroyed ? "Destroyed" : "Active"}{unit.hit_points == null ? "" : ` · ${unit.hit_points} HP`}</dd><dt>Ammunition</dt><dd>{unit.ammunition}</dd><dt>Fuel (modeled seconds)</dt><dd>{unit.fuel.toFixed(0)}</dd></dl>}
+      {unit && <dl><dt>Name</dt><dd>{unit.name}</dd><dt>Side</dt><dd>{unit.side}</dd><dt>Position</dt><dd>{unit.position.latitude_deg.toFixed(4)}, {unit.position.longitude_deg.toFixed(4)} · {unit.position.altitude_m.toFixed(0)} m</dd><dt>Damage</dt><dd>{unit.destroyed ? "Destroyed" : "Active"}{unit.hit_points == null ? "" : ` · ${unit.hit_points} HP`}</dd><dt>Ammunition</dt><dd>{unit.ammunition}</dd><dt>{truth.data?.logistics?.units.some(u => u.unit_id === unit.id) ? "Fuel (kg)" : "Fuel (modeled seconds)"}</dt><dd>{(truth.data?.logistics?.units.find(u => u.unit_id === unit.id)?.fuel_kg ?? unit.fuel).toFixed(0)}</dd></dl>}
       {weapon && <dl><dt>Model</dt><dd>{weapon.kind}</dd><dt>State</dt><dd>{weapon.phase}</dd><dt>Position</dt><dd>{weapon.position ? `${weapon.position.latitude_deg.toFixed(4)}, ${weapon.position.longitude_deg.toFixed(4)}` : "No flight trajectory modeled"}</dd><dt>Impact tick</dt><dd>{weapon.impact_tick ?? "Not scheduled"}</dd><dt>Provider</dt><dd>{weapon.provider_id ? names.get(weapon.provider_id) ?? weapon.provider_id : "None"}</dd></dl>}
+      {truth.data?.logistics && <><h2>Logistics truth</h2><LogisticsStatus logistics={truth.data.logistics} names={names} tick={truth.data.tick} /></>}
       <WeatherEditor apiBase={apiBase} gameId={gameId} role={role} onPreview={setWeatherPreview} />
       <h2>Network topology</h2><p>Current links and queues. Message contents are not included.</p>
       <div className="truth-links"><table><thead><tr><th>Link</th><th>State</th><th>Queue</th></tr></thead><tbody>

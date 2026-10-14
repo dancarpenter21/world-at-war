@@ -357,6 +357,9 @@ pub(super) fn intent_fields(
         ),
     ]);
     match &intent.kind {
+        OrderKind::Logistics { command } => {
+            fields.insert("logistics_command".into(), serde_json::json!(command));
+        }
         OrderKind::SetRadarEmission { emitting } => {
             fields.insert("radar_emitting".into(), serde_json::json!(emitting));
         }

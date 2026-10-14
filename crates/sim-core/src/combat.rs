@@ -102,6 +102,8 @@ struct Flight {
 #[derive(Resource, Default, Clone, Serialize, Deserialize)]
 pub(super) struct CombatState {
     health: BTreeMap<Uuid, u32>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    maximum_health: BTreeMap<Uuid, u32>,
     sides: BTreeMap<Uuid, Side>,
     weapons: BTreeMap<Uuid, TrainingWeapon>,
     designations: BTreeMap<Uuid, Track>,
@@ -448,4 +450,27 @@ pub(super) fn resolve_impacts(world: &mut World) {
         }
     }
     world.insert_resource(combat);
+}
+
+impl CombatState {
+    pub(super) fn set_ammunition(&mut self, id: Uuid, n: u32) {
+        if let Some(w) = self.weapons.get_mut(&id) {
+            w.ammunition = n;
+        }
+    }
+    pub(super) fn maximum_hit_points(&self, id: Uuid) -> Option<u32> {
+        self.maximum_health.get(&id).copied()
+    }
+    pub(super) fn repair(&mut self, id: Uuid, n: u32) {
+        if let Some(max) = self.maximum_health.get(&id) {
+            if let Some(hp) = self.health.get_mut(&id) {
+                if *hp > 0 {
+                    *hp = hp.saturating_add(n).min(*max);
+                }
+            }
+        }
+    }
+    pub(super) fn initialize_logistics_health(&mut self) {
+        self.maximum_health = self.health.clone();
+    }
 }

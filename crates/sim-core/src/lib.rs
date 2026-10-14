@@ -1,6 +1,7 @@
 //! Deterministic, server-authoritative primitives for World At War.
 
 mod frame_clock;
+pub mod logistics;
 pub mod operations;
 pub mod performance;
 use frame_clock::FrameClock;
@@ -540,6 +541,9 @@ pub enum OrderKind {
     SetRadarEmission {
         emitting: bool,
     },
+    Logistics {
+        command: logistics::Command,
+    },
     Iftu {
         weapon_id: Uuid,
         command: iftu::Command,
@@ -549,7 +553,7 @@ pub enum OrderKind {
 impl OrderKind {
     pub fn action_key(&self) -> &'static str {
         match self {
-            Self::Move { .. } => ACTION_MOVE,
+            Self::Move { .. } | Self::Logistics { .. } => ACTION_MOVE,
             Self::SetRadarEmission { .. } => "set_radar_emission",
             Self::Engage { .. } | Self::Iftu { .. } => ACTION_ENGAGE,
         }
@@ -964,15 +968,18 @@ impl Simulation {
         world.insert_resource(KnowledgeNamespace(knowledge_namespace));
         world.insert_resource(CombatState::default());
         world.insert_resource(iftu::WeaponSystem::default());
+        world.insert_resource(logistics::Runtime::default());
 
         let mut schedule = Schedule::default();
         schedule.add_systems((
             advance_clock,
             apply_orders.after(advance_clock),
             operations::advance_operations.after(apply_orders),
-            move_platforms.after(operations::advance_operations),
+            logistics::guide_units.after(operations::advance_operations),
+            move_platforms.after(logistics::guide_units),
+            logistics::advance.after(move_platforms),
             combat::resolve_impacts
-                .after(move_platforms)
+                .after(logistics::advance)
                 .run_if(frame_clock::game_second_advanced),
             detect_contacts
                 .after(combat::resolve_impacts)
@@ -1784,6 +1791,7 @@ impl Simulation {
         let visible_ids: BTreeSet<_> = own_units.iter().map(|unit| unit.id).collect();
         let link_statuses = self.communication_link_statuses(knowledge_owner, &visible_ids);
         RoleProjection {
+            logistics: self.logistics_projection(knowledge_owner),
             frame: self.frame_number(),
             elapsed_seconds: self.frame_number().map(|_| self.elapsed_game_seconds()),
             sensing: self
@@ -1995,6 +2003,8 @@ pub struct VisibleUnit {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoleProjection {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub logistics: Option<logistics::Projection>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sensing: Option<sensing::LocalView>,
     #[serde(default)]
     pub iftu: iftu::Projection,
@@ -2032,6 +2042,7 @@ fn apply_orders(
     knowledge: Res<KnowledgeBases>,
     reports: Res<ReportKnowledge>,
     mut applied: ResMut<AppliedIntents>,
+    mut logistics: ResMut<logistics::Runtime>,
     mut training_combat: ResMut<CombatState>,
     mut sensing: Option<ResMut<sensing::Runtime>>,
     mut units: Query<(
@@ -2083,7 +2094,37 @@ fn apply_orders(
             });
             continue;
         }
+        if !matches!(
+            intent.kind,
+            OrderKind::Logistics { .. } | OrderKind::SetRadarEmission { .. }
+        ) && !logistics.movement_allowed(intent.target)
+        {
+            let status = OrderStatus::Rejected(
+                "unit is attached, servicing or unavailable; depart before movement or engagement"
+                    .into(),
+            );
+            applied.0.insert(intent.intent_id, status.clone());
+            results.0.push(OrderResult {
+                intent_id: intent.intent_id,
+                status,
+            });
+            continue;
+        }
         match intent.kind {
+            OrderKind::Logistics { command } => {
+                let status = logistics
+                    .command(intent.target, &command, clock.tick)
+                    .map(|()| {
+                        operations.tactical_move(intent.target);
+                        OrderStatus::Accepted
+                    })
+                    .unwrap_or_else(OrderStatus::Rejected);
+                applied.0.insert(intent.intent_id, status.clone());
+                results.0.push(OrderResult {
+                    intent_id: intent.intent_id,
+                    status,
+                });
+            }
             OrderKind::SetRadarEmission { emitting } => {
                 let status = sensing
                     .as_mut()

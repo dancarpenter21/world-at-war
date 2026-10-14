@@ -45,6 +45,7 @@ mod tests {
 
     fn projection() -> RoleProjection {
         RoleProjection {
+            logistics: None,
             frame: None,
             elapsed_seconds: None,
             sensing: None,

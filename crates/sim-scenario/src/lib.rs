@@ -4,7 +4,8 @@ mod radio_exercise;
 
 pub use radio_exercise::{
     combat_training_scenario, command_link_exercise_scenario, contested_combat_scenario,
-    ridge_relay_exercise_scenario, sensor_relay_exercise_scenario,
+    joint_sustainment_exercise_scenario, ridge_relay_exercise_scenario,
+    sensor_relay_exercise_scenario,
 };
 
 use std::collections::BTreeMap;
@@ -27,6 +28,8 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Scenario {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub logistics: Option<sim_core::logistics::Configuration>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sensing: Option<sim_core::sensing::Configuration>,
     #[serde(default)]
@@ -146,6 +149,17 @@ impl Scenario {
             {
                 return Err(ScenarioError::InvalidSidc(unit.id));
             }
+        }
+        if let Some(logistics) = &self.logistics {
+            logistics
+                .validate(
+                    &self
+                        .units
+                        .iter()
+                        .map(|u| (u.id, (u.side, u.domain)))
+                        .collect(),
+                )
+                .map_err(ScenarioError::InvalidSimulation)?;
         }
         let mut seat_ids = ids.clone();
         seat_ids.extend(self.authority.roles.iter().map(|r| r.id));
@@ -330,6 +344,11 @@ impl Scenario {
                     .map_err(ScenarioError::InvalidSimulation)?;
             }
         }
+        if let Some(configuration) = &self.logistics {
+            simulation
+                .configure_logistics(configuration.clone())
+                .map_err(ScenarioError::InvalidSimulation)?;
+        }
         simulation
             .initialize_radio_geometry()
             .map_err(ScenarioError::InvalidSimulation)?;
@@ -512,7 +531,7 @@ pub fn regional_campaign_scenario() -> Scenario {
         }
     }
     let (network, communication_links, simulator_options) = global_communications(&mut units);
-    Scenario { sensing: None, observer_seats: training_observers(), iftu: Some(campaign_iftu_configuration()), sensor_report_routes: vec![], combat: None, impact_report_routes: vec![], reporting_window_ticks: 0, campaign: Some(campaign), id: "regional-campaign.v1".into(), title: "Regional Joint Campaign".into(), description: "Two delegated sectors, competing joint plans, interception and strike under communications disruption. Offline training estimates.".into(), version: 2, requires_space_catalog: false, units, network, simulator_options, communication_links, authority, jamming_regions: vec![JammingRegion { active_from_tick: 0, active_until_tick: None, id: "sector-boundary-outage".into(), name: "Receiver interference near sector boundary".into(), center: GeoPose { latitude_deg: 38.1, longitude_deg: -76.55, altitude_m: 0.0 }, radius_m: 8000.0, band: FrequencyBand::new(960_000_000,1_215_000_000), jammed: 1.0 }] }
+    Scenario { logistics: None, sensing: None, observer_seats: training_observers(), iftu: Some(campaign_iftu_configuration()), sensor_report_routes: vec![], combat: None, impact_report_routes: vec![], reporting_window_ticks: 0, campaign: Some(campaign), id: "regional-campaign.v1".into(), title: "Regional Joint Campaign".into(), description: "Two delegated sectors, competing joint plans, interception and strike under communications disruption. Offline training estimates.".into(), version: 2, requires_space_catalog: false, units, network, simulator_options, communication_links, authority, jamming_regions: vec![JammingRegion { active_from_tick: 0, active_until_tick: None, id: "sector-boundary-outage".into(), name: "Receiver interference near sector boundary".into(), center: GeoPose { latitude_deg: 38.1, longitude_deg: -76.55, altitude_m: 0.0 }, radius_m: 8000.0, band: FrequencyBand::new(960_000_000,1_215_000_000), jammed: 1.0 }] }
 }
 
 pub fn global_crisis_scenario() -> Scenario {
@@ -623,6 +642,7 @@ pub fn global_crisis_scenario() -> Scenario {
     let authority = global_crisis_authority();
     let (network, communication_links, simulator_options) = global_communications(&mut units);
     Scenario {
+        logistics: None,
         sensing: None,
         observer_seats: vec![],
         iftu: None,
@@ -1413,6 +1433,7 @@ pub fn jammed_flight_scenario() -> Scenario {
     };
 
     Scenario {
+        logistics: None,
         sensing: None,        observer_seats: vec![],
         iftu: None,        campaign: None,
         id: "jammed-flight.v1".into(),
@@ -1939,3 +1960,31 @@ mod tests {
 
 #[cfg(test)]
 mod radio_propagation_tests;
+
+/// New Regional games expose source coverage; unsupported real capabilities stay unavailable.
+pub fn upgrade_logistics(mut scenario: Scenario) -> Scenario {
+    if scenario.id != "regional-campaign.v1" {
+        return scenario;
+    }
+    let unavailable: Vec<_> = scenario.units.iter().filter(|u|u.side==Side::Blue&&u.domain==Domain::Air).map(|u| {
+        let profile_id = if u.name.starts_with("F-35A") {"f-35a"}else if u.name.starts_with("E-3G"){"e-3g"}else{"unknown"};
+        sim_core::logistics::Unavailable {unit_id:u.id,profile_id:profile_id.into(),reasons:vec!["Flight-performance tables, receiver intake limits and basing operating limits require sources; no estimates enabled".into()]}
+    }).collect();
+    let reports = unavailable
+        .iter()
+        .map(|u| sim_core::logistics::ReportRoute {
+            source: u.unit_id,
+            recipient: Uuid::from_u128(1),
+            interval_ticks: 5,
+        })
+        .collect();
+    scenario.logistics = Some(sim_core::logistics::Configuration {
+        version: 1,
+        units: vec![],
+        facilities: vec![],
+        unavailable,
+        reports,
+    });
+    scenario.version += 1;
+    scenario
+}

@@ -23,6 +23,8 @@ struct PlatformState {
 pub struct SimulationSnapshot {
     schema_version: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    logistics: Option<logistics::Runtime>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     sensing: Option<sensing::Runtime>,
     platforms: Vec<PlatformState>,
     clock: SimClock,
@@ -74,7 +76,14 @@ impl Simulation {
             })
             .collect();
         SimulationSnapshot {
-            schema_version: if self.world.contains_resource::<FrameClock>() {
+            logistics: self
+                .world
+                .get_resource::<logistics::Runtime>()
+                .filter(|r| r.enabled())
+                .cloned(),
+            schema_version: if self.world.resource::<logistics::Runtime>().enabled() {
+                4
+            } else if self.world.contains_resource::<FrameClock>() {
                 3
             } else if self.world.contains_resource::<sensing::Runtime>() {
                 2
@@ -106,9 +115,11 @@ impl Simulation {
 
     /// Restore a trusted, schema-compatible snapshot without advancing its clocks.
     pub fn restore(snapshot: SimulationSnapshot) -> Result<Self, String> {
-        if !matches!(snapshot.schema_version, 1..=3)
-            || (snapshot.schema_version == 3) != snapshot.frame_clock.is_some()
-            || (snapshot.schema_version != 3
+        if !matches!(snapshot.schema_version, 1..=4)
+            || (snapshot.schema_version == 3 && snapshot.frame_clock.is_none())
+            || (snapshot.schema_version < 3 && snapshot.frame_clock.is_some())
+            || (snapshot.schema_version == 4) != snapshot.logistics.is_some()
+            || (snapshot.schema_version < 3
                 && (snapshot.schema_version == 2) != snapshot.sensing.is_some())
             || snapshot.frame_clock.is_some_and(|clock| {
                 !clock.valid()
@@ -148,6 +159,7 @@ impl Simulation {
         world.insert_resource(snapshot.operations);
         world.insert_resource(snapshot.combat);
         world.insert_resource(snapshot.weapons);
+        world.insert_resource(snapshot.logistics.unwrap_or_default());
         for platform in snapshot.platforms {
             let mut entity = world.spawn((
                 platform.id,
@@ -174,9 +186,11 @@ impl Simulation {
             advance_clock,
             apply_orders.after(advance_clock),
             operations::advance_operations.after(apply_orders),
-            move_platforms.after(operations::advance_operations),
+            logistics::guide_units.after(operations::advance_operations),
+            move_platforms.after(logistics::guide_units),
+            logistics::advance.after(move_platforms),
             combat::resolve_impacts
-                .after(move_platforms)
+                .after(logistics::advance)
                 .run_if(frame_clock::game_second_advanced),
             detect_contacts
                 .after(combat::resolve_impacts)

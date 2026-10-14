@@ -585,9 +585,12 @@ async fn main() -> anyhow::Result<()> {
                 s
             }
         })
+        .map(sim_scenario::upgrade_logistics)
         .collect();
+    sim_catalog::logistics::Catalog::bundled().map_err(anyhow::Error::msg)?;
     scenarios.push(sim_scenario::sensing_exercise_scenario());
     scenarios.push(sim_scenario::ridge_relay_exercise_scenario());
+    scenarios.push(sim_scenario::joint_sustainment_exercise_scenario());
     for scenario in &scenarios {
         scenario.validate()?;
     }
