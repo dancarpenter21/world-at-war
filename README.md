@@ -140,6 +140,8 @@ Copy [`.env.example`](.env.example) to an ignored root `.env` file for Compose c
 | `APP_PORT` | Host port for the Compose edge proxy; defaults to `8080`. |
 | `BIND_ADDR` | Rust server bind address for direct runs; defaults to `0.0.0.0:8000`. Compose fixes this to the internal server address. |
 | `VITE_API_BASE` | Optional browser API-origin override for direct Vite runs or custom frontend builds. |
+| `VITE_MAP_RESOLUTION_SCALE` | Optional frontend map resolution scale from 0.25 to 1 (default 1). |
+| `VITE_MAP_FRAME_RATE` | Optional integer map rendering limit from 1 to 60 FPS; defaults to 60. Set in the frontend build/development environment. The server simulation clock is independent. |
 | `SPACETRACK_USERNAME` / `SPACETRACK_PASSWORD` | Optional server-side Space-Track credentials, instead of entering them in the UI. Never commit real values. |
 | `ADMIN_SETUP_TOKEN` | Optional bearer token required to configure catalog credentials through the UI. |
 | `COOKIE_SECURE` | Set to `true` or `1` when HTTPS terminates in front of the application; applies to guest and remembered-provider cookies. |
@@ -381,6 +383,21 @@ npm run test:e2e
 ```
 
 Browser tests require Playwright Chromium. The seven campaign integration tests use real application APIs and simulation delivery; they only replace external map imagery and deliberately interrupt requests/streams for recovery checks. The smaller planning contract test retains API fixtures. Host runs write planning/import screenshots and failure traces under `web/test-results/`; view a failure trace with `npx playwright show-trace <trace.zip>`. The Space-Track test uses a local mock unless both live-provider test variables are explicitly set. Tests never read or modify the development stack's catalog cache.
+
+Run `npm run test:e2e:parallel` from `web/` to run three local shards concurrently
+with isolated frontend/backend ports and artifact directories. Set `E2E_SHARDS=2`
+on smaller machines. If a persistence database is supplied, its tests run together
+after the concurrent shards to avoid sharing mutable database state.
+
+CI divides the browser suite across three independent runners with one worker per
+runner and separate diagnostics artifacts. Locally, use `npm run test:e2e -- --shard=1/3`
+(and shards `2/3`, `3/3`) to select the same groups.
+
+Functional browser tests limit operational and truth-map rendering to 5 FPS at half resolution so
+several isolated, software-rendered player contexts can share a hosted runner.
+They retain real Cesium canvases, interpolation, polling and WebSocket streams;
+the simulation still targets 60 Hz. Set `E2E_MAP_FRAME_RATE=60 E2E_MAP_RESOLUTION_SCALE=1` for an explicit
+full-rate rendering check. This test setting does not change production's default.
 
 To retain artifacts from a container run, omit `--rm`, name the test container, and copy its results afterward:
 

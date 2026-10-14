@@ -1,3 +1,4 @@
+import { MAP_FRAME_RATE, MAP_RESOLUTION_SCALE } from "./mapFrameRate";
 import { formatGeometry } from "./networkModel";
 import { SmoothPositions } from "./smoothPositions";
 import { useEffect, useRef, useState } from "react";
@@ -53,10 +54,12 @@ function TruthMap({ truth, network, onSelect, weatherPreview, animateMotion, ren
   const smoothing = useRef(new SmoothPositions());
   const selection = useRef(onSelect); selection.current = onSelect;
   useEffect(() => {
-    const map = new Viewer(host.current!, {
+    const container = host.current;
+    if (!container) return;
+    const map = new Viewer(container, {
       animation: false, baseLayerPicker: false, timeline: false, geocoder: false, homeButton: false,
       navigationHelpButton: false, sceneModePicker: false, fullscreenButton: false, infoBox: false,
-      terrainProvider: new EllipsoidTerrainProvider(), requestRenderMode: true, maximumRenderTimeChange: Infinity, targetFrameRate: 60,
+      terrainProvider: new EllipsoidTerrainProvider(), requestRenderMode: true, maximumRenderTimeChange: Infinity, targetFrameRate: MAP_FRAME_RATE,
       baseLayer: new ImageryLayer(new OpenStreetMapImageryProvider({ url: "https://tile.openstreetmap.org/" })),
     });
     map.scene.globe.baseColor = Color.fromCssColorString("#1f3340");
@@ -65,6 +68,8 @@ function TruthMap({ truth, network, onSelect, weatherPreview, animateMotion, ren
     const controls = attachMapKeyboardControls(map.camera, map.scene.globe.ellipsoid); controls.setEnabled(true);
     const stop = map.selectedEntityChanged.addEventListener(entity => selection.current(entity?.id ?? ""));
     const stopMotion = map.clock.onTick.addEventListener(() => { if (smoothing.current.tick()) map.scene.requestRender(); });
+    map.resolutionScale = MAP_RESOLUTION_SCALE;
+    container.dataset.frameRate = String(map.targetFrameRate);
     viewer.current = map;
     return () => { stopMotion(); stop(); controls.destroy(); viewer.current = null; map.destroy(); };
   }, []);

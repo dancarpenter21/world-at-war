@@ -14,7 +14,8 @@
     "preview": "vite preview",
     "perf:server": "node scripts/performance-server.mjs",
     "test:performance": "node --test scripts/performance.node-test.mjs scripts/performance-soak.node-test.mjs",
-    "perf:soak": "node scripts/performance-soak.mjs"
+    "perf:soak": "node scripts/performance-soak.mjs",
+    "test:e2e:parallel": "tsc --project tsconfig.e2e.json && cargo build --manifest-path ../Cargo.toml --package world-at-war-server --locked && node scripts/browser-shards.mjs"
   },
   "dependencies": {
     "@xyflow/react": "^12.11.2",

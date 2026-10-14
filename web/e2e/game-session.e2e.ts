@@ -27,7 +27,7 @@ async function openSession(page: Page, guest = false, projection = sessionProjec
     const request = route.request();
     const pathname = new URL(request.url()).pathname;
     const headers = {
-      "access-control-allow-origin": request.headers().origin ?? "http://127.0.0.1:4173",
+      "access-control-allow-origin": request.headers().origin ?? `http://127.0.0.1:${process.env.E2E_FRONTEND_PORT ?? "4173"}`,
       "access-control-allow-credentials": "true",
       "access-control-allow-headers": "content-type, authorization, x-csrf-token",
       "access-control-allow-methods": "GET, POST, PUT, DELETE, OPTIONS"

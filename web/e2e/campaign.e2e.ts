@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { startBackend, backendUrl, type Backend } from "./support/server";
 import type { PlanningView } from "../src/PlanningWorkspace";
 
-const baseURL = `http://${process.env.E2E_BROWSER_HOST ?? "127.0.0.1"}:4173`;
+const baseURL = `http://${process.env.E2E_BROWSER_HOST ?? "127.0.0.1"}:${process.env.E2E_FRONTEND_PORT ?? "4173"}`;
 const commanderRole = "00000000-0000-0000-0000-0000000000c9";
 const pilotRole = "00000000-0000-0000-0000-0000000000d3";
 const controllerRole = "00000000-0000-0000-0000-0000000000cd";

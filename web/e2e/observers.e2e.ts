@@ -31,7 +31,11 @@ async function stream(page: Page) {
     socket.onmessage = () => result.frames++;
     socket.onclose = event => { result.close = event.code; };
   }, { seat, base: backendUrl });
-  await expect.poll(() => page.evaluate(() => (window as any).truthStream.frames)).toBeGreaterThan(1);
+  await expect.poll(async () => {
+    const stream = await page.evaluate(() => (window as any).truthStream);
+    expect(stream.close, "truth stream must remain authorized while awaiting frames").toBe(0);
+    return stream.frames;
+  }, { timeout: 15_000 }).toBeGreaterThan(1);
 }
 
 test("host grants read-only truth; reload, reconnect and paused shared-tab revocation preserve boundaries", async ({ page, browser }) => {

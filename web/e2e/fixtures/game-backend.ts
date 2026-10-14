@@ -14,7 +14,7 @@ export async function startGameBackend() {
   let backend: ChildProcess | undefined;
   let provider: Server | undefined;
   let output = "";
-  const url = "http://127.0.0.1:18101";
+  const url = `http://127.0.0.1:${process.env.E2E_BACKEND_PORT ?? "18101"}`;
   const close = async () => {
     if (backend && backend.exitCode === null && !backend.killed) {
       const stopped = new Promise<void>((resolve) => backend!.once("exit", () => resolve()));
@@ -61,7 +61,7 @@ export async function startGameBackend() {
       cwd: runDirectory, windowsHide: true,
       env: {
         ...process.env,
-        BIND_ADDR: "0.0.0.0:18101", APP_ALLOWED_ORIGINS: `http://${process.env.E2E_BROWSER_HOST ?? "127.0.0.1"}:4173`, ADMIN_SETUP_TOKEN: "",
+        BIND_ADDR: `0.0.0.0:${process.env.E2E_BACKEND_PORT ?? "18101"}`, APP_ALLOWED_ORIGINS: `http://${process.env.E2E_BROWSER_HOST ?? "127.0.0.1"}:${process.env.E2E_FRONTEND_PORT ?? "4173"}`, ADMIN_SETUP_TOKEN: "",
         SPACETRACK_USERNAME: "", SPACETRACK_PASSWORD: "", DATABASE_URL: "",
         SPACETRACK_LOGIN_URL: `http://127.0.0.1:${address.port}/ajaxauth/login`,
         SPACETRACK_GP_URL: `http://127.0.0.1:${address.port}/basicspacedata/query/class/gp/format/json`,

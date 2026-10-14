@@ -94,7 +94,7 @@ test("plays the command exercise without a catalog and retains a congested radio
     const url = `${backend.url}/v1/games/${gameId}/roles/${exerciseRole}/intents/${order.body.intent.intent_id}?${receiptAuthorization}`;
     await expect.poll(async () => (await (await request.get(url)).json()).state, { timeout: 15_000 }).toBe("executed");
   }
-  await expect(movement.getByRole("status")).toContainText("Order executed", { timeout: 10_000 });
+  await expect(movement.getByRole("status")).toContainText("Order executed", { timeout: 30_000 });
   await expect(movement.locator(".movement-current")).toHaveText("Current order: 270° at 80 m/s", { timeout: 10_000 });
   const state = await (await request.get(`${backend.url}/v1/games/${gameId}/state?${authorization}`)).json();
   expect(state.own_units.find((unit: { id: string }) => unit.id === targetId).velocity).toMatchObject({ north_mps: 0, east_mps: 80 });
@@ -327,7 +327,7 @@ test("runs a real game, persists networked command delivery, and retains the map
   expect((await conflict.json()).code).toBe("intent_conflict");
   const receiptAuthorization = new URLSearchParams({ player_id: playerId, lease_generation: String(heldRole.lease_generation) });
   const receiptUrl = `${backend.url}/v1/games/${gameId}/roles/${roleId}/intents/${orderBody.intent.intent_id}?${receiptAuthorization}`;
-  await expect.poll(async () => (await (await request.get(receiptUrl)).json()).state, { timeout: 10_000 }).toBe("executed");
+  await expect.poll(async () => (await (await request.get(receiptUrl)).json()).state, { timeout: 30_000 }).toBe("executed");
   const receipt = await (await request.get(receiptUrl)).json();
   expect(receipt.message_id).toBe(submission.message_id);
   expect(receipt.executed_tick).toBeGreaterThanOrEqual(receipt.submitted_tick);
@@ -380,12 +380,12 @@ test("runs a real game, persists networked command delivery, and retains the map
   await movement.getByLabel("Course (°)").fill("90");
   await movement.getByLabel("Speed (m/s)").fill("80");
   await movement.getByRole("button", { name: "Send movement order", exact: true }).click();
-  await expect(movement.getByRole("status")).toContainText("Order executed", { timeout: 10_000 });
+  await expect(movement.getByRole("status")).toContainText("Order executed", { timeout: 30_000 });
   const commanded = await (await request.get(`${backend.url}/v1/games/${gameId}/state?${authorization}`)).json();
   expect(commanded.own_units.find((unit: { id: string }) => unit.id === targetId).velocity).toMatchObject({ north_mps: 0, east_mps: 80 });
   await page.screenshot({ path: testInfo.outputPath("real-movement-order-executed.png") });
   await movement.getByRole("button", { name: "Stop unit", exact: true }).click();
-  await expect(movement.getByRole("status")).toContainText("Order executed", { timeout: 10_000 });
+  await expect(movement.getByRole("status")).toContainText("Order executed", { timeout: 30_000 });
   await expect(movement.getByRole("status")).toContainText("Stopped");
   const stopped = await (await request.get(`${backend.url}/v1/games/${gameId}/state?${authorization}`)).json();
   expect(stopped.own_units.find((unit: { id: string }) => unit.id === targetId).velocity).toMatchObject({ north_mps: 0, east_mps: 0 });

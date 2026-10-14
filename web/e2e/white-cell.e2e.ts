@@ -31,7 +31,8 @@ test("White Cell hosts human Red and Blue, approves a late referee, shares notes
   await page.getByLabel("Red control").selectOption("human"); await page.getByLabel("Game title").fill("White Cell exercise");
   await page.getByRole("button", { name: "Create game", exact: true }).click();
   await expect(page.getByRole("region", { name: "White Cell workspace" })).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator(".truth-map canvas")).toBeVisible();
+  await expect(page.locator(".truth-map canvas")).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".truth-map")).toHaveAttribute("data-frame-rate", process.env.E2E_MAP_FRAME_RATE ?? "5");
   await page.getByRole("button", { name: "Start scenario", exact: true }).click();
   await expect(page.getByRole("button", { name: "Pause scenario", exact: true })).toBeVisible();
   const seat = await selection(page); const prefix = `${backendUrl}/v1/games/${seat.game_id}`;
@@ -39,9 +40,10 @@ test("White Cell hosts human Red and Blue, approves a late referee, shares notes
   contexts.push(blueContext, redContext, refereeContext);
   const blue = await blueContext.newPage(), red = await redContext.newPage(), referee = await refereeContext.newPage();
   await join(blue, "Blue commander", "White Cell exercise"); await blue.locator(".team-card").filter({ hasText: /^Blue/ }).click();
-  await blue.getByRole("button", { name: /^Joint Force Commander/ }).click(); await expect(blue.locator(".globe canvas")).toBeVisible();
+  await blue.getByRole("button", { name: /^Joint Force Commander/ }).click(); await expect(blue.locator(".globe canvas")).toBeVisible({ timeout: 30_000 });
+  await expect(blue.locator(".globe")).toHaveAttribute("data-frame-rate", process.env.E2E_MAP_FRAME_RATE ?? "5");
   await join(red, "Red commander", "White Cell exercise"); await red.locator(".team-card").filter({ hasText: /^Red/ }).click();
-  await red.getByRole("button", { name: /^Red Commander/ }).click(); await expect(red.locator(".globe canvas")).toBeVisible();
+  await red.getByRole("button", { name: /^Red Commander/ }).click(); await expect(red.locator(".globe canvas")).toBeVisible({ timeout: 30_000 });
   await join(referee, "Late referee", "White Cell exercise"); await referee.locator(".team-card").filter({ hasText: /^White Cell/ }).click();
   await expect(referee.getByText("Waiting for approval to join White Cell.")).toBeVisible();
   expect((await referee.request.get(`${prefix}/white-cell?role_id=${seat.role_id}&lease_generation=${seat.lease_generation}`)).status()).toBe(403);
@@ -49,8 +51,8 @@ test("White Cell hosts human Red and Blue, approves a late referee, shares notes
   await page.locator(".team-request").filter({ hasText: "Late referee" }).getByRole("button", { name: "Approve", exact: true }).click();
   await page.getByRole("button", { name: "Close team panel" }).click();
   await expect(referee.getByRole("region", { name: "White Cell workspace" })).toBeVisible({ timeout: 30_000 });
-  await referee.getByRole("combobox", { name: "Simulation speed", exact: true }).selectOption("5");
-  await expect(page.getByRole("combobox", { name: "Simulation speed", exact: true })).toHaveValue("5");
+  await referee.getByRole("combobox", { name: "Simulation speed", exact: true }).selectOption("5", { timeout: 30_000 });
+  await expect(page.getByRole("combobox", { name: "Simulation speed", exact: true })).toHaveValue("5", { timeout: 15_000 });
   await referee.getByRole("button", { name: "Pause scenario", exact: true }).click();
   await expect(page.getByRole("button", { name: "Resume scenario", exact: true })).toBeVisible();
   await referee.getByRole("combobox", { name: "Simulation speed", exact: true }).selectOption("0.25");
@@ -112,7 +114,7 @@ test("White Cell joins a paused game and an approved transfer clears referee acc
   await referee.getByRole("combobox", { name: "Simulation speed", exact: true }).selectOption("2");
   await expect(referee.getByRole("alert")).toContainText("Game controls changed; refresh and try again");
   await referee.unroute("**/v1/games/*/time-scale");
-  await referee.getByRole("combobox", { name: "Simulation speed", exact: true }).selectOption("5");
+  await referee.getByRole("combobox", { name: "Simulation speed", exact: true }).selectOption("5", { timeout: 30_000 });
   await expect(referee.getByRole("alert")).toHaveCount(0);
   await expect(referee.getByRole("button", { name: "Resume scenario", exact: true })).toBeVisible();
   await referee.getByRole("button", { name: /^Team & players/ }).click(); referee.once("dialog", dialog => dialog.accept());
@@ -122,6 +124,6 @@ test("White Cell joins a paused game and an approved transfer clears referee acc
   await expect(referee.getByRole("region", { name: "White Cell workspace" })).toHaveCount(0, { timeout: 15_000 });
   await referee.getByRole("button", { name: "Close team panel" }).click();
   await referee.getByRole("button", { name: /^Pilot, CAP Alpha 1/ }).click();
-  await expect(referee.locator(".globe canvas")).toBeVisible();
+  await expect(referee.locator(".globe canvas")).toBeVisible({ timeout: 30_000 });
   await expect(referee.getByRole("button", { name: "Resume scenario", exact: true })).toHaveCount(0);
 });

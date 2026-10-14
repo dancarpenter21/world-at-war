@@ -1,3 +1,4 @@
+import { MAP_FRAME_RATE, MAP_RESOLUTION_SCALE } from "./mapFrameRate";
 import { useEffect, useRef, useState } from "react";
 import {
   Cartesian3, Color, EllipsoidTerrainProvider,
@@ -68,7 +69,7 @@ export default function Globe({ projection, filters, gameId, playerId, roleId, s
       baseLayerPicker: false, fullscreenButton: false, geocoder: false, homeButton: false,
       infoBox: true, navigationHelpButton: false, sceneModePicker: false, selectionIndicator: true,
       terrainProvider: new EllipsoidTerrainProvider(), timeline: false,
-      requestRenderMode: true, maximumRenderTimeChange: Infinity, targetFrameRate: 60
+      requestRenderMode: true, maximumRenderTimeChange: Infinity, targetFrameRate: MAP_FRAME_RATE
     });
     viewer.scene.globe.baseColor = Color.fromCssColorString("#1f3340");
     viewer.camera.setView({ destination: Cartesian3.fromDegrees(-40, 30, 20_000_000) });
@@ -77,6 +78,8 @@ export default function Globe({ projection, filters, gameId, playerId, roleId, s
       const position = viewer.camera.positionWC;
       if (host.current) host.current.dataset.renderedCamera = `${position.x.toFixed(2)},${position.y.toFixed(2)},${position.z.toFixed(2)}`;
     });
+    viewer.resolutionScale = MAP_RESOLUTION_SCALE;
+    host.current.dataset.frameRate = String(viewer.targetFrameRate);
     viewerRef.current = viewer;
     operationsLayerRef.current = new OperationsLayer(viewer.entities);
     const keyboardControls = attachMapKeyboardControls(viewer.camera, viewer.scene.globe.ellipsoid);

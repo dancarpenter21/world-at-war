@@ -9,13 +9,13 @@ import { fileURLToPath } from "node:url";
 import { writeFile } from "node:fs/promises";
 
 export const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-export const backendUrl = `http://${process.env.E2E_BROWSER_HOST ?? "127.0.0.1"}:18101`;
-const healthUrl = "http://127.0.0.1:18101/health";
+export const backendUrl = `http://${process.env.E2E_BROWSER_HOST ?? "127.0.0.1"}:${process.env.E2E_BACKEND_PORT ?? "18101"}`;
+const healthUrl = `http://127.0.0.1:${process.env.E2E_BACKEND_PORT ?? "18101"}/health`;
 
 export async function startBackend(environment: Record<string, string> = {}) {
   // Fail rather than accidentally test an unrelated process occupying our fixed frontend API port.
   const occupied = await fetch(healthUrl).then(() => true, () => false);
-  if (occupied) throw new Error("E2E backend port 18101 is already occupied");
+  if (occupied) throw new Error(`E2E backend port ${process.env.E2E_BACKEND_PORT ?? "18101"} is already occupied`);
   const directory = await mkdtemp(path.join(tmpdir(), "world-at-war-e2e-"));
   const terrain = await installFixtureTerrain(directory);
   const airports = [JSON.parse(await readFile(new URL("../fixtures/airport.json", import.meta.url), "utf8"))];
@@ -30,7 +30,7 @@ export async function startBackend(environment: Record<string, string> = {}) {
     startError = undefined;
     const processHandle = spawn(path.join(repoRoot, "target/debug/world-at-war-server"), [], {
       cwd: directory,
-      env: { ...process.env, BIND_ADDR: "0.0.0.0:18101", APP_ALLOWED_ORIGINS: `http://${process.env.E2E_BROWSER_HOST ?? "127.0.0.1"}:4173`, ADMIN_SETUP_TOKEN: "", DATABASE_URL: "", COOKIE_SECURE: "false",
+      env: { ...process.env, BIND_ADDR: `0.0.0.0:${process.env.E2E_BACKEND_PORT ?? "18101"}`, APP_ALLOWED_ORIGINS: `http://${process.env.E2E_BROWSER_HOST ?? "127.0.0.1"}:${process.env.E2E_FRONTEND_PORT ?? "4173"}`, ADMIN_SETUP_TOKEN: "", DATABASE_URL: "", COOKIE_SECURE: "false",
         SPACETRACK_USERNAME: "", SPACETRACK_PASSWORD: "", SPACETRACK_LOGIN_URL: "http://127.0.0.1:1/login", SPACETRACK_GP_URL: "http://127.0.0.1:1/gp",
         SPACE_CARDS_DIR: path.join(directory, "cards"), AIRPORT_CACHE_DIR: airportCache,
         AIRPORT_REFRESH_MAX_AGE_SECONDS: "86400", OURAIRPORTS_AIRPORTS_URL: "http://127.0.0.1:1/airports",

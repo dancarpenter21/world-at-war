@@ -37,7 +37,7 @@ test("host speed widget stays synchronized, pause freezes time, and controller w
   await page.getByRole("button", { name: "Resume scenario" }).click();
   await expect.poll(async () => (await (await page.request.get(url)).json()).baseline.visibility_m).toBe(1200);
   await expect.poll(async () => (await (await page.request.get(backendUrl + "/v1/games")).json())[0].tick).toBeGreaterThan(3);
-  await expect(guest.getByRole("button", { name: "Radar off", exact: true })).toBeEnabled();
+  await expect(guest.getByRole("button", { name: "Radar off", exact: true })).toBeEnabled({ timeout: 15_000 });
   await guest.getByRole("button", { name: "Radar off", exact: true }).click();
   await expect(guest.getByText(/Radar order: executed/)).toBeVisible();
   await expect(guest.getByText(/Last confirmed state: Off/)).toBeVisible();

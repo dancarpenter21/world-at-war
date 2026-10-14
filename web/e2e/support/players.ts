@@ -6,7 +6,7 @@ export function playerRequests(page: Page, primaryLabel: string) {
   const owned: APIRequestContext[] = [];
   async function send(input: string, method: "GET" | "POST", options?: { data?: unknown }) {
     const url = new URL(input);
-    const origin = page.url().startsWith("http") ? new URL(page.url()).origin : `http://${process.env.E2E_BROWSER_HOST ?? "127.0.0.1"}:4173`;
+    const origin = page.url().startsWith("http") ? new URL(page.url()).origin : `http://${process.env.E2E_BROWSER_HOST ?? "127.0.0.1"}:${process.env.E2E_FRONTEND_PORT ?? "4173"}`;
     const data = options?.data && typeof options.data === "object" ? { ...options.data } as Record<string, unknown> : options?.data;
     const label = String((data as Record<string, unknown> | undefined)?.player_id ?? url.searchParams.get("player_id") ?? primaryLabel);
     let client = clients.get(label);
