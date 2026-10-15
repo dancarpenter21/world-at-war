@@ -59,6 +59,21 @@ pub(super) fn submit_player_intent(
     request: SubmitIntentRequest,
 ) -> SubmissionResult {
     validate_role_lease(game, role_id, request.player_id, request.lease_generation)?;
+    submit_validated_intent(game, role_id, request.player_id, request.intent)
+}
+
+/// Caller authenticates control; all gameplay validation is shared by humans and agents.
+pub(super) fn submit_validated_intent(
+    game: &mut Game,
+    role_id: Uuid,
+    principal: Uuid,
+    intent: PlayerIntent,
+) -> SubmissionResult {
+    let request = SubmitIntentRequest {
+        player_id: principal,
+        lease_generation: 0,
+        intent,
+    };
     if request.intent.issuer_role != role_id {
         return Err(api_error(
             StatusCode::FORBIDDEN,
@@ -202,12 +217,19 @@ pub(super) fn receipt_for(
     query: &ReceiptQuery,
 ) -> Result<IntentReceipt, (StatusCode, Json<ErrorResponse>)> {
     validate_role_lease(game, role_id, query.player_id, query.lease_generation)?;
+    receipt_for_principal(game, role_id, intent_id, query.player_id)
+}
+
+pub(super) fn receipt_for_principal(
+    game: &Game,
+    role_id: Uuid,
+    intent_id: Uuid,
+    principal: Uuid,
+) -> Result<IntentReceipt, (StatusCode, Json<ErrorResponse>)> {
     let submission = game
         .intent_submissions
         .get(&intent_id)
-        .filter(|submission| {
-            submission.player_id == query.player_id && submission.role_id == role_id
-        })
+        .filter(|submission| submission.player_id == principal && submission.role_id == role_id)
         .ok_or_else(|| api_error(StatusCode::NOT_FOUND, "intent_not_found", "order not found"))?;
     let intent_key = intent_id.to_string();
     let latest_message = game.network_messages.iter().rev().find(|record| {

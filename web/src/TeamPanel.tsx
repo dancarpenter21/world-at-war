@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { apiRequest } from "./apiClient";
+import { AgentControllers } from "./AgentControllers";
 
 export type Team = "blue" | "red" | "white_cell";
 export type TeamView = {
@@ -44,6 +45,7 @@ export function TeamPanel({ apiBase, gameId, playerId, hostId, view, onChanged, 
           <button className="secondary" disabled={pending || (r.player_id === playerId && hostId !== playerId)} onClick={() => void mutate(`/requests/${r.id}/decision`, { approve: false })}>Decline</button></div>)}
         <h3>Players</h3><ul>{view.members.map(m => <li key={m.player_id}>{m.display_name} · {teamName(m.team)}{m.team === "white_cell" ? m.active ? " · connected referee" : " · offline referee" : ""}
           {hostId === playerId && m.player_id !== playerId && m.team && <button className="secondary" disabled={pending} onClick={() => void mutate(`/members/${m.player_id}`, {}, "DELETE")}>Remove from team</button>}</li>)}</ul></>}
+      {view.can_manage && <AgentControllers apiBase={apiBase} gameId={gameId} onChanged={onChanged} />}
       {view.team && <button className="secondary" disabled={pending} onClick={() => void mutate(`/members/${playerId}`, {}, "DELETE")}>Leave team</button>}
     </>}
   </section>;

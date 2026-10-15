@@ -1,4 +1,6 @@
-//! Basic Red planner. It accepts a role projection and cannot inspect ECS truth.
+pub mod agent;
+
+// Legacy patrol policy; retained for existing scenarios and recovery.
 
 use sim_core::{Domain, OrderKind, PlayerIntent, RoleProjection};
 use uuid::Uuid;
@@ -43,7 +45,7 @@ mod tests {
     use super::*;
     use sim_core::{GeoPose, Side, Track, Velocity, VisibleUnit};
 
-    fn projection() -> RoleProjection {
+    pub(super) fn projection() -> RoleProjection {
         RoleProjection {
             logistics: None,
             frame: None,
@@ -85,7 +87,7 @@ mod tests {
         choose_patrol_intent(Uuid::from_u128(2), Uuid::from_u128(1), projection)
     }
 
-    fn add_contact(projection: &mut RoleProjection) {
+    pub(super) fn add_contact(projection: &mut RoleProjection) {
         projection.tracks.push(Track {
             evidence: None,
             uncertainty_m: 100.0,

@@ -245,6 +245,15 @@ pub(super) async fn guard(
         )
         .into_response();
     }
+    // Narrow machine-only endpoints authenticate their scoped bearer inside the handler.
+    if crate::agents::is_agent_path(path) {
+        let mut response = next.run(request).await;
+        response.headers_mut().insert(
+            axum::http::header::CACHE_CONTROL,
+            HeaderValue::from_static("no-store"),
+        );
+        return response;
+    }
     let session = state.sessions.find(request.headers());
     if (is_game || (is_auth && !bootstrap)) && session.is_none() {
         return required().into_response();
@@ -660,6 +669,7 @@ mod tests {
     include!("sensing_auth_tests.rs");
     include!("radio_auth_tests.rs");
     include!("logistics_auth_tests.rs");
+    include!("agent_auth_tests.rs");
     use super::*;
     use axum::body::{to_bytes, Body};
     use serde_json::{json, Value};

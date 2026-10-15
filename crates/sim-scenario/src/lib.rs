@@ -3,8 +3,8 @@
 mod radio_exercise;
 
 pub use radio_exercise::{
-    combat_training_scenario, command_link_exercise_scenario, contested_combat_scenario,
-    joint_sustainment_exercise_scenario, ridge_relay_exercise_scenario,
+    ai_defense_exercise_scenario, combat_training_scenario, command_link_exercise_scenario,
+    contested_combat_scenario, joint_sustainment_exercise_scenario, ridge_relay_exercise_scenario,
     sensor_relay_exercise_scenario,
 };
 
@@ -28,6 +28,8 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Scenario {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ai_goals: Vec<sim_ai::agent::Goal>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub logistics: Option<sim_core::logistics::Configuration>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -148,6 +150,38 @@ impl Scenario {
                     .all(|character| character.is_ascii_digit())
             {
                 return Err(ScenarioError::InvalidSidc(unit.id));
+            }
+        }
+        let mut goal_ids = std::collections::BTreeSet::new();
+        for goal in &self.ai_goals {
+            if !goal_ids.insert(goal.id)
+                || !self.authority.roles.iter().any(|r| r.id == goal.role_id)
+                || goal.home_facility_id.is_some_and(|id| {
+                    !self
+                        .logistics
+                        .as_ref()
+                        .is_some_and(|l| l.facilities.iter().any(|f| f.unit_id == id))
+                })
+                || goal.name.trim().is_empty()
+                || !goal.radius_m.is_finite()
+                || goal.radius_m <= 0.0
+                || !goal.speed_mps.is_finite()
+                || !(0.0..=1000.0).contains(&goal.speed_mps)
+                || goal.speed_mps == 0.0
+                || !goal.minimum_identification.is_finite()
+                || !(0.0..=1.0).contains(&goal.minimum_identification)
+                || !goal.return_below_fuel_fraction.is_finite()
+                || !(0.0..=1.0).contains(&goal.return_below_fuel_fraction)
+                || goal.max_track_age_ticks == 0
+                || [goal.center, goal.home].iter().any(|p| {
+                    !p.latitude_deg.is_finite()
+                        || p.latitude_deg.abs() > 90.0
+                        || !p.longitude_deg.is_finite()
+                        || p.longitude_deg.abs() > 180.0
+                        || !p.altitude_m.is_finite()
+                })
+            {
+                return Err(ScenarioError::InvalidAuthoredData("invalid AI goal".into()));
             }
         }
         if let Some(logistics) = &self.logistics {
@@ -531,7 +565,7 @@ pub fn regional_campaign_scenario() -> Scenario {
         }
     }
     let (network, communication_links, simulator_options) = global_communications(&mut units);
-    Scenario { logistics: None, sensing: None, observer_seats: training_observers(), iftu: Some(campaign_iftu_configuration()), sensor_report_routes: vec![], combat: None, impact_report_routes: vec![], reporting_window_ticks: 0, campaign: Some(campaign), id: "regional-campaign.v1".into(), title: "Regional Joint Campaign".into(), description: "Two delegated sectors, competing joint plans, interception and strike under communications disruption. Offline training estimates.".into(), version: 2, requires_space_catalog: false, units, network, simulator_options, communication_links, authority, jamming_regions: vec![JammingRegion { active_from_tick: 0, active_until_tick: None, id: "sector-boundary-outage".into(), name: "Receiver interference near sector boundary".into(), center: GeoPose { latitude_deg: 38.1, longitude_deg: -76.55, altitude_m: 0.0 }, radius_m: 8000.0, band: FrequencyBand::new(960_000_000,1_215_000_000), jammed: 1.0 }] }
+    Scenario { ai_goals: vec![], logistics: None, sensing: None, observer_seats: training_observers(), iftu: Some(campaign_iftu_configuration()), sensor_report_routes: vec![], combat: None, impact_report_routes: vec![], reporting_window_ticks: 0, campaign: Some(campaign), id: "regional-campaign.v1".into(), title: "Regional Joint Campaign".into(), description: "Two delegated sectors, competing joint plans, interception and strike under communications disruption. Offline training estimates.".into(), version: 2, requires_space_catalog: false, units, network, simulator_options, communication_links, authority, jamming_regions: vec![JammingRegion { active_from_tick: 0, active_until_tick: None, id: "sector-boundary-outage".into(), name: "Receiver interference near sector boundary".into(), center: GeoPose { latitude_deg: 38.1, longitude_deg: -76.55, altitude_m: 0.0 }, radius_m: 8000.0, band: FrequencyBand::new(960_000_000,1_215_000_000), jammed: 1.0 }] }
 }
 
 pub fn global_crisis_scenario() -> Scenario {
@@ -642,6 +676,7 @@ pub fn global_crisis_scenario() -> Scenario {
     let authority = global_crisis_authority();
     let (network, communication_links, simulator_options) = global_communications(&mut units);
     Scenario {
+        ai_goals: vec![],
         logistics: None,
         sensing: None,
         observer_seats: vec![],
@@ -1433,6 +1468,7 @@ pub fn jammed_flight_scenario() -> Scenario {
     };
 
     Scenario {
+        ai_goals: vec![],
         logistics: None,
         sensing: None,        observer_seats: vec![],
         iftu: None,        campaign: None,

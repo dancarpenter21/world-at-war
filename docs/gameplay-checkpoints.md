@@ -107,3 +107,17 @@ The lobby does not download Cesium until the operational map opens. This regress
 ## Reproduce
 
 From `web/`, run `npm run test:e2e` after preparing the pinned sibling c3mesh checkout. The suite builds the Rust server, starts isolated local provider fixtures, and captures fresh screenshots under the ignored `web/test-results/` directory. See [the project README](../README.md) for toolchain and setup commands.
+
+## AI controllers and OpenRouter
+
+The AI Defense Exercise provides fictional report-driven Red interception, and
+operational roles on either side can use external agents. Desktop and phone
+browser checks run the real Node agent runner against a local OpenRouter-compatible
+provider, submit role-scoped orders, observe timeout fallback, and rotate the token.
+These screenshots show the controller management flow with credentials hidden:
+
+![Agent controller management on desktop](screenshots/agent-controllers-desktop.png)
+![Agent controller management on phone](screenshots/agent-controllers-phone.png)
+
+See [configuration, protocol and limits](AI_IMPLEMENTATION.md). The fixture confirms
+the integration flow, not availability or quality of any live free model.

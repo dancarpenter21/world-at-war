@@ -1,5 +1,12 @@
 # Feature status and next implementation step — 2026-10-13
 
+Current update — 2026-10-14: the first goal-directed defensive AI and external
+agent/OpenRouter adapter are implemented; see [AI behavior and limits](../docs/AI_IMPLEMENTATION.md).
+The fictional joint sustainment loop is implemented; real-platform rollout remains
+blocked by the documented [source gaps](../docs/LOGISTICS_IMPLEMENTATION.md).
+The assessment below records the earlier checkpoint and does not supersede those
+new implementations. Remaining domain loops and interactive review follow.
+
 Status: feature assessment initially reviewed against `ca71e40`, updated after
 the White Cell and terrain-aware radio increments. Implementation evidence lives
 in their checkpoint documents; the remaining release work below is planned.

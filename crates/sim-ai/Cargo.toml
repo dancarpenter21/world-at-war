@@ -8,3 +8,5 @@ license.workspace = true
 [dependencies]
 sim-core = { path = "../sim-core" }
 uuid.workspace = true
+serde.workspace = true
+serde_json.workspace = true

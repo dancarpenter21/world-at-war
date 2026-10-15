@@ -1,3 +1,4 @@
+mod agents;
 mod ai_orders;
 mod airport_catalog;
 mod airspace_import;
@@ -591,6 +592,7 @@ async fn main() -> anyhow::Result<()> {
     scenarios.push(sim_scenario::sensing_exercise_scenario());
     scenarios.push(sim_scenario::ridge_relay_exercise_scenario());
     scenarios.push(sim_scenario::joint_sustainment_exercise_scenario());
+    scenarios.push(sim_scenario::ai_defense_exercise_scenario());
     for scenario in &scenarios {
         scenario.validate()?;
     }
@@ -696,6 +698,16 @@ fn router(state: AppState) -> Router {
             get(communications_catalog_status),
         )
         .route("/v1/games", get(list_games).post(create_game))
+        .route("/v1/games/{game_id}/agent/work", get(agents::work))
+        .route(
+            "/v1/games/{game_id}/agent/decisions",
+            post(agents::decide).layer(axum::extract::DefaultBodyLimit::max(65_536)),
+        )
+        .route("/v1/games/{game_id}/agents", get(agents::inspect))
+        .route(
+            "/v1/games/{game_id}/agents/{role_id}",
+            post(agents::configure),
+        )
         .route("/v1/games/{game_id}/join", post(join_game))
         .route("/v1/games/{game_id}/teams", get(teams::read))
         .route("/v1/games/{game_id}/teams/requests", post(teams::request))
@@ -1064,7 +1076,7 @@ async fn create_game(
             .collect(),
         packet_messages: BTreeMap::new(),
         pending_deliveries: BTreeMap::new(),
-        ai_planner: ai_orders::AiPlannerState::default(),
+        ai_planner: ai_orders::AiPlannerState::with_goals(scenario.ai_goals.clone()),
         sensor_reports: sensor_reports::SensorReportState::new(
             scenario.sensor_report_routes.clone(),
         ),
@@ -1214,6 +1226,7 @@ async fn set_game_status(
         ));
     }
     if game.status != status {
+        agents::invalidate_work(game);
         game.status = status;
         teams::record_control(game, player, format!("status {status:?}"));
         game.scheduler.reset();
@@ -1350,6 +1363,7 @@ async fn update_authority(
     debug_assert_eq!(roles.len(), new_ids.len());
     game.roles = roles;
     game.authority = request.definition;
+    agents::authority_changed(game);
     game.authority_events.push(AuthorityEvent {
         tick: game.simulation.tick(),
         kind: "authority_updated".into(),
@@ -1459,6 +1473,20 @@ async fn decide_authority_request(
             "the training mission has ended",
         ));
     }
+    Ok(Json(decide_validated_authority(
+        game,
+        role_id,
+        request_id,
+        matches!(request.decision, AuthorityDecision::Approve),
+    )?))
+}
+
+fn decide_validated_authority(
+    game: &mut Game,
+    role_id: Uuid,
+    request_id: Uuid,
+    approve: bool,
+) -> Result<AuthorityRequest, (StatusCode, Json<ErrorResponse>)> {
     let mut authority_request = game.authority_requests.remove(&request_id).ok_or_else(|| {
         api_error(
             StatusCode::NOT_FOUND,
@@ -1480,16 +1508,11 @@ async fn decide_authority_request(
             "this role cannot decide the request now",
         ));
     }
-    advance_authority_request(
-        game,
-        &mut authority_request,
-        matches!(request.decision, AuthorityDecision::Approve),
-        false,
-    );
+    advance_authority_request(game, &mut authority_request, approve, false);
     let response = authority_request.clone();
     game.authority_requests
         .insert(request_id, authority_request);
-    Ok(Json(response))
+    Ok(response)
 }
 
 async fn create_satellite_request(
@@ -1970,11 +1993,12 @@ fn status_for_decision_role(
     step: &sim_core::AuthorityDecisionStep,
     tick: u64,
 ) -> AuthorityRequestStatus {
-    if game
-        .roles
-        .get(&step.role_id)
-        .and_then(|role| role.owner)
-        .is_some()
+    if agents::controls(game, step.role_id)
+        || game
+            .roles
+            .get(&step.role_id)
+            .and_then(|role| role.owner)
+            .is_some()
     {
         AuthorityRequestStatus::PendingHuman {
             role_id: step.role_id,
@@ -2130,11 +2154,12 @@ fn process_vacant_authority_requests(game: &mut Game) {
             game.authority_requests.insert(id, request);
             continue;
         };
-        let occupied = game
-            .roles
-            .get(&step.role_id)
-            .and_then(|role| role.owner)
-            .is_some();
+        let occupied = agents::controls(game, step.role_id)
+            || game
+                .roles
+                .get(&step.role_id)
+                .and_then(|role| role.owner)
+                .is_some();
         match request.status {
             AuthorityRequestStatus::WaitingVacant { .. } if occupied => {
                 request.status = AuthorityRequestStatus::PendingHuman {
@@ -3360,11 +3385,15 @@ async fn run_simulation_loop(state: AppState) {
             }
             leases::expire(game, std::time::Instant::now());
         }
+        let agent_time_ms = agents::now_ms();
         let mut inputs: BTreeMap<_, _> = if before.is_some() {
             games
                 .iter()
                 .map(|(id, game)| {
                     let mut input = recovery::TickInput::capture(game);
+                    if !game.ai_planner.agents.is_empty() {
+                        input.agent_time_ms = Some(agent_time_ms);
+                    }
                     input.advance = Some(due.contains(id));
                     input.frame_scale = due.contains(id).then_some(game.time_scale.unwrap_or(1.0));
                     (*id, input)
@@ -3381,6 +3410,7 @@ async fn run_simulation_loop(state: AppState) {
             game.scheduler.advanced_frame(now);
             let started = std::time::Instant::now();
             let delay = scheduled.elapsed().as_secs_f64() * 1000.0;
+            agents::advance(game, agent_time_ms);
             ai_orders::process_ai_orders(game);
             advance_game_frame(game, game.time_scale.unwrap_or(1.0));
             intents::record_execution_results(game);
@@ -3709,7 +3739,7 @@ mod authority_tests {
             .collect(),
             packet_messages: BTreeMap::new(),
             pending_deliveries: BTreeMap::new(),
-            ai_planner: ai_orders::AiPlannerState::default(),
+            ai_planner: ai_orders::AiPlannerState::with_goals(scenario.ai_goals.clone()),
             sensor_reports: sensor_reports::SensorReportState::new(
                 scenario.sensor_report_routes.clone(),
             ),

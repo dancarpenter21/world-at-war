@@ -202,6 +202,18 @@ Report routes are explicit same-side subscriptions with validated sensing roles,
 
 The recipient's state, network view, message detail endpoint, REST event history, and network stream withhold incoming report contents until delivery is persisted. Dropped, expired, or failed-persistence reports do not update the recipient's knowledge. Received tracks retain their original observation tick, use the actual receive tick, and never read the target's current truth. Older or duplicate reports cannot overwrite a newer report from the same source. Report routes are disabled in the other existing scenarios; upgraded scenarios add measurement-based fusion while retaining explicit report subscriptions.
 
+## Game AI and OpenRouter
+
+**AI Defense Exercise** adds report-driven Red defense, interception and legal
+engagement orders. In **Team & players → AI controllers**, hosts and White Cell
+can assign individual Blue or Red roles to humans, built-in AI or external agents.
+The game continues during inference and uses a bounded deterministic fallback.
+
+The included Node runner supports `OPENROUTER_BASE_URL`, `OPENROUTER_API_KEY` and
+free-model selection (`openrouter/free` or an explicit `:free` model). Configure
+an ignored `.env` file and run `node --env-file=.env web/scripts/agent-runner.mjs`.
+See [setup, decision API, behavior and limits](docs/AI_IMPLEMENTATION.md).
+
 ## Logistics and aerial refueling
 
 **Joint Sustainment Exercise** adds fictional airfield/port/carrier servicing,

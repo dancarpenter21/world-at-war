@@ -1,0 +1,425 @@
+{
+  "id": "ai-defense-exercise.v1",
+  "title": "AI Defense Exercise",
+  "description": "Fictional two-sided defense: delivered sensor reports cue two interceptors. Assign Blue or Red roles to an external agent, or use deterministic Red defense. Initial sensor interference clears at tick 8.",
+  "version": 1,
+  "provenance": "Fictional positions, training weapon limits, target durability, and exercise rules. No real weapon performance data.",
+  "units": [
+    {
+      "id": "00000000-0000-0000-0000-000000000005",
+      "name": "Red Defense Headquarters",
+      "side": "Red",
+      "domain": "Land",
+      "sidc": "100610000012110000000000000000",
+      "position": {
+        "latitude_deg": 13.584,
+        "longitude_deg": 144.93,
+        "altitude_m": 180
+      },
+      "velocity": {
+        "north_mps": 0,
+        "east_mps": 0,
+        "climb_mps": 0
+      },
+      "sensor": null,
+      "network_device_ids": [],
+      "flight_path": null
+    },
+    {
+      "id": "00000000-0000-0000-0000-00000000000b",
+      "name": "Red Interceptor One",
+      "side": "Red",
+      "domain": "Air",
+      "sidc": "100601000011010000000000000000",
+      "position": {
+        "latitude_deg": 13.7,
+        "longitude_deg": 145.05,
+        "altitude_m": 8000
+      },
+      "velocity": {
+        "north_mps": 0,
+        "east_mps": 0,
+        "climb_mps": 0
+      },
+      "sensor": null,
+      "network_device_ids": [],
+      "flight_path": null
+    },
+    {
+      "id": "00000000-0000-0000-0000-00000000000c",
+      "name": "Red Interceptor Two",
+      "side": "Red",
+      "domain": "Air",
+      "sidc": "100601000011010000000000000000",
+      "position": {
+        "latitude_deg": 13.75,
+        "longitude_deg": 145.1,
+        "altitude_m": 8000
+      },
+      "velocity": {
+        "north_mps": 0,
+        "east_mps": 0,
+        "climb_mps": 0
+      },
+      "sensor": null,
+      "network_device_ids": [],
+      "flight_path": null
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000033",
+      "name": "Blue Exercise Aircraft",
+      "side": "Blue",
+      "domain": "Air",
+      "sidc": "100301000011010000000000000000",
+      "position": {
+        "latitude_deg": 13.85,
+        "longitude_deg": 145.05,
+        "altitude_m": 8000
+      },
+      "velocity": {
+        "north_mps": 0,
+        "east_mps": 0,
+        "climb_mps": 0
+      },
+      "sensor": null,
+      "network_device_ids": [],
+      "flight_path": null
+    },
+    {
+      "id": "00000000-0000-0000-0000-00000000000d",
+      "name": "Red Reporting Sensor",
+      "side": "Red",
+      "domain": "Land",
+      "sidc": "100610000012110000000000000000",
+      "position": {
+        "latitude_deg": 13.78,
+        "longitude_deg": 145.05,
+        "altitude_m": 200
+      },
+      "velocity": {
+        "north_mps": 0,
+        "east_mps": 0,
+        "climb_mps": 0
+      },
+      "sensor": {
+        "range_m": 40000,
+        "identification_range_m": 30000
+      },
+      "network_device_ids": [],
+      "flight_path": null
+    }
+  ],
+  "radio": {
+    "bit_rate_bps": 2400,
+    "propagation_delay_ns": 5000000,
+    "mtu_bytes": 1200,
+    "overhead_bytes": 24,
+    "max_queue_packets": 4,
+    "max_queue_bytes": 4096,
+    "shared_medium": "sensor-relay-training-net",
+    "seed": 42
+  },
+  "authority": {
+    "version": 1,
+    "roles": [
+      {
+        "id": "00000000-0000-0000-0000-000000004e85",
+        "name": "Red National Authority",
+        "side": "Red",
+        "kind": "national_command",
+        "location_unit_id": "00000000-0000-0000-0000-000000000005",
+        "claimable": false,
+        "ai_controlled": false
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004e86",
+        "name": "Red Defense Commander",
+        "side": "Red",
+        "kind": "component_commander",
+        "location_unit_id": "00000000-0000-0000-0000-000000000005",
+        "claimable": false,
+        "ai_controlled": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004e87",
+        "name": "Red Interceptor Operator 1",
+        "side": "Red",
+        "kind": "pilot",
+        "location_unit_id": "00000000-0000-0000-0000-00000000000b",
+        "claimable": true,
+        "ai_controlled": false
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004e88",
+        "name": "Red Interceptor Operator 2",
+        "side": "Red",
+        "kind": "pilot",
+        "location_unit_id": "00000000-0000-0000-0000-00000000000c",
+        "claimable": true,
+        "ai_controlled": false
+      },
+      {
+        "id": "00000000-0000-0000-0000-00000000526d",
+        "name": "Blue Aircraft Operator",
+        "side": "Blue",
+        "kind": "pilot",
+        "location_unit_id": "00000000-0000-0000-0000-000000000033",
+        "claimable": true,
+        "ai_controlled": false
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004e89",
+        "name": "Red Sensor Operator",
+        "side": "Red",
+        "kind": "pilot",
+        "location_unit_id": "00000000-0000-0000-0000-00000000000d",
+        "claimable": true,
+        "ai_controlled": false
+      }
+    ],
+    "relationships": [
+      {
+        "id": "00000000-0000-0000-0000-000000004ee9",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e85",
+        "subordinate_role_id": "00000000-0000-0000-0000-000000004e86",
+        "subordinate_unit_id": null,
+        "kind": "national_command"
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004eea",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e86",
+        "subordinate_role_id": "00000000-0000-0000-0000-000000004e87",
+        "subordinate_unit_id": null,
+        "kind": "tacon"
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004eeb",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e86",
+        "subordinate_role_id": "00000000-0000-0000-0000-000000004e88",
+        "subordinate_unit_id": null,
+        "kind": "tacon"
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004eec",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e85",
+        "subordinate_role_id": null,
+        "subordinate_unit_id": "00000000-0000-0000-0000-000000000005",
+        "kind": "national_command"
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004eed",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e87",
+        "subordinate_role_id": null,
+        "subordinate_unit_id": "00000000-0000-0000-0000-00000000000b",
+        "kind": "tacon"
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004eee",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e88",
+        "subordinate_role_id": null,
+        "subordinate_unit_id": "00000000-0000-0000-0000-00000000000c",
+        "kind": "tacon"
+      },
+      {
+        "id": "00000000-0000-0000-0000-0000000052d1",
+        "superior_role_id": "00000000-0000-0000-0000-00000000526d",
+        "subordinate_role_id": null,
+        "subordinate_unit_id": "00000000-0000-0000-0000-000000000033",
+        "kind": "national_command"
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004f4c",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e86",
+        "subordinate_role_id": "00000000-0000-0000-0000-000000004e89",
+        "subordinate_unit_id": null,
+        "kind": "tacon"
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004f4d",
+        "superior_role_id": "00000000-0000-0000-0000-000000004e89",
+        "subordinate_role_id": null,
+        "subordinate_unit_id": "00000000-0000-0000-0000-00000000000d",
+        "kind": "tacon"
+      }
+    ],
+    "policies": [
+      {
+        "id": "00000000-0000-0000-0000-000000004f4d",
+        "name": "CAP Alpha 1 movement authority",
+        "action": "move",
+        "target_unit_ids": [
+          "00000000-0000-0000-0000-00000000000b"
+        ],
+        "direct_role_ids": [
+          "00000000-0000-0000-0000-000000004e86",
+          "00000000-0000-0000-0000-000000004e87"
+        ],
+        "request_role_ids": [],
+        "decision_steps": [],
+        "notify_role_ids": [],
+        "executable": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004f4e",
+        "name": "CAP Alpha 2 movement authority",
+        "action": "move",
+        "target_unit_ids": [
+          "00000000-0000-0000-0000-00000000000c"
+        ],
+        "direct_role_ids": [
+          "00000000-0000-0000-0000-000000004e86",
+          "00000000-0000-0000-0000-000000004e88"
+        ],
+        "request_role_ids": [],
+        "decision_steps": [],
+        "notify_role_ids": [],
+        "executable": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004f60",
+        "name": "Training engagement authority",
+        "action": "engage",
+        "target_unit_ids": [
+          "00000000-0000-0000-0000-00000000000b"
+        ],
+        "direct_role_ids": [
+          "00000000-0000-0000-0000-000000004e86"
+        ],
+        "request_role_ids": [
+          "00000000-0000-0000-0000-000000004e87"
+        ],
+        "decision_steps": [
+          {
+            "role_id": "00000000-0000-0000-0000-000000004e86",
+            "vacant_delay_ticks": 3,
+            "approve_probability_bps": 0
+          }
+        ],
+        "notify_role_ids": [],
+        "executable": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004fb1",
+        "name": "Blue aircraft movement",
+        "action": "move",
+        "target_unit_ids": [
+          "00000000-0000-0000-0000-000000000033"
+        ],
+        "direct_role_ids": [
+          "00000000-0000-0000-0000-00000000526d"
+        ],
+        "request_role_ids": [],
+        "decision_steps": [],
+        "notify_role_ids": [],
+        "executable": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000004fb2",
+        "name": "Second interceptor engagement",
+        "action": "engage",
+        "target_unit_ids": [
+          "00000000-0000-0000-0000-00000000000c"
+        ],
+        "direct_role_ids": [
+          "00000000-0000-0000-0000-000000004e86"
+        ],
+        "request_role_ids": [
+          "00000000-0000-0000-0000-000000004e88"
+        ],
+        "decision_steps": [
+          {
+            "role_id": "00000000-0000-0000-0000-000000004e86",
+            "vacant_delay_ticks": 3,
+            "approve_probability_bps": 0
+          }
+        ],
+        "notify_role_ids": [],
+        "executable": true
+      }
+    ]
+  },
+  "sensor_report_routes": [
+    {
+      "origin_role_id": "00000000-0000-0000-0000-000000004e89",
+      "recipient_unit_id": "00000000-0000-0000-0000-000000000005",
+      "interval_ticks": 3
+    }
+  ],
+  "combat": {
+    "units": [
+      {
+        "unit_id": "00000000-0000-0000-0000-00000000000b",
+        "hit_points": 100,
+        "weapon": {
+          "ammunition": 4,
+          "range_m": 4000,
+          "speed_mps": 600,
+          "blast_radius_m": 75,
+          "damage": 100,
+          "max_track_age_ticks": 15
+        }
+      },
+      {
+        "unit_id": "00000000-0000-0000-0000-000000000033",
+        "hit_points": 100,
+        "weapon": null
+      },
+      {
+        "unit_id": "00000000-0000-0000-0000-00000000000c",
+        "hit_points": 100,
+        "weapon": {
+          "ammunition": 4,
+          "range_m": 4000,
+          "speed_mps": 600,
+          "blast_radius_m": 75,
+          "damage": 100,
+          "max_track_age_ticks": 15
+        }
+      }
+    ],
+    "mission": null
+  },
+  "ai_goals": [
+    {
+      "id": "00000000-0000-0000-0000-00000000ea61",
+      "role_id": "00000000-0000-0000-0000-000000004e86",
+      "name": "Defend headquarters approaches",
+      "priority": 100,
+      "center": {
+        "latitude_deg": 13.7,
+        "longitude_deg": 145.05,
+        "altitude_m": 8000
+      },
+      "home": {
+        "latitude_deg": 13.7,
+        "longitude_deg": 145.05,
+        "altitude_m": 8000
+      },
+      "radius_m": 40000,
+      "speed_mps": 180,
+      "minimum_identification": 0.8,
+      "max_track_age_ticks": 20,
+      "return_below_fuel_fraction": 0.2,
+      "return_below_hit_points": 20
+    }
+  ],
+  "jamming_regions": [
+    {
+      "id": "sensor-startup-interference",
+      "name": "Initial sensor radio interference",
+      "center": {
+        "latitude_deg": 13.78,
+        "longitude_deg": 145.05,
+        "altitude_m": 200
+      },
+      "radius_m": 2000,
+      "band": {
+        "lower_hz": 960000000,
+        "upper_hz": 1215000000
+      },
+      "jammed": 1.0,
+      "active_from_tick": 0,
+      "active_until_tick": 8
+    }
+  ]
+}

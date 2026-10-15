@@ -2265,6 +2265,8 @@ dependencies = [
 name = "sim-ai"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "sim-core",
  "uuid",
 ]
@@ -2330,6 +2332,7 @@ dependencies = [
  "c3mesh",
  "serde",
  "serde_json",
+ "sim-ai",
  "sim-comms",
  "sim-core",
  "sim-geo",

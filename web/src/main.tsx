@@ -289,9 +289,10 @@ function App() {
       } else { localStorage.removeItem("world-at-war-session"); if (session) setMessage("Previous scenario is unavailable. Choose a scenario."); }
       sessionRestoreAttempted.current = true;
     }
+    const defaultScenario = loadedScenarios.find(scenario => scenario.id === "command-link-exercise.v1") ?? loadedScenarios[0];
     setScenarios(loadedScenarios); setGames(loadedGames); setSpaceStatus(effectiveStatus);
-    setGameTitle((current) => current.trim() ? current : loadedScenarios[0]?.title ?? "");
-    setSelectedScenarioId((current) => current && loadedScenarios.some((scenario) => scenario.id === current) ? current : loadedScenarios[0]?.id ?? "");
+    setGameTitle((current) => current.trim() ? current : defaultScenario?.title ?? "");
+    setSelectedScenarioId((current) => current && loadedScenarios.some((scenario) => scenario.id === current) ? current : defaultScenario?.id ?? "");
     setGame((current) => current
       ? loadedGames.find((candidate) => candidate.id === current.id) ?? current
       : null);

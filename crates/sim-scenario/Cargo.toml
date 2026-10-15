@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+sim-ai = { path = "../sim-ai" }
 sim-geo = { path = "../sim-geo" }
 c3mesh.workspace = true
 serde.workspace = true

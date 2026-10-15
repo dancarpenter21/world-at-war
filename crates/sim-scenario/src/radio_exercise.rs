@@ -7,6 +7,8 @@ const EXERCISE_DATA: &str = include_str!("../../../data/scenarios/command-link-e
 #[serde(deny_unknown_fields)]
 struct RadioScenarioDefinition {
     #[serde(default)]
+    ai_goals: Vec<sim_ai::agent::Goal>,
+    #[serde(default)]
     logistics: Option<sim_core::logistics::Configuration>,
     #[serde(default)]
     logistics_config: Option<String>,
@@ -99,6 +101,7 @@ fn parse_radio_scenario(data: &str) -> Result<Scenario, ScenarioError> {
     }
     simulator_options.seed = definition.radio.seed;
     let scenario = Scenario {
+        ai_goals: definition.ai_goals,
         logistics,
         sensing: None,
         observer_seats: vec![],
@@ -415,4 +418,14 @@ mod logistics_tests {
         assert_eq!(config.unavailable.len(), 3);
         assert!(iftu_exercise_scenario().logistics.is_none());
     }
+}
+
+/// Fictional two-sided defense, with delivered knowledge and bounded radio disruption.
+pub fn ai_defense_exercise_scenario() -> Scenario {
+    let mut scenario = parse_radio_scenario(include_str!(
+        "../../../data/scenarios/ai-defense-exercise.v1.json"
+    ))
+    .expect("committed AI defense exercise must be valid");
+    scenario.observer_seats = training_observers();
+    scenario
 }

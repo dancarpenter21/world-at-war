@@ -67,6 +67,8 @@ pub(super) fn digest(bytes: &[u8]) -> String {
 #[derive(Serialize, Deserialize)]
 pub(super) struct TickInput {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_time_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub advance: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub frame_scale: Option<f64>,
@@ -77,6 +79,7 @@ pub(super) struct TickInput {
 impl TickInput {
     pub fn capture(game: &Game) -> Self {
         Self {
+            agent_time_ms: None,
             advance: None,
             frame_scale: None,
             roles: game
@@ -106,6 +109,9 @@ impl TickInput {
         }
         game.status = self.status;
         if game.status == GameStatus::Running && self.advance.unwrap_or(true) {
+            if let Some(now) = self.agent_time_ms {
+                agents::advance(game, now);
+            }
             ai_orders::process_ai_orders(game);
             if let Some(scale) = self.frame_scale {
                 anyhow::ensure!(game_clock::SCALES.contains(&scale), "invalid frame scale");
@@ -465,6 +471,7 @@ async fn load_internal(state: &AppState, migration: Option<bool>) -> anyhow::Res
                 game.simulation.tick()
             );
         }
+        agents::invalidate_work(&mut game);
         game.network_message_events.clear();
         store.load_audit(&mut game).await?;
         if game.status == GameStatus::Running {

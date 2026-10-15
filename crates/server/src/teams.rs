@@ -146,7 +146,7 @@ pub(super) fn red_available(game: &Game) -> bool {
 pub(super) fn human_red_supported(scenario: &Scenario) -> bool {
     matches!(
         scenario.id.as_str(),
-        "global-crisis.v2" | "regional-campaign.v1"
+        "global-crisis.v2" | "regional-campaign.v1" | "ai-defense-exercise.v1"
     ) && scenario.authority.roles.iter().any(|r| r.side == Side::Red)
 }
 fn validate_destination(game: &Game, target: Team) -> Result<(), Failure> {

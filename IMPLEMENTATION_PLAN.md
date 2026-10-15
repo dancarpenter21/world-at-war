@@ -1,5 +1,31 @@
 # World At War Implementation Plan
 
+## Goal-directed AI and OpenRouter agents — 2026-10-14
+
+The fictional AI Defense Exercise adds delivered-report-driven Red defense,
+nearest-unit allocation, interception, legal engagement and return behavior.
+Individual Blue or Red operational roles support human, deterministic or external
+control, with scoped revocable credentials and wall-time fallback. The external
+Node runner supports OpenRouter base URL, API key, free router/explicit free
+models, locally validated decisions, deadline cancellation and rate-limit handling.
+See [setup, interfaces and fidelity limits](docs/AI_IMPLEMENTATION.md).
+
+The joint sustainment mechanics are also implemented; their real-platform source
+coverage remains incomplete. These checkpoints supersede the older recommendation
+to build the first Red goal planner and fictional logistics loop below. Remaining
+multi-domain loops, richer doctrine and interactive review remain release work.
+Stronger durability remains deprioritized.
+
+Validation passes 310 fast Rust tests, all 20 isolated PostgreSQL tests, 54
+frontend tests, 12 mocked runner/provider tests, formatting, strict Clippy,
+dependency-pin verification, frontend/E2E TypeScript checking and production
+frontend build. The full Chromium run passed 67 cases and skipped its dedicated-
+database case, exposing two lobby-default regressions from the new alphabetical
+scenario entry. Both were fixed by retaining Command Link as the default; all 10
+affected agent/gameplay browser cases then passed on the final implementation.
+The final agent cases also prove the game clock advances during held inference.
+No live OpenRouter calls, long soak or existing-database migration was run.
+
 ## Terrain-aware radio increment — 2026-10-13
 
 New campaign games opt eligible radio links into Earth/terrain obstruction with

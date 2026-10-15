@@ -7,6 +7,8 @@ const RETRY_TICKS: u64 = 10;
 #[derive(Default, Serialize, Deserialize)]
 pub(super) struct AiPlannerState {
     attempts: BTreeMap<Uuid, Attempt>,
+    #[serde(default, skip_serializing_if = "crate::agents::AgentState::is_empty")]
+    pub(super) agents: crate::agents::AgentState,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -16,7 +18,7 @@ struct Attempt {
     kind: OrderKind,
 }
 
-fn order_is_pending(game: &Game, unit_id: Uuid) -> bool {
+pub(super) fn order_is_pending(game: &Game, unit_id: Uuid) -> bool {
     game.pending_deliveries.values().any(|action| match action {
         DeliveryAction::ExecuteIntent(order)
         | DeliveryAction::ExecuteRequest { intent: order, .. } => order.intent.target == unit_id,
@@ -43,10 +45,20 @@ pub(super) fn process_ai_orders(game: &mut Game) {
     if game.status != GameStatus::Running || game.simulation.mission_complete() {
         return;
     }
+    crate::agents::process_policies(game);
     let mut roles: Vec<_> = game
         .roles
         .values()
-        .filter(|role| role.ai_controlled)
+        .filter(|role| {
+            role.ai_controlled
+                && !game.ai_planner.agents.connections.contains_key(&role.id)
+                && !game
+                    .ai_planner
+                    .agents
+                    .goals
+                    .iter()
+                    .any(|g| g.role_id == role.id)
+        })
         .cloned()
         .collect();
     // The smallest command scope plans first; ties use stable role IDs. An
@@ -62,6 +74,8 @@ pub(super) fn process_ai_orders(game: &mut Game) {
                 .own_units
                 .iter()
                 .any(|unit| unit.id == unit_id && unit.domain == Domain::Air)
+                || (!game.ai_planner.agents.is_empty()
+                    && !crate::agents::planner_owns(game, role.id, unit_id))
                 || !assigned.insert(unit_id)
             {
                 continue;
@@ -104,3 +118,11 @@ pub(super) fn process_ai_orders(game: &mut Game) {
 
 #[cfg(test)]
 mod tests;
+
+impl AiPlannerState {
+    pub(super) fn with_goals(goals: Vec<sim_ai::agent::Goal>) -> Self {
+        let mut state = Self::default();
+        state.agents.goals = goals;
+        state
+    }
+}
