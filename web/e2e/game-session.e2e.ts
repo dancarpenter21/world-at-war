@@ -115,7 +115,9 @@ async function openSession(page: Page, guest = false, projection = sessionProjec
   await page.getByRole("button", { name: /Blue One Pilot/ }).click();
   if (!guest) await page.getByRole("button", { name: "Start scenario", exact: true }).click();
   await expect(page.locator("header .tick")).toHaveText("TICK 12");
-  if (options.waitForMap !== false) await expect(page.locator(".globe canvas")).toBeVisible();
+  // The Cesium bundle is loaded after the session opens. Hosted runners can
+  // need longer than the default assertion timeout to download and initialize it.
+  if (options.waitForMap !== false) await expect(page.locator(".globe canvas")).toBeVisible({ timeout: 30_000 });
   return state;
 }
 

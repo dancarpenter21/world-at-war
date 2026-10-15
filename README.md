@@ -64,7 +64,7 @@ Current limitations: new referee exercise injects and outcome overrides, raw pac
 
 ## Prerequisites
 
-- Rust 1.89 or newer for the Rust 2021 workspace and its locked dependencies.
+- Rust 1.97.1 or newer for the Rust 2021 workspace and its locked dependencies.
 - GitHub read access to [c3mesh](https://github.com/dancarpenter21/c3mesh), checked out as the sibling `../c3mesh` at the prepared v0.4.0 source commit pinned in [c3mesh-revision.txt](c3mesh-revision.txt). The setup scripts clone the dependency when missing and select the pinned revision when its working tree is clean. This source revision includes packet-safe history compaction and complete runtime snapshots; registry publication of 0.4.0 is pending credentials.
 - Node.js 22+ and npm for frontend development.
 - Docker Compose v2 for the container workflows.
@@ -365,7 +365,7 @@ cd web
 npm run test:e2e:gameplay
 ```
 
-**Continuous integration** checks the pinned c3mesh checkout, formatting, strict lints, and workspace tests on Linux and Windows using Rust 1.89.0 and current stable. A separate PostgreSQL job tests durable transactions and recovery. The Linux web job includes a database-backed browser crash test, uses the npm lockfile, builds the production client, and runs all browser tests with local catalog providers. Browser reports, screenshots, and failure traces are retained for seven days. See [.github/workflows/checks.yml](.github/workflows/checks.yml).
+**Continuous integration** checks the pinned c3mesh checkout, formatting, strict lints, and workspace tests on Linux and Windows using Rust 1.97.1 and current stable. A separate PostgreSQL job tests durable transactions and recovery. The Linux web job includes a database-backed browser crash test, uses the npm lockfile, builds the production client, and runs all browser tests with local catalog providers. Browser reports, screenshots, and failure traces are retained for seven days. See [.github/workflows/checks.yml](.github/workflows/checks.yml).
 
 The [production container workflow](.github/workflows/containers.yml) runs when container definitions, dependency pins, authored scenario data, or smoke inputs change, and can also be dispatched manually. It builds the server and client with their lockfiles, starts the production Compose edge stack, and verifies static assets, a catalog-free game, an identical order retry, recorded packet delivery, actual movement execution, and pause through the proxy. The stack is always stopped afterward. Docker contexts exclude local builds, test reports, tool state, and environment files.
 

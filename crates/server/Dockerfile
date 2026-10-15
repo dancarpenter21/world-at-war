@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM rust:1.89-bookworm AS build
+FROM rust:1.97.1-bookworm AS build
 WORKDIR /workspace
 COPY Cargo.toml Cargo.lock c3mesh-revision.txt ./
 COPY crates ./crates
@@ -13,11 +13,12 @@ COPY data/logistics ./data/logistics
 COPY --from=c3mesh Cargo.toml Cargo.lock README.md /c3mesh/
 COPY --from=c3mesh src /c3mesh/src
 COPY --from=c3mesh examples /c3mesh/examples
-RUN cargo build --release --package world-at-war-server --locked
+RUN rustc --version && cargo build --release --package world-at-war-server --locked
 
-FROM rust:1.89-bookworm AS development
+FROM rust:1.97.1-bookworm AS development
 WORKDIR /workspace
-RUN apt-get update \
+RUN rustc --version \
+  && apt-get update \
   && apt-get install --no-install-recommends -y curl \
   && rm -rf /var/lib/apt/lists/* \
   && cargo install cargo-watch --locked

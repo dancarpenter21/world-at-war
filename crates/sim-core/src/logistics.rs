@@ -16,8 +16,9 @@ pub struct Evidence {
 impl Evidence {
     fn validate_for(&self, fictional: bool) -> Result<(), String> {
         self.validate()?;
-        if !fictional
-            && !(self.source.starts_with("https://") || self.source.starts_with("licensed:"))
+        if !(fictional
+            || self.source.starts_with("https://")
+            || self.source.starts_with("licensed:"))
         {
             return Err("real logistics parameters require public or licensed evidence; fictional fallback is unavailable".into());
         }
