@@ -2097,7 +2097,9 @@ fn apply_orders(
         if !matches!(
             intent.kind,
             OrderKind::Logistics { .. } | OrderKind::SetRadarEmission { .. }
-        ) && !logistics.movement_allowed(intent.target)
+        ) && (!logistics.movement_allowed(intent.target)
+            || (matches!(intent.kind, OrderKind::Move { .. })
+                && logistics.fixed_facility(intent.target)))
         {
             let status = OrderStatus::Rejected(
                 "unit is attached, servicing or unavailable; depart before movement or engagement"
@@ -2190,10 +2192,25 @@ fn apply_orders(
                 applied.0.insert(intent.intent_id, OrderStatus::Accepted);
             }
             OrderKind::Engage { track_id } => {
+                if logistics.ammunition(intent.target) == Some(0) {
+                    let status = OrderStatus::Rejected("ammunition exhausted".into());
+                    applied.0.insert(intent.intent_id, status.clone());
+                    results.0.push(OrderResult {
+                        intent_id: intent.intent_id,
+                        status,
+                    });
+                    continue;
+                }
                 if training_combat.weapon_status(intent.target).is_some() {
                     let status = training_combat
                         .launch(&intent, side.0, *pose, clock.tick)
-                        .map(|_| OrderStatus::Accepted)
+                        .map(|_| {
+                            logistics.consume_ammunition(intent.target, clock.tick);
+                            if let Some(ammo) = logistics.ammunition(intent.target) {
+                                combat.profile.ammunition = ammo;
+                            }
+                            OrderStatus::Accepted
+                        })
                         .unwrap_or_else(OrderStatus::Rejected);
                     applied.0.insert(intent.intent_id, status.clone());
                     results.0.push(OrderResult {
@@ -2231,6 +2248,12 @@ fn apply_orders(
                     ),
                     _ => Err("track is not identified in executor's local picture".into()),
                 };
+                if result.is_ok() {
+                    logistics.consume_ammunition(intent.target, clock.tick);
+                    if let Some(ammo) = logistics.ammunition(intent.target) {
+                        combat.profile.ammunition = ammo;
+                    }
+                }
                 results.0.push(OrderResult {
                     intent_id: intent.intent_id,
                     status: result

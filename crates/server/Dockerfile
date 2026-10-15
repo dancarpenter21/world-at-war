@@ -9,6 +9,7 @@ COPY data/aco ./data/aco
 COPY data/weapons ./data/weapons
 COPY data/sensing ./data/sensing
 COPY data/communications ./data/communications
+COPY data/logistics ./data/logistics
 COPY --from=c3mesh Cargo.toml Cargo.lock README.md /c3mesh/
 COPY --from=c3mesh src /c3mesh/src
 COPY --from=c3mesh examples /c3mesh/examples
@@ -28,6 +29,7 @@ COPY data/aco ./data/aco
 COPY data/weapons ./data/weapons
 COPY data/sensing ./data/sensing
 COPY data/communications ./data/communications
+COPY data/logistics ./data/logistics
 COPY --from=c3mesh Cargo.toml Cargo.lock README.md /c3mesh/
 COPY --from=c3mesh src /c3mesh/src
 COPY --from=c3mesh examples /c3mesh/examples

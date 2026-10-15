@@ -202,6 +202,20 @@ Report routes are explicit same-side subscriptions with validated sensing roles,
 
 The recipient's state, network view, message detail endpoint, REST event history, and network stream withhold incoming report contents until delivery is persisted. Dropped, expired, or failed-persistence reports do not update the recipient's knowledge. Received tracks retain their original observation tick, use the actual receive tick, and never read the target's current truth. Older or duplicate reports cannot overwrite a newer report from the same source. Report routes are disabled in the other existing scenarios; upgraded scenarios add measurement-based fusion while retaining explicit report subscriptions.
 
+## Logistics and aerial refueling
+
+**Joint Sustainment Exercise** adds fictional airfield/port/carrier servicing,
+physical cargo deliveries, underway replenishment and boom/drogue aerial refueling.
+Fuel transfers respect donor reserves, receiver intake and capacity, equipment rates
+and game elapsed time. Use **Logistics and basing** in the command panel; individual
+operators and White Cell can inspect the appropriate resource state.
+
+See [play instructions, interfaces, source coverage and limits](docs/LOGISTICS_IMPLEMENTATION.md).
+The aircraft fuel catalog covers all existing Blue types, but source gaps currently
+prevent enabling real-platform logistics. New Regional games report those gaps;
+its named aircraft retain their preceding campaign behavior. No estimates are
+silently substituted for required flight-performance tables or receiver limits.
+
 ## Combat training
 
 Select **Combat Training Exercise**, create a game, claim **Exercise Commander**, and start. CAP Alpha 1 detects the nearby hostile drone; its report must arrive at the command post before the commander can select the contact under **Engagement orders**. Send the order and watch its delivery and launch receipt. A successful impact completes the objective and pauses the scenario permanently. Leave and create a new game to retry.

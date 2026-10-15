@@ -17,7 +17,8 @@
           "license": "Publicly accessible source; factual values only, no source-document redistribution",
           "normalized_value": 8278.0607525,
           "normalized_unit": "kg",
-          "conversion": "1 international pound = 0.45359237 kg exactly"
+          "conversion": "1 international pound = 0.45359237 kg exactly",
+          "confidence": "official"
         }
       ],
       "missing": [
@@ -43,7 +44,8 @@
           "license": "Publicly accessible source; factual values only, no source-document redistribution",
           "normalized_value": 8958.449307500001,
           "normalized_unit": "kg",
-          "conversion": "1 international pound = 0.45359237 kg exactly"
+          "conversion": "1 international pound = 0.45359237 kg exactly",
+          "confidence": "official"
         }
       ],
       "missing": [
@@ -82,7 +84,8 @@
           "license": "Publicly accessible source; factual values only, no source-document redistribution",
           "normalized_value": 75749.92579000001,
           "normalized_unit": "kg",
-          "conversion": "1 international pound = 0.45359237 kg exactly"
+          "conversion": "1 international pound = 0.45359237 kg exactly",
+          "confidence": "official"
         }
       ],
       "missing": [
@@ -108,7 +111,8 @@
           "license": "Publicly accessible source; factual values only, no source-document redistribution",
           "normalized_value": 141610.17713689,
           "normalized_unit": "kg",
-          "conversion": "1 international pound = 0.45359237 kg exactly"
+          "conversion": "1 international pound = 0.45359237 kg exactly",
+          "confidence": "official"
         }
       ],
       "missing": [
@@ -134,7 +138,8 @@
           "license": "Publicly accessible source; factual values only, no source-document redistribution",
           "normalized_value": null,
           "normalized_unit": null,
-          "conversion": "Mass conversion unavailable without sourced fuel density and reference conditions"
+          "conversion": "Mass conversion unavailable without sourced fuel density and reference conditions",
+          "confidence": "official"
         }
       ],
       "missing": [
@@ -173,7 +178,8 @@
           "license": "Publicly accessible source; factual values only, no source-document redistribution",
           "normalized_value": 96297,
           "normalized_unit": "kg",
-          "conversion": "Published SI value"
+          "conversion": "Published SI value",
+          "confidence": "official"
         },
         {
           "field": "boom_offload_rate",
@@ -186,7 +192,8 @@
           "license": "Publicly accessible source; factual values only, no source-document redistribution",
           "normalized_value": null,
           "normalized_unit": null,
-          "conversion": "Mass conversion unavailable without sourced fuel density and reference conditions"
+          "conversion": "Mass conversion unavailable without sourced fuel density and reference conditions",
+          "confidence": "official"
         },
         {
           "field": "drogue_offload_rate",
@@ -199,7 +206,8 @@
           "license": "Publicly accessible source; factual values only, no source-document redistribution",
           "normalized_value": null,
           "normalized_unit": null,
-          "conversion": "Mass conversion unavailable without sourced fuel density and reference conditions"
+          "conversion": "Mass conversion unavailable without sourced fuel density and reference conditions",
+          "confidence": "official"
         },
         {
           "field": "boom_receiver_rate",
@@ -212,7 +220,8 @@
           "license": "Publicly accessible source; factual values only, no source-document redistribution",
           "normalized_value": null,
           "normalized_unit": null,
-          "conversion": "Mass conversion unavailable without sourced fuel density and reference conditions"
+          "conversion": "Mass conversion unavailable without sourced fuel density and reference conditions",
+          "confidence": "official"
         }
       ],
       "missing": [
@@ -251,7 +260,8 @@
           "license": "Publicly accessible source; factual values only, no source-document redistribution",
           "normalized_value": 1814.36948,
           "normalized_unit": "kg",
-          "conversion": "1 international pound = 0.45359237 kg exactly"
+          "conversion": "1 international pound = 0.45359237 kg exactly",
+          "confidence": "official"
         }
       ],
       "missing": [
@@ -277,7 +287,8 @@
           "license": "Publicly accessible source; factual values only, no source-document redistribution",
           "normalized_value": 7847.1480010000005,
           "normalized_unit": "kg",
-          "conversion": "1 international pound = 0.45359237 kg exactly"
+          "conversion": "1 international pound = 0.45359237 kg exactly",
+          "confidence": "official"
         }
       ],
       "missing": [

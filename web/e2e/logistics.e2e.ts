@@ -50,6 +50,9 @@ for (const phone of [false, true]) test(`delivered aerial refueling and logistic
   expect((await receiver()).transferred_kg).toBe(100);
   await page.getByRole("button", { name: "Pause scenario", exact: true }).click();
   await expect(workspace).toContainText("100.0 kg transferred");
+  const completed=workspace.locator(":scope > .logistics-status").getByText(/100\.0 kg transferred/);
+  await completed.scrollIntoViewIfNeeded();
+  await expect(completed).toBeVisible();
   await page.screenshot({ path: info.outputPath(`logistics-refueling-${phone ? "phone" : "desktop"}.png`), fullPage: true });
   await page.reload();
   if (phone) await page.getByRole("button", { name: "Commands", exact: true }).click();

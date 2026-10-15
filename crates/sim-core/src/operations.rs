@@ -239,6 +239,8 @@ pub struct MissionTask {
     pub route: Vec<GeoPose>,
     pub speed_mps: f64,
     pub home: GeoPose,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub home_facility_id: Option<Uuid>,
     pub depends_on: Vec<Uuid>,
     pub lost_comms: LostCommsProcedure,
     pub engagement: EngagementConstraints,
@@ -580,6 +582,8 @@ pub struct CombatState {
 }
 #[derive(Clone, Serialize, Deserialize)]
 struct Execution {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    recovering: Option<Uuid>,
     plan_id: Uuid,
     task: MissionTask,
     revision: u64,
@@ -797,6 +801,7 @@ impl Simulation {
                 ops.missions.insert(
                     task.id,
                     Execution {
+                        recovering: None,
                         plan_id: ato.plan_id,
                         task: task.clone(),
                         revision: ato.revision,
@@ -983,22 +988,6 @@ pub(super) fn advance_operations(world: &mut World) {
     let mut shots = BTreeSet::new();
     for m in ops.missions.values_mut() {
         let task = &m.task;
-        if world
-            .resource::<crate::logistics::Runtime>()
-            .configured(task.unit_id)
-            && !world
-                .resource::<crate::logistics::Runtime>()
-                .movement_allowed(task.unit_id)
-        {
-            if !matches!(
-                m.state,
-                MissionState::Completed | MissionState::Cancelled | MissionState::Failed
-            ) {
-                m.state = MissionState::Holding;
-                m.detail = "Awaiting logistics readiness or return/refueling completion".into();
-            }
-            continue;
-        }
         if tick < task.start_tick
             || matches!(
                 m.state,
@@ -1010,7 +999,13 @@ pub(super) fn advance_operations(world: &mut World) {
         let Some((pose, side, combat)) = states.get(&task.unit_id) else {
             continue;
         };
-        if combat.destroyed || hits.contains(&task.unit_id) || combat.profile.fuel_seconds <= 0.0 {
+        let has_logistics = world
+            .resource::<crate::logistics::Runtime>()
+            .configured(task.unit_id);
+        if combat.destroyed
+            || hits.contains(&task.unit_id)
+            || (!has_logistics && combat.profile.fuel_seconds <= 0.0)
+        {
             m.state = MissionState::Failed;
             m.detail = "Aircraft unavailable".into();
             motion.insert(
@@ -1021,6 +1016,25 @@ pub(super) fn advance_operations(world: &mut World) {
                     climb_mps: 0.0,
                 },
             );
+            continue;
+        }
+        if let Some(facility) = m.recovering {
+            if world
+                .resource::<crate::logistics::Runtime>()
+                .recovered(task.unit_id, facility)
+            {
+                m.state = MissionState::Completed;
+                m.detail = "Recovered at assigned facility; turnaround reported separately".into();
+            }
+            continue;
+        }
+        if has_logistics
+            && !world
+                .resource::<crate::logistics::Runtime>()
+                .movement_allowed(task.unit_id)
+        {
+            m.state = MissionState::Holding;
+            m.detail = "Awaiting logistics readiness or return/refueling completion".into();
             continue;
         }
         if tick >= task.end_tick && m.state != MissionState::Returning {
@@ -1067,6 +1081,33 @@ pub(super) fn advance_operations(world: &mut World) {
             }
         } else if m.state == MissionState::Holding {
             m.state = MissionState::Active;
+        }
+        if has_logistics && (m.state == MissionState::Returning || task.kind == MissionKind::Return)
+        {
+            let home = task
+                .home_facility_id
+                .or_else(|| {
+                    world
+                        .resource::<crate::logistics::Runtime>()
+                        .home(task.unit_id)
+                })
+                .unwrap();
+            match world.resource_mut::<crate::logistics::Runtime>().command(
+                task.unit_id,
+                &crate::logistics::Command::Return { facility_id: home },
+                tick,
+            ) {
+                Ok(()) => {
+                    m.recovering = Some(home);
+                    m.state = MissionState::Returning;
+                    m.detail = "Returning through facility recovery procedures".into();
+                }
+                Err(error) => {
+                    m.state = MissionState::Failed;
+                    m.detail = error;
+                }
+            }
+            continue;
         }
         if let Some(volumes) = ops.airspaces.get(&task.unit_id) {
             for volume in volumes.iter().filter(|a| a.contains(*pose, tick)) {
@@ -1131,7 +1172,11 @@ pub(super) fn advance_operations(world: &mut World) {
                 }
                 let distance = great_circle_distance_m(*pose, track.position)
                     .hypot(pose.altitude_m - track.position.altitude_m);
-                if distance <= combat.profile.weapon_range_m && line_of_sight(*pose, track.position)
+                if distance <= combat.profile.weapon_range_m
+                    && line_of_sight(*pose, track.position)
+                    && world
+                        .resource_mut::<crate::logistics::Runtime>()
+                        .consume_ammunition(task.unit_id, tick)
                 {
                     let mut sample =
                         ops.seed ^ task.id.as_u128() as u64 ^ tick.wrapping_mul(0x9e3779b97f4a7c15);
@@ -1216,6 +1261,15 @@ pub(super) fn advance_operations(world: &mut World) {
                 .configured(*id)
         })
         .collect();
+    let logistics_ammunition: BTreeMap<_, _> = logistics_units
+        .iter()
+        .filter_map(|id| {
+            world
+                .resource::<crate::logistics::Runtime>()
+                .ammunition(*id)
+                .map(|n| (*id, n))
+        })
+        .collect();
     let mut query = world.query::<(
         &SimEntityId,
         &mut Velocity,
@@ -1236,7 +1290,9 @@ pub(super) fn advance_operations(world: &mut World) {
                     (combat.profile.fuel_seconds - delta_seconds).max(0.0);
             }
         }
-        if shots.contains(&id.0) {
+        if let Some(ammunition) = logistics_ammunition.get(&id.0) {
+            combat.profile.ammunition = *ammunition;
+        } else if shots.contains(&id.0) {
             combat.profile.ammunition = combat.profile.ammunition.saturating_sub(1);
         }
         if combat.destroyed {

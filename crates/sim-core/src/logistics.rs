@@ -14,6 +14,15 @@ pub struct Evidence {
     pub license: String,
 }
 impl Evidence {
+    fn validate_for(&self, fictional: bool) -> Result<(), String> {
+        self.validate()?;
+        if !fictional
+            && !(self.source.starts_with("https://") || self.source.starts_with("licensed:"))
+        {
+            return Err("real logistics parameters require public or licensed evidence; fictional fallback is unavailable".into());
+        }
+        Ok(())
+    }
     fn validate(&self) -> Result<(), String> {
         if [
             &self.source,
@@ -221,6 +230,7 @@ pub enum FacilityKind {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Facility {
+    pub fictional: bool,
     pub unit_id: Uuid,
     pub kind: FacilityKind,
     pub fuel_type: String,
@@ -229,6 +239,7 @@ pub struct Facility {
     pub parking_capacity: usize,
     pub movement_slots: usize,
     pub service_slots: usize,
+    pub replenishment_slots: usize,
     pub compatible_profile_ids: Vec<String>,
     pub fuel_rate_kg_s: f64,
     pub ammunition_seconds: f64,
@@ -298,7 +309,7 @@ impl Configuration {
             return Err("duplicate logistics facility".into());
         }
         for f in &self.facilities {
-            f.evidence.validate()?;
+            f.evidence.validate_for(f.fictional)?;
             if !units.contains_key(&f.unit_id)
                 || f.parking_capacity == 0
                 || f.movement_slots == 0
@@ -344,7 +355,16 @@ impl Configuration {
         let mut seen = BTreeSet::new();
         for u in &self.units {
             let p = &u.profile;
-            p.evidence.validate()?;
+            p.evidence.validate_for(p.fictional)?;
+            for evidence in [
+                &p.burn.evidence,
+                &p.climb_burn.evidence,
+                &p.idle_burn.evidence,
+                &p.combat_burn.evidence,
+                &p.envelope.evidence,
+            ] {
+                evidence.validate_for(p.fictional)?;
+            }
             p.burn.validate()?;
             p.climb_burn.validate()?;
             p.idle_burn.validate()?;
@@ -391,7 +411,7 @@ impl Configuration {
                 {
                     return Err("refueling interface incompatible with unit domain".into());
                 }
-                station.evidence.validate()?;
+                station.evidence.validate_for(p.fictional)?;
                 if !station.rate_kg_s.is_finite() || station.rate_kg_s <= 0.0 {
                     return Err("invalid refueling rate".into());
                 }
@@ -484,6 +504,7 @@ pub enum Phase {
     Disconnecting,
     Loading,
     Unloading,
+    Replenishing,
     Immobilized,
     Destroyed,
     Unavailable,
@@ -494,6 +515,11 @@ pub struct UnitStatus {
     pub profile_id: String,
     pub fuel_kg: f64,
     pub capacity_kg: f64,
+    pub estimated_endurance_seconds: Option<f64>,
+    pub receiving_interfaces: Vec<Interface>,
+    pub support_interfaces: Vec<Interface>,
+    pub support_interface: Option<Interface>,
+    pub cargo_capacity_kg: f64,
     pub ammunition: u32,
     pub phase: Phase,
     pub facility_id: Option<Uuid>,
@@ -532,6 +558,8 @@ struct UnitRuntime {
     requested_interface: Option<Interface>,
     station: Option<usize>,
     combat_until: u64,
+    #[serde(default)]
+    cargo_stage: u8,
 }
 #[derive(Resource, Debug, Clone, Default, Serialize, Deserialize)]
 pub(super) struct Runtime {
@@ -560,6 +588,21 @@ impl Runtime {
                             profile_id: u.profile.id.clone(),
                             fuel_kg: u.fuel_kg,
                             capacity_kg: u.profile.fuel_capacity_kg,
+                            estimated_endurance_seconds: None,
+                            receiving_interfaces: u
+                                .profile
+                                .intake
+                                .iter()
+                                .map(|s| s.interface)
+                                .collect(),
+                            support_interfaces: u
+                                .profile
+                                .outlets
+                                .iter()
+                                .map(|s| s.interface)
+                                .collect(),
+                            support_interface: None,
+                            cargo_capacity_kg: u.profile.cargo_capacity_kg,
                             ammunition: u.ammunition,
                             phase: if u.initial_facility.is_some() {
                                 Phase::Queued
@@ -585,6 +628,7 @@ impl Runtime {
                         requested_interface: None,
                         station: None,
                         combat_until: 0,
+                        cargo_stage: 0,
                     },
                 )
             })
@@ -600,8 +644,39 @@ impl Runtime {
             ..Default::default()
         }
     }
+    pub(super) fn ammunition(&self, id: Uuid) -> Option<u32> {
+        self.units.get(&id).map(|u| u.status.ammunition)
+    }
+    pub(super) fn consume_ammunition(&mut self, id: Uuid, tick: u64) -> bool {
+        let Some(u) = self.units.get_mut(&id) else {
+            return true;
+        };
+        if u.status.ammunition == 0 {
+            return false;
+        }
+        u.status.ammunition -= 1;
+        u.combat_until = tick.saturating_add(u.profile.combat_phase_seconds);
+        true
+    }
+    pub(super) fn home(&self, id: Uuid) -> Option<Uuid> {
+        self.units.get(&id).map(|u| u.profile.home)
+    }
+    pub(super) fn recovered(&self, id: Uuid, facility: Uuid) -> bool {
+        self.units.get(&id).is_some_and(|u| {
+            u.status.facility_id == Some(facility)
+                && matches!(
+                    u.status.phase,
+                    Phase::Queued | Phase::Servicing | Phase::Ready
+                )
+        })
+    }
     pub(super) fn configured(&self, id: Uuid) -> bool {
         self.units.contains_key(&id)
+    }
+    pub(super) fn fixed_facility(&self, id: Uuid) -> bool {
+        self.facilities
+            .get(&id)
+            .is_some_and(|f| matches!(f.kind, FacilityKind::Airfield | FacilityKind::Port))
     }
     pub(super) fn movement_allowed(&self, id: Uuid) -> bool {
         self.units.get(&id).is_none_or(|u| {
@@ -618,6 +693,31 @@ impl Runtime {
                     && u.profile.compatible_facility_kinds.contains(&f.kind)
                     && f.compatible_profile_ids.contains(&u.profile.id)
             })
+    }
+    fn cargo_destination(&self, id: Uuid, facility: Uuid) -> bool {
+        self.compatible(id, facility)
+            || self
+                .units
+                .get(&id)
+                .zip(self.facilities.get(&facility))
+                .is_some_and(|(u, f)| {
+                    self.sides.get(&id) == self.sides.get(&facility)
+                        && f.fuel_type == u.profile.fuel_type
+                        && f.kind == FacilityKind::Carrier
+                        && f.replenishment_slots > 0
+                        && u.profile
+                            .outlets
+                            .iter()
+                            .any(|s| s.interface == Interface::Underway)
+                })
+    }
+    fn gross_mass(&self, id: Uuid) -> f64 {
+        let u = &self.units[&id];
+        u.profile.dry_mass_kg
+            + u.status.fuel_kg
+            + u.status.cargo.mass()
+            + self.facilities.get(&id).map_or(0.0, |f| f.stock.mass())
+            + self.reserved(id).mass()
     }
     fn reserved(&self, id: Uuid) -> Stock {
         let mut stock = Stock::default();
@@ -639,7 +739,7 @@ impl Runtime {
         }
         if matches!(
             current.status.phase,
-            Phase::Connecting | Phase::Transferring | Phase::Disconnecting
+            Phase::Connecting | Phase::Transferring | Phase::Disconnecting | Phase::Replenishing
         ) && !matches!(command, Command::Cancel)
         {
             return Err("disconnect before assigning another logistics task".into());
@@ -699,7 +799,12 @@ impl Runtime {
                 {
                     return Err("unsupported donor interface or donor not deployed".into());
                 }
-                self.units.get_mut(&id).unwrap().support = Some(*interface);
+                let u = self.units.get_mut(&id).unwrap();
+                u.support = Some(*interface);
+                u.status.support_interface = Some(*interface);
+                u.status.detail = format!(
+                    "{interface:?} refueling support established; waiting for compatible receivers"
+                );
             }
             Command::Refuel {
                 donor_id,
@@ -711,7 +816,9 @@ impl Runtime {
                     || self.sides.get(&id) != self.sides.get(donor_id)
                     || !amount_kg.is_finite()
                     || *amount_kg <= 0.0
-                    || current.status.phase != Phase::Deployed
+                    || !(current.status.phase == Phase::Deployed
+                        || (current.status.phase == Phase::Immobilized
+                            && *interface == Interface::Underway))
                     || donor.status.phase != Phase::Deployed
                     || donor.support != Some(*interface)
                     || current.profile.fuel_type != donor.profile.fuel_type
@@ -747,7 +854,7 @@ impl Runtime {
                     || manifest.mass() <= 0.0
                     || manifest.mass() > current.profile.cargo_capacity_kg
                     || !self.compatible(id, *source_id)
-                    || !self.compatible(id, *destination_id)
+                    || !self.cargo_destination(id, *destination_id)
                     || current.cargo_task.is_some()
                     || current.status.cargo.mass() > 0.0
                 {
@@ -781,7 +888,10 @@ impl Runtime {
                 self.disconnect_donor(id);
                 let u = self.units.get_mut(&id).unwrap();
                 u.support = None;
-                if matches!(
+                if u.status.phase == Phase::Replenishing {
+                    u.cargo_stage = 2;
+                    u.timer = 0.0;
+                } else if matches!(
                     u.status.phase,
                     Phase::Connecting | Phase::Transferring | Phase::Rendezvous
                 ) {
@@ -831,6 +941,7 @@ impl Runtime {
         let mut projection = Projection::default();
         if let Some(u) = self.units.get(&id) {
             let mut s = u.status.clone();
+            s.support_interface = u.support;
             s.observed_tick = tick;
             s.received_tick = tick;
             projection.units.push(s);
@@ -926,19 +1037,31 @@ fn facility_open(f: &Facility, p: &Position, weather: &sensing::Weather) -> bool
         && (f.kind != FacilityKind::Carrier
             || (wind >= f.min_wind_over_deck_mps && wind <= f.max_wind_over_deck_mps))
 }
+fn operating_speed(p: &Position, w: &sensing::Weather) -> f64 {
+    let (north, east) = if p.domain == Domain::Air {
+        (w.wind_north_mps, w.wind_east_mps)
+    } else {
+        (0.0, 0.0)
+    };
+    (p.velocity.north_mps - north).hypot(p.velocity.east_mps - east)
+}
 fn transfer_open(
     receiver: &Position,
     donor: &Position,
     e: &Envelope,
     w: &sensing::Weather,
 ) -> bool {
-    let speed = (donor.velocity.north_mps - w.wind_north_mps)
-        .hypot(donor.velocity.east_mps - w.wind_east_mps);
+    let speed = operating_speed(donor, w);
+    let receiver_speed = operating_speed(receiver, w);
     !receiver.destroyed
         && !donor.destroyed
         && receiver.side == donor.side
         && donor.pose.altitude_m >= e.min_altitude_m
         && donor.pose.altitude_m <= e.max_altitude_m
+        && receiver.pose.altitude_m >= e.min_altitude_m
+        && receiver.pose.altitude_m <= e.max_altitude_m
+        && receiver_speed >= e.min_speed_mps
+        && receiver_speed <= e.max_speed_mps
         && speed >= e.min_speed_mps
         && speed <= e.max_speed_mps
         && geodesy::slant_distance_m(receiver.pose, donor.pose) <= e.connection_distance_m
@@ -972,13 +1095,34 @@ pub(super) fn guide_units(world: &mut World) {
     let ids: Vec<_> = runtime.units.keys().copied().collect();
     for id in ids {
         let p = &positions[&id];
-        if p.destroyed {
+        let carried_on_lost_carrier = runtime.units.get(&id).is_some_and(|u| {
+            matches!(
+                u.status.phase,
+                Phase::Queued
+                    | Phase::Servicing
+                    | Phase::Ready
+                    | Phase::Loading
+                    | Phase::Unloading
+                    | Phase::Departing
+            ) && u
+                .status
+                .facility_id
+                .and_then(|f| runtime.facilities.get(&f))
+                .is_some_and(|f| f.kind == FacilityKind::Carrier && positions[&f.unit_id].destroyed)
+        });
+        if p.destroyed || carried_on_lost_carrier {
             runtime.release_reservation(id);
             runtime.disconnect_donor(id);
             let u = runtime.units.get_mut(&id).unwrap();
             u.status.phase = Phase::Destroyed;
             u.status.cargo = Stock::default();
             u.status.detail = "Platform destroyed; carried cargo lost".into();
+        }
+        if p.domain == Domain::Sea
+            && runtime.units[&id].status.fuel_kg == 0.0
+            && runtime.units[&id].status.phase == Phase::Deployed
+        {
+            runtime.units.get_mut(&id).unwrap().status.phase = Phase::Immobilized;
         }
         let u = &runtime.units[&id];
         if matches!(u.status.phase, Phase::Deployed) && u.status.fuel_kg <= u.profile.reserve_kg {
@@ -1032,7 +1176,9 @@ pub(super) fn guide_units(world: &mut World) {
                 if let Some(d) = u.status.counterpart_id.and_then(|d| positions.get(&d)) {
                     motion.insert(
                         id,
-                        if u.status.phase == Phase::Rendezvous
+                        if p.domain == Domain::Sea && u.status.fuel_kg == 0.0 {
+                            Velocity::default()
+                        } else if u.status.phase == Phase::Rendezvous
                             && geodesy::slant_distance_m(p.pose, d.pose)
                                 > u.profile.envelope.connection_distance_m
                         {
@@ -1041,6 +1187,11 @@ pub(super) fn guide_units(world: &mut World) {
                             d.velocity
                         },
                     );
+                }
+            }
+            Phase::Replenishing => {
+                if let Some(parent) = u.status.facility_id.and_then(|f| positions.get(&f)) {
+                    motion.insert(id, parent.velocity);
                 }
             }
             Phase::Destroyed | Phase::Immobilized | Phase::Unavailable => {
@@ -1099,6 +1250,7 @@ pub(super) fn advance(world: &mut World) {
         .collect();
     for id in &ids {
         let p = &positions[id];
+        let gross_mass = runtime.gross_mass(*id);
         let u = runtime.units.get_mut(id).unwrap();
         if ammunition[id] < u.status.ammunition {
             u.combat_until = tick.saturating_add(u.profile.combat_phase_seconds);
@@ -1125,19 +1277,25 @@ pub(super) fn advance(world: &mut World) {
                 | Phase::Unloading
                 | Phase::Departing
         );
+        if attached {
+            u.status.estimated_endurance_seconds = None;
+        }
+        let rescue = p.domain == Domain::Sea
+            && u.status.fuel_kg == 0.0
+            && matches!(
+                u.status.phase,
+                Phase::Rendezvous | Phase::Connecting | Phase::Transferring | Phase::Disconnecting
+            );
         if !attached
+            && !rescue
             && !matches!(
                 u.status.phase,
                 Phase::Destroyed | Phase::Unavailable | Phase::Immobilized
             )
         {
             let w = condition(world, p.pose, tick);
-            let speed = (p.velocity.north_mps - w.wind_north_mps)
-                .hypot(p.velocity.east_mps - w.wind_east_mps);
-            let mass = u.profile.dry_mass_kg + u.status.fuel_kg + u.status.cargo.mass();
-            if ammunition[id] < u.status.ammunition {
-                u.combat_until = tick.saturating_add(u.profile.combat_phase_seconds);
-            }
+            let speed = operating_speed(p, &w);
+            let mass = gross_mass;
             let table = if tick < u.combat_until {
                 &u.profile.combat_burn
             } else if p.velocity.climb_mps > 0.1 {
@@ -1150,8 +1308,11 @@ pub(super) fn advance(world: &mut World) {
             match table.rate(p.pose.altitude_m, speed, mass) {
                 Some(rate) => {
                     u.status.fuel_kg = (u.status.fuel_kg - rate * dt).max(0.0);
+                    u.status.estimated_endurance_seconds =
+                        (rate > 0.0).then(|| u.status.fuel_kg / rate);
                 }
                 None => {
+                    u.status.estimated_endurance_seconds = None;
                     u.status.phase = Phase::Unavailable;
                     u.status.detail =
                         "Outside sourced fuel-performance envelope; operation unavailable".into();
@@ -1173,6 +1334,7 @@ pub(super) fn advance(world: &mut World) {
     order.sort_by_key(|id| (runtime.units[id].queue_at, *id));
     let mut movement_slots: BTreeMap<Uuid, usize> = BTreeMap::new();
     let mut service_slots: BTreeMap<Uuid, usize> = BTreeMap::new();
+    let mut replenishment_slots: BTreeMap<Uuid, usize> = BTreeMap::new();
 
     let mut pump_used: BTreeMap<Uuid, f64> = BTreeMap::new();
     for id in order {
@@ -1184,7 +1346,7 @@ pub(super) fn advance(world: &mut World) {
             let fp = &positions[&facility_id];
             let w = condition(world, fp.pose, tick);
             let u = &runtime.units[&id];
-            let mass = u.profile.dry_mass_kg + u.status.fuel_kg + u.status.cargo.mass();
+            let mass = runtime.gross_mass(id);
             if mass > u.profile.maximum_landing_mass_kg
                 || mass > f.maximum_operating_mass_kg
                 || (f.kind == FacilityKind::Airfield
@@ -1193,6 +1355,19 @@ pub(super) fn advance(world: &mut World) {
             {
                 runtime.units.get_mut(&id).unwrap().status.detail =
                     "Recovery blocked: runway or operating mass limit".into();
+                continue;
+            }
+            if p.domain == Domain::Sea
+                && f.kind == FacilityKind::Carrier
+                && u.status.cargo.mass() > 0.0
+            {
+                if transfer_open(p, fp, &u.profile.envelope, &w) {
+                    let u = runtime.units.get_mut(&id).unwrap();
+                    u.status.phase = Phase::Replenishing;
+                    u.cargo_stage = 0;
+                    u.timer = 0.0;
+                    u.status.detail = "Connecting underway cargo equipment".into();
+                }
                 continue;
             }
             let occupied = runtime
@@ -1257,6 +1432,7 @@ pub(super) fn advance(world: &mut World) {
         ) {
             let facility_id = runtime.units[&id].status.facility_id.unwrap();
             let reserved = runtime.reserved(facility_id);
+            let gross_mass = runtime.gross_mass(id);
             let f = runtime.facilities.get_mut(&facility_id).unwrap();
             let fp = &positions[&facility_id];
             let w = condition(world, fp.pose, tick);
@@ -1266,7 +1442,7 @@ pub(super) fn advance(world: &mut World) {
                 continue;
             }
             if phase == Phase::Departing {
-                let mass = u.profile.dry_mass_kg + u.status.fuel_kg + u.status.cargo.mass();
+                let mass = gross_mass;
                 if mass > u.profile.maximum_takeoff_mass_kg
                     || mass > f.maximum_operating_mass_kg
                     || world
@@ -1306,19 +1482,7 @@ pub(super) fn advance(world: &mut World) {
             if phase == Phase::Loading {
                 if let Some((_, destination, remaining)) = &mut u.cargo_task {
                     u.timer += f.cargo_rate_kg_s * dt;
-                    let budget = u.timer;
-                    let amount = remaining.fuel_kg.min(budget);
-                    remaining.fuel_kg -= amount;
-                    u.status.cargo.fuel_kg += amount;
-                    let ammo = remaining.ammunition.min((budget - amount).floor() as u32);
-                    remaining.ammunition -= ammo;
-                    u.status.cargo.ammunition += ammo;
-                    let repair = remaining
-                        .repair_points
-                        .min((budget - amount - f64::from(ammo)).max(0.0));
-                    remaining.repair_points -= repair;
-                    u.status.cargo.repair_points += repair;
-                    u.timer -= amount + f64::from(ammo) + repair;
+                    u.timer = transfer_stock(remaining, &mut u.status.cargo, None, u.timer);
                     if remaining.mass() <= 1e-9 {
                         u.status.phase = Phase::Returning;
                         u.status.facility_id = Some(*destination);
@@ -1332,40 +1496,13 @@ pub(super) fn advance(world: &mut World) {
             }
             if phase == Phase::Unloading {
                 u.timer += f.cargo_rate_kg_s * dt;
-                let budget = u.timer;
-                let amount = u
-                    .status
-                    .cargo
-                    .fuel_kg
-                    .min((f.capacity.fuel_kg - f.stock.fuel_kg - reserved.fuel_kg).max(0.0))
-                    .min(budget);
-                u.status.cargo.fuel_kg -= amount;
-                f.stock.fuel_kg += amount;
-                let ammo = u
-                    .status
-                    .cargo
-                    .ammunition
-                    .min(
-                        f.capacity
-                            .ammunition
-                            .saturating_sub(f.stock.ammunition)
-                            .saturating_sub(reserved.ammunition),
-                    )
-                    .min((budget - amount).floor() as u32);
-                u.status.cargo.ammunition -= ammo;
-                f.stock.ammunition += ammo;
-                let repair = u
-                    .status
-                    .cargo
-                    .repair_points
-                    .min(
-                        (f.capacity.repair_points - f.stock.repair_points - reserved.repair_points)
-                            .max(0.0),
-                    )
-                    .min((budget - amount - f64::from(ammo)).max(0.0));
-                u.status.cargo.repair_points -= repair;
-                f.stock.repair_points += repair;
-                u.timer -= amount + f64::from(ammo) + repair;
+                let capacity = Stock {
+                    fuel_kg: (f.capacity.fuel_kg - reserved.fuel_kg).max(0.0),
+                    ammunition: f.capacity.ammunition.saturating_sub(reserved.ammunition),
+                    repair_points: (f.capacity.repair_points - reserved.repair_points).max(0.0),
+                };
+                u.timer =
+                    transfer_stock(&mut u.status.cargo, &mut f.stock, Some(&capacity), u.timer);
                 u.status.detail = "Unloading cargo; destination capacity enforced".into();
                 if u.status.cargo.mass() <= 1e-9 {
                     u.status.phase = Phase::Queued;
@@ -1420,6 +1557,71 @@ pub(super) fn advance(world: &mut World) {
             } else {
                 u.status.detail =
                     "Automatic turnaround; depleted supplies can delay completion".into();
+            }
+        } else if phase == Phase::Replenishing {
+            let destination = runtime.units[&id].status.facility_id.unwrap();
+            let target = &positions[&destination];
+            let reserved = runtime.reserved(destination);
+            let f = runtime.facilities.get_mut(&destination).unwrap();
+            let u = runtime.units.get_mut(&id).unwrap();
+            let weather = condition(world, target.pose, tick);
+            if u.cargo_stage < 2 && !transfer_open(p, target, &u.profile.envelope, &weather) {
+                u.cargo_stage = 2;
+                u.timer = 0.0;
+                u.status.detail = "Cargo transfer interrupted by operating envelope".into();
+            }
+            let occupied = replenishment_slots.entry(destination).or_default();
+            if *occupied >= f.replenishment_slots {
+                u.status.detail = "Waiting for receiver replenishment station".into();
+                continue;
+            }
+            *occupied += 1;
+            if u.cargo_stage == 0 {
+                u.timer += dt;
+                if u.timer + 1e-9 >= u.profile.envelope.connection_seconds {
+                    u.cargo_stage = 1;
+                    u.timer = 0.0;
+                }
+            } else if u.cargo_stage == 2 {
+                u.timer += dt;
+                if u.timer + 1e-9 >= u.profile.envelope.disconnection_seconds {
+                    u.status.phase = Phase::Deployed;
+                    u.status.facility_id = None;
+                    u.timer = 0.0;
+                    u.status.detail =
+                        "Underway cargo equipment disconnected; remaining cargo retained".into();
+                }
+            } else {
+                let rate = u
+                    .profile
+                    .outlets
+                    .iter()
+                    .filter(|s| s.interface == Interface::Underway)
+                    .map(|s| s.rate_kg_s)
+                    .fold(0.0, f64::max)
+                    .min(u.profile.shared_rate_kg_s)
+                    .min(f.cargo_rate_kg_s);
+                let before = u.status.cargo.fuel_kg;
+                let capacity = Stock {
+                    fuel_kg: (f.capacity.fuel_kg - reserved.fuel_kg).max(0.0),
+                    ammunition: f.capacity.ammunition.saturating_sub(reserved.ammunition),
+                    repair_points: (f.capacity.repair_points - reserved.repair_points).max(0.0),
+                };
+                u.timer = transfer_stock(
+                    &mut u.status.cargo,
+                    &mut f.stock,
+                    Some(&capacity),
+                    rate * dt + u.timer,
+                );
+                let amount = before - u.status.cargo.fuel_kg;
+                u.status.transferred_kg += amount;
+                u.status.rate_kg_s = amount / dt;
+                u.status.detail =
+                    "Underway delivery into carrier fuel, ammunition and repair stocks".into();
+                if u.status.cargo.mass() <= 1e-9 {
+                    u.cargo_stage = 2;
+                    u.timer = 0.0;
+                }
             }
         } else if matches!(
             phase,
@@ -1589,7 +1791,9 @@ pub(super) fn advance(world: &mut World) {
         if let Some(u) = runtime.units.get(&id.0) {
             combat.profile.ammunition = u.status.ammunition;
             combat.profile.fuel_seconds = if u.status.fuel_kg > 0.0 {
-                f64::MAX
+                u.status
+                    .estimated_endurance_seconds
+                    .unwrap_or(u.status.fuel_kg)
             } else {
                 0.0
             };
@@ -1680,6 +1884,29 @@ impl Simulation {
         let tick = self.tick();
         let runtime = self.world.resource_mut::<Runtime>();
         let mut runtime = runtime;
+        if !runtime.configuration.as_ref().is_some_and(|c| {
+            c.reports
+                .iter()
+                .any(|r| r.source == source && r.recipient == recipient)
+        }) || report.units.len() > 1
+            || report.facilities.len() > 1
+            || report.units.iter().any(|u| {
+                u.unit_id != source
+                    || u.observed_tick > tick
+                    || !u.fuel_kg.is_finite()
+                    || u.fuel_kg < 0.0
+                    || !u.cargo.valid()
+            })
+            || report.facilities.iter().any(|f| {
+                f.facility.unit_id != source
+                    || f.observed_tick > tick
+                    || !f.facility.stock.valid()
+                    || !f.reserved.valid()
+            })
+            || report.unavailable.iter().any(|u| u.unit_id != source)
+        {
+            return false;
+        }
         let newest = |p: &Projection| {
             p.units
                 .iter()
@@ -1716,5 +1943,34 @@ impl Simulation {
         }
         p.unavailable = c.unavailable.clone();
         Some(p)
+    }
+}
+
+/// Returns only the fractional work needed for the next indivisible store. Blocked
+/// capacity cannot accumulate work and later bypass physical transfer rates.
+fn transfer_stock(from: &mut Stock, to: &mut Stock, capacity: Option<&Stock>, budget: f64) -> f64 {
+    let fuel_space = capacity.map_or(f64::MAX, |c| (c.fuel_kg - to.fuel_kg).max(0.0));
+    let fuel = from.fuel_kg.min(fuel_space).min(budget);
+    from.fuel_kg -= fuel;
+    to.fuel_kg += fuel;
+    let ammo_space = capacity.map_or(u32::MAX, |c| c.ammunition.saturating_sub(to.ammunition));
+    let ammo = from
+        .ammunition
+        .min(ammo_space)
+        .min(((budget - fuel + 1e-9).max(0.0)).floor() as u32);
+    from.ammunition -= ammo;
+    to.ammunition += ammo;
+    let repair_space = capacity.map_or(f64::MAX, |c| (c.repair_points - to.repair_points).max(0.0));
+    let repair = from
+        .repair_points
+        .min(repair_space)
+        .min((budget - fuel - f64::from(ammo)).max(0.0));
+    from.repair_points -= repair;
+    to.repair_points += repair;
+    let unused = (budget - fuel - f64::from(ammo) - repair).max(0.0);
+    if from.ammunition > 0 && ammo_space > ammo && unused < 1.0 {
+        unused
+    } else {
+        0.0
     }
 }

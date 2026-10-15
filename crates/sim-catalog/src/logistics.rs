@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields)]
 pub struct Fact {
     pub field: String,
+    pub confidence: super::Confidence,
     pub value: f64,
     pub unit: String,
     pub source_url: String,

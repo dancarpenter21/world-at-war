@@ -792,7 +792,7 @@
         "maximum_landing_mass_kg": 2500,
         "minimum_departure_hit_points": 20
       },
-      "fuel_kg": 600,
+      "fuel_kg": 1000,
       "ammunition": 1,
       "initial_facility": "00000000-0000-0000-0000-000000000005"
     },
@@ -826,7 +826,7 @@
           ],
           "gross_mass_kg": [
             1000,
-            2500
+            5000
           ],
           "kg_per_second": [
             1,
@@ -897,7 +897,7 @@
           ],
           "gross_mass_kg": [
             1000,
-            2500
+            5000
           ],
           "kg_per_second": [
             1,
@@ -928,7 +928,7 @@
           ],
           "gross_mass_kg": [
             1000,
-            2500
+            5000
           ],
           "kg_per_second": [
             1,
@@ -959,7 +959,7 @@
           ],
           "gross_mass_kg": [
             1000,
-            2500
+            5000
           ],
           "kg_per_second": [
             1,
@@ -982,8 +982,8 @@
         "combat_phase_seconds": 10,
         "required_runway_m": 500,
         "required_runway_width_m": 20,
-        "maximum_takeoff_mass_kg": 2500,
-        "maximum_landing_mass_kg": 2500,
+        "maximum_takeoff_mass_kg": 5000,
+        "maximum_landing_mass_kg": 5000,
         "minimum_departure_hit_points": 20
       },
       "fuel_kg": 250,
@@ -1020,7 +1020,7 @@
           ],
           "gross_mass_kg": [
             1000,
-            2500
+            5000
           ],
           "kg_per_second": [
             1,
@@ -1103,7 +1103,7 @@
           ],
           "gross_mass_kg": [
             1000,
-            2500
+            5000
           ],
           "kg_per_second": [
             1,
@@ -1134,7 +1134,7 @@
           ],
           "gross_mass_kg": [
             1000,
-            2500
+            5000
           ],
           "kg_per_second": [
             1,
@@ -1165,7 +1165,7 @@
           ],
           "gross_mass_kg": [
             1000,
-            2500
+            5000
           ],
           "kg_per_second": [
             1,
@@ -1188,8 +1188,8 @@
         "combat_phase_seconds": 10,
         "required_runway_m": 500,
         "required_runway_width_m": 20,
-        "maximum_takeoff_mass_kg": 2500,
-        "maximum_landing_mass_kg": 2500,
+        "maximum_takeoff_mass_kg": 5000,
+        "maximum_landing_mass_kg": 5000,
         "minimum_departure_hit_points": 20
       },
       "fuel_kg": 900,
@@ -1203,7 +1203,7 @@
       "kind": "airfield",
       "fuel_type": "fictional-joint-fuel",
       "stock": {
-        "fuel_kg": 400,
+        "fuel_kg": 40,
         "ammunition": 20,
         "repair_points": 100
       },
@@ -1246,14 +1246,16 @@
       "runway_width_m": 30,
       "maximum_operating_mass_kg": 10000,
       "heading_deg": 0,
-      "max_crosswind_mps": 20
+      "max_crosswind_mps": 20,
+      "replenishment_slots": 0,
+      "fictional": true
     },
     {
       "unit_id": "00000000-0000-0000-0000-000000000019",
       "kind": "airfield",
       "fuel_type": "fictional-joint-fuel",
       "stock": {
-        "fuel_kg": 40,
+        "fuel_kg": 1000,
         "ammunition": 20,
         "repair_points": 100
       },
@@ -1296,7 +1298,9 @@
       "runway_width_m": 30,
       "maximum_operating_mass_kg": 10000,
       "heading_deg": 0,
-      "max_crosswind_mps": 20
+      "max_crosswind_mps": 20,
+      "replenishment_slots": 0,
+      "fictional": true
     },
     {
       "unit_id": "00000000-0000-0000-0000-00000000001a",
@@ -1345,7 +1349,9 @@
       "runway_width_m": 30,
       "maximum_operating_mass_kg": 10000,
       "heading_deg": 0,
-      "max_crosswind_mps": 20
+      "max_crosswind_mps": 20,
+      "replenishment_slots": 0,
+      "fictional": true
     },
     {
       "unit_id": "00000000-0000-0000-0000-00000000001b",
@@ -1393,7 +1399,9 @@
       "runway_width_m": 30,
       "maximum_operating_mass_kg": 10000,
       "heading_deg": 0,
-      "max_crosswind_mps": 20
+      "max_crosswind_mps": 20,
+      "replenishment_slots": 1,
+      "fictional": true
     },
     {
       "unit_id": "00000000-0000-0000-0000-000000000010",
@@ -1442,7 +1450,9 @@
       "runway_width_m": 30,
       "maximum_operating_mass_kg": 10000,
       "heading_deg": 0,
-      "max_crosswind_mps": 20
+      "max_crosswind_mps": 20,
+      "replenishment_slots": 1,
+      "fictional": true
     }
   ],
   "reports": [

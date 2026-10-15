@@ -30,7 +30,7 @@
       "name": "Exercise Boom Fighter",
       "side": "Blue",
       "domain": "Air",
-      "sidc": "100310000012110000000000000000",
+      "sidc": "100301000011010000000000000000",
       "position": {
         "latitude_deg": 13.584,
         "longitude_deg": 144.932,
@@ -50,7 +50,7 @@
       "name": "Exercise Carrier Fighter",
       "side": "Blue",
       "domain": "Air",
-      "sidc": "100310000012110000000000000000",
+      "sidc": "100301000011010000000000000000",
       "position": {
         "latitude_deg": 13.584,
         "longitude_deg": 144.934,
@@ -70,7 +70,7 @@
       "name": "Exercise Joint Tanker",
       "side": "Blue",
       "domain": "Air",
-      "sidc": "100310000012110000000000000000",
+      "sidc": "100301000011010000000000000000",
       "position": {
         "latitude_deg": 13.584,
         "longitude_deg": 144.932,
@@ -90,7 +90,7 @@
       "name": "Exercise Cargo Aircraft",
       "side": "Blue",
       "domain": "Air",
-      "sidc": "100310000012110000000000000000",
+      "sidc": "100301000011010000000000000000",
       "position": {
         "latitude_deg": 13.584,
         "longitude_deg": 144.93,
@@ -110,7 +110,7 @@
       "name": "Exercise Surface Escort",
       "side": "Blue",
       "domain": "Sea",
-      "sidc": "100310000012110000000000000000",
+      "sidc": "100330000012010000000000000000",
       "position": {
         "latitude_deg": 13.584,
         "longitude_deg": 144.94,
@@ -130,7 +130,7 @@
       "name": "Exercise Supply Ship",
       "side": "Blue",
       "domain": "Sea",
-      "sidc": "100310000012110000000000000000",
+      "sidc": "100330000012010000000000000000",
       "position": {
         "latitude_deg": 13.584,
         "longitude_deg": 144.94,
@@ -170,7 +170,7 @@
       "name": "Exercise Port",
       "side": "Blue",
       "domain": "Sea",
-      "sidc": "100310000012110000000000000000",
+      "sidc": "100330000012010000000000000000",
       "position": {
         "latitude_deg": 13.584,
         "longitude_deg": 144.946,
@@ -190,7 +190,7 @@
       "name": "Exercise Carrier",
       "side": "Blue",
       "domain": "Sea",
-      "sidc": "100310000012110000000000000000",
+      "sidc": "100330000012010000000000000000",
       "position": {
         "latitude_deg": 13.584,
         "longitude_deg": 144.95,

@@ -61,6 +61,10 @@ services:
           path: ./data/sensing
           target: /workspace/data/sensing
           initial_sync: true
+        - action: sync+restart
+          path: ./data/logistics
+          target: /workspace/data/logistics
+          initial_sync: true
         - action: sync
           path: ./data/scenarios
           target: /workspace/data/scenarios
@@ -112,6 +116,10 @@ services:
             - Dockerfile
         - action: rebuild
           path: ./web/package.json
+        - action: sync
+          path: ./data/logistics
+          target: /data/logistics
+          initial_sync: true
         - action: rebuild
           path: ./web/package-lock.json
         - action: rebuild
